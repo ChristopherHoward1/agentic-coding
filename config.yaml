@@ -1,0 +1,20 @@
+# The one knob. Everything vendor- or project-specific lives here.
+
+profile: software            # software | machine-learning | database
+
+models:
+  orchestrator: inherit      # the main Claude Code session
+  plan_reviewer: sonnet      # fresh subagent, .claude/agents/plan-reviewer.md
+  code_reviewer: sonnet      # fresh subagent, .claude/agents/code-reviewer.md
+
+implementer:
+  runtime: codex             # codex | claude | custom
+  # Command receives the handoff on stdin, runs inside the worktree.
+  command: 'codex exec --sandbox workspace-write -'
+
+gate:
+  command: scripts/gate.sh
+  max_retries: 2             # failed-gate feedback loops before escalating to the Owner
+
+worktrees:
+  dir: ../agentic-coding-worktrees
