@@ -4,16 +4,19 @@ One screen, always. Reasoning lives in work units — link, don't restate.
 
 ## Objective
 
-_What this project is trying to be. One paragraph max._
+An end-to-end agentic development framework for a solo developer: skills-driven plan/implement/review loop, mechanically enforced writer≠reviewer, deterministic gate, worktree isolation. Thin by design — framework work stops the moment real use stops demanding it.
 
 ## Now
 
-_The active work unit(s), one line each: `work/<slug>` — what and why._
+- Shakedown: run `/init` on this repo, then dogfood the full loop on a first real task (add CI). See `work/bootstrap-retro.md` for the ordered task list and known gaps.
 
 ## Decisions
 
-_One line each, newest first: date — decision — link to work unit or commit._
+- 2026-08-15 — No custom runtime; Claude Code is the orchestrator (Overstory's archival was the cautionary tale) — `3b80c19`
+- 2026-08-15 — Gate is a shell script with an exit-code contract; agents never overrule it — `3b80c19`
+- 2026-08-15 — knowledge/ starts empty; docs earn their way in — `3b80c19`
 
 ## Risks
 
-_Top 3 at most. If a risk isn't shaping current decisions, it doesn't belong here._
+- The agent loop is untested end-to-end — everything above the shell layer is hypothesis until the dogfood cycle runs.
+- Correlated validators: orchestrator and reviewers are both Claude; deterministic checks carry the weight, agent agreement corroborates.
