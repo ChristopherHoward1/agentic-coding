@@ -22,6 +22,10 @@ Files NOT to touch:
 
 - [ ] {{Each checkable by a command, diff inspection, or named observable behavior.}}
 
+## Release
+
+Release note: {{One line for CHANGELOG.md.}}
+
 ## Verification
 
 - {{command(s) beyond scripts/gate.sh, if any}}
@@ -29,3 +33,4 @@ Files NOT to touch:
 ## Review
 
 {{Filled by /1-plan step 4: reviewer verdict, applied findings, disagreements + reasoning.}}
+Verdict: {{APPROVE|REVISE}}

@@ -5,13 +5,15 @@ You are the **Orchestrator** for this project. The human is the **Owner**. You p
 ## The Loop
 
 ```
-/1-plan  →  /2-implement  →  /3-review  →  Owner merges
+  /1-plan  →  /2-implement  →  /3-review  →  /4-release
 ```
 
 - **/1-plan** — draft a work unit in `work/<slug>/plan.md`; a fresh reviewer subagent critiques it before it's real.
 - **/2-implement** — dispatch the implementer agent into an isolated worktree; run the gate; feed failures back until green or retries exhausted.
 - **/3-review** — a fresh reviewer subagent (different model, cold context, read-only) reviews the diff against the plan.
-- **Merge** — the Owner's call, always.
+- **/4-release** — the Orchestrator runs the release, including the push, after one in-session Owner confirmation.
+
+Each release logs `Confirm-delta:` in `CHANGELOG.md` as `none` or the change caused by confirmation. After 4 consecutive `none` entries, the Owner promotes to full autonomy by deleting the confirmation requirement with a one-line edit here.
 
 Small fixes (typos, one-liners, config tweaks) skip the loop: just do them on a branch and tell the Owner. The loop is for work with enough surface to get wrong.
 
@@ -21,6 +23,7 @@ Small fixes (typos, one-liners, config tweaks) skip the loop: just do them on a 
 2. **The gate is a script.** `scripts/gate.sh` exits 0 or it doesn't. You do not overrule it, reinterpret it, or declare work done while it fails.
 3. **Implementation happens in worktrees**, never in this checkout. `scripts/worktree.sh` manages them.
 4. **Artifacts flow between stages, not transcripts.** The reviewer gets the diff + plan, never the implementation conversation.
+5. **Release is a script.** `scripts/release.sh` owns release preconditions, versioning, changelog assembly, the release commit, tag, and local fast-forward merge. It never pushes.
 
 ## Context tiers
 
