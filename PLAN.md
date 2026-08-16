@@ -8,7 +8,7 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 
 ## Now
 
-- Shakedown: run `/init` on this repo, then dogfood the full loop on a first real task (add CI). See `work/bootstrap-retro.md` for the ordered task list and known gaps.
+- `/init` shakedown done (skill discovery, gate, codex all verified). Now dogfooding the full loop on the first real task: **`work/ci-workflow`** (add GitHub Actions CI) — approved, in `/2-implement`. See `work/bootstrap-retro.md` for the remaining task list, known gaps, and logged candidate improvements.
 
 ## Decisions
 
