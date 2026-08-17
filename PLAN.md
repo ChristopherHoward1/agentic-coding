@@ -8,7 +8,7 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 
 ## Now
 
-- First dogfood cycle shipped (`work/ci-workflow`, merged, CI green). Next: **`work/trip-release`** (/4-release stage + merge-authority amendment) — Owner decisions made, awaiting /1-plan review.
+- First dogfood cycle shipped (`work/ci-workflow`, merged, CI green). **`work/trip-release`** (/4-release stage + merge-authority amendment): implemented on `wt/trip-release`, code review APPROVE after 3 rounds — awaiting Owner merge.
 
 ## Decisions
 

@@ -1,6 +1,6 @@
 # /4-release stage + merge-authority amendment
 
-**Slug:** trip-release · **Date:** 2026-08-16 · **Status:** approved
+**Slug:** trip-release · **Date:** 2026-08-16 · **Status:** implemented — review APPROVE, awaiting Owner merge
 
 ## Context
 
@@ -53,4 +53,12 @@ Verdict: REVISE → revised 2026-08-16, all five findings applied, no disagreeme
 4. Staleness dirs and CalVer comparison underspecified → pinned git-log path set; numeric field-wise compare with MICRO ≥ 10 test.
 5. Simpler version → adopted (that's #1's resolution).
 
-**Status:** revised draft — awaiting Owner approval to mark approved and proceed to /2-implement.
+**Status:** revised draft — Owner approved 2026-08-16; implemented by codex on `wt/trip-release`.
+
+### Code review (3 rounds, fresh reviewer each)
+
+- R1 REVISE: broken ff-merge topology (git switch inside worktree), no tests, ambiguous verdict sentinel → all fixed.
+- R2 REVISE: "Owner merges; you never do" survived in /3-review skill; rollback didn't cover commit/tag failure → both fixed (trap-based rollback + regression test).
+- R3: all criteria verified, gate 17/17. Non-blocking nit: sentinel matches any line, relies on /3-review's overwrite-the-final-verdict discipline.
+
+Code-review verdict: APPROVE
