@@ -8,7 +8,7 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 
 ## Now
 
-- First dogfood cycle shipped (`work/ci-workflow`, merged, CI green). **`work/trip-release`** (/4-release stage + merge-authority amendment): implemented on `wt/trip-release`, code review APPROVE after 3 rounds — awaiting Owner merge.
+- Two dogfood cycles shipped: `work/ci-workflow` (CI green) and `work/trip-release` (/4-release stage + merge-authority amendment, merged 2026-08-17). Loop is now plan → implement → review → release; next release cuts 2026.8.1 and starts the k=4 Confirm-delta promotion clock.
 
 ## Decisions
 

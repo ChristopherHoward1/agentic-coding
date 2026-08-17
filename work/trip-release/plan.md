@@ -1,6 +1,6 @@
 # /4-release stage + merge-authority amendment
 
-**Slug:** trip-release · **Date:** 2026-08-16 · **Status:** implemented — review APPROVE, awaiting Owner merge
+**Slug:** trip-release · **Date:** 2026-08-16 · **Status:** merged (2026-08-17)
 
 ## Context
 
