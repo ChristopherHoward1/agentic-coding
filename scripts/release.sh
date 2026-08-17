@@ -170,6 +170,19 @@ check_ff_possible() {
     || die "main cannot fast-forward to $release_branch"
 }
 
+rollback_release() {
+  local status=$?
+  local pre_release_head="$1"
+  local new_version="$2"
+
+  trap - ERR
+  set +e
+  git tag -d "v$new_version" >/dev/null 2>&1
+  git reset --hard "$pre_release_head" >/dev/null 2>&1
+  echo "release: irreversible step failed; release commit and tag changes were rolled back" >&2
+  exit "$status"
+}
+
 release() {
   local slug="$1"
   local confirm_delta="$2"
@@ -209,6 +222,7 @@ release() {
 
   release_note=$(extract_release_note "$plan_path")
   pre_release_head=$(git rev-parse HEAD)
+  trap 'rollback_release "$pre_release_head" "$new_version"' ERR
 
   printf '%s\n' "$new_version" >VERSION
   prepend_changelog "$new_version" "$release_note" "$confirm_delta"
@@ -216,11 +230,8 @@ release() {
   git add VERSION CHANGELOG.md
   git commit -m "Release v$new_version"
   git tag "v$new_version"
-  if ! git -C "$main_checkout" merge --ff-only "$release_branch"; then
-    git tag -d "v$new_version" >/dev/null 2>&1 || true
-    git reset --hard "$pre_release_head" >/dev/null
-    die "fast-forward merge failed; release commit and tag were rolled back"
-  fi
+  git -C "$main_checkout" merge --ff-only "$release_branch"
+  trap - ERR
 
   cat <<EOF
 release: prepared v$new_version on local main

@@ -175,6 +175,33 @@ check "release happy path lands fast-forward on primary main and stops before pu
   [ \"\$(git -C '$REL_PRIMARY' rev-parse origin/main)\" = '$origin_before' ]
 "
 
+setup_release_fixture release-tag-race-rolls-back 2026.8.9 "Code-review verdict: APPROVE" pass fresh
+release_head_before=$(git -C "$REL_WORKTREE" rev-parse HEAD)
+real_git=$(command -v git)
+tag_fail_bin="$TMP/tag-fail-bin"
+mkdir -p "$tag_fail_bin"
+cat >"$tag_fail_bin/git" <<EOF
+#!/usr/bin/env bash
+if [[ "\$1" == tag && "\${2:-}" == v2026.8.10 ]]; then
+  "$real_git" tag v2026.8.10 HEAD~1
+fi
+"$real_git" "\$@"
+EOF
+chmod +x "$tag_fail_bin/git"
+check "release rolls back cleanly when tag creation fails after prechecks" bash -c "
+  cd '$REL_WORKTREE' &&
+  PATH='$tag_fail_bin:$REL_FAKEBIN':\$PATH bash scripts/release.sh demo >/dev/null 2>&1 &&
+  exit 1
+  status=\$?
+  [ \"\$status\" -ne 0 ] &&
+  [ \"\$(git rev-parse HEAD)\" = '$release_head_before' ] &&
+  [ \"\$(cat VERSION)\" = 2026.8.9 ] &&
+  git diff --quiet &&
+  git diff --cached --quiet &&
+  [ -z \"\$(git ls-files --others --exclude-standard)\" ] &&
+  ! git rev-parse --verify --quiet refs/tags/v2026.8.10
+"
+
 setup_release_fixture release-happy-primary 2026.8.9 "Code-review verdict: APPROVE" pass fresh
 check "release can be invoked from primary checkout" bash -c "cd '$REL_PRIMARY' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo && [ \"\$(cat VERSION)\" = 2026.8.10 ]"
 

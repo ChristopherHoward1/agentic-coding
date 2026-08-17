@@ -15,7 +15,7 @@ Input: a work unit whose worktree branch `wt/<slug>` passed the gate.
    - Substantive findings → back to the implementer via `/2-implement`'s followup flow (same worktree).
    - Trivial mechanical fixes (typo-grade) → you may fix them directly, but then the re-review in step 4 is mandatory, because you just became a writer.
 4. **Re-review after any change:** spawn a *new* fresh code-reviewer thread on the updated diff. Repeat until APPROVE or 3 rounds — after 3, escalate the open findings to the Owner rather than grinding.
-5. **Hand to the Owner:** verdict, findings summary (resolved and open), gate status, and the merge command. The Owner merges; you never do.
+5. **Hand off to release:** on APPROVE, report the verdict, findings summary (resolved and open), and gate status to the Owner, then proceed to `/4-release`. `/4-release` stops for the Owner's push confirmation under the release model.
 
 ## Rules
 

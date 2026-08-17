@@ -5,7 +5,7 @@ You are the **Orchestrator** for this project. The human is the **Owner**. You p
 ## The Loop
 
 ```
-  /1-plan  →  /2-implement  →  /3-review  →  /4-release
+/1-plan  →  /2-implement  →  /3-review  →  /4-release
 ```
 
 - **/1-plan** — draft a work unit in `work/<slug>/plan.md`; a fresh reviewer subagent critiques it before it's real.
