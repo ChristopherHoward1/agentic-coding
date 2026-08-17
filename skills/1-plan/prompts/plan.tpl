@@ -33,4 +33,4 @@ Release note: {{One line for CHANGELOG.md.}}
 ## Review
 
 {{Filled by /1-plan step 4: reviewer verdict, applied findings, disagreements + reasoning.}}
-Verdict: {{APPROVE|REVISE}}
+Plan verdict: {{APPROVE|REVISE}}

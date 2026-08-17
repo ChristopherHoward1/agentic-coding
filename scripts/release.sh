@@ -63,6 +63,7 @@ extract_release_note() {
   local plan_path="$1"
   local note
 
+  # Release notes are intentionally one line so changelog assembly stays deterministic.
   note=$(
     sed -n -E 's/^\**Release note:\**[[:space:]]*//p' "$plan_path" | head -n 1
   )
@@ -100,8 +101,8 @@ prepend_changelog() {
 
 check_verdict() {
   local plan_path="$1"
-  grep -qx 'Verdict: APPROVE' "$plan_path" \
-    || die "$plan_path must contain exact line: Verdict: APPROVE"
+  grep -qx 'Code-review verdict: APPROVE' "$plan_path" \
+    || die "$plan_path must contain exact line: Code-review verdict: APPROVE"
 }
 
 check_gate() {
@@ -130,30 +131,84 @@ check_version_exceeds() {
     || die "new version $new_version must exceed VERSION $current_version"
 }
 
+worktree_for_branch() {
+  local branch="$1"
+
+  git worktree list --porcelain | awk -v branch="refs/heads/$branch" '
+    $1 == "worktree" {
+      path = substr($0, 10)
+      next
+    }
+    $1 == "branch" && $2 == branch {
+      print path
+      found = 1
+      exit
+    }
+    END {
+      if (!found) exit 1
+    }
+  '
+}
+
+check_clean_worktree() {
+  local checkout="$1"
+  local label="$2"
+
+  git -C "$checkout" diff --quiet || die "$label has unstaged changes"
+  git -C "$checkout" diff --cached --quiet || die "$label has staged changes"
+  [[ -z "$(git -C "$checkout" ls-files --others --exclude-standard)" ]] \
+    || die "$label has untracked files"
+}
+
+check_ff_possible() {
+  local main_checkout="$1"
+  local release_branch="$2"
+
+  git -C "$main_checkout" rev-parse --verify --quiet "$release_branch" >/dev/null \
+    || die "missing release branch: $release_branch"
+  git -C "$main_checkout" merge-base --is-ancestor main "$release_branch" \
+    || die "main cannot fast-forward to $release_branch"
+}
+
 release() {
   local slug="$1"
   local confirm_delta="$2"
   local plan_path="work/$slug/plan.md"
-  local branch
+  local release_branch="wt/$slug"
+  local main_checkout
+  local release_checkout
   local current_version
   local new_version
   local release_note
+  local pre_release_head
 
-  [[ -f "$plan_path" ]] || die "missing work unit plan: $plan_path"
-  [[ -f VERSION ]] || die "missing VERSION"
+  main_checkout=$(worktree_for_branch main) \
+    || die "main must be checked out in the primary worktree"
+  release_checkout=$(worktree_for_branch "$release_branch") \
+    || die "$release_branch must be checked out in a linked worktree"
 
-  branch=$(git branch --show-current)
-  [[ -n "$branch" ]] || die "cannot release from detached HEAD"
+  [[ -f "$release_checkout/$plan_path" ]] || die "missing work unit plan: $plan_path"
+  [[ -f "$release_checkout/VERSION" ]] || die "missing VERSION"
 
+  cd "$release_checkout"
   current_version=$(<VERSION)
   new_version=$(next_version "$current_version")
 
   check_verdict "$plan_path"
+  check_clean_worktree "$release_checkout" "$release_branch"
+  check_clean_worktree "$main_checkout" "main checkout"
+  check_ff_possible "$main_checkout" "$release_branch"
+  git rev-parse --verify --quiet "refs/tags/v$new_version" >/dev/null \
+    && die "tag v$new_version already exists"
   check_gate
+  check_clean_worktree "$release_checkout" "$release_branch"
   check_archi_fresh
   check_version_exceeds "$new_version" "$current_version"
+  check_clean_worktree "$main_checkout" "main checkout"
+  check_ff_possible "$main_checkout" "$release_branch"
 
   release_note=$(extract_release_note "$plan_path")
+  pre_release_head=$(git rev-parse HEAD)
 
   printf '%s\n' "$new_version" >VERSION
   prepend_changelog "$new_version" "$release_note" "$confirm_delta"
@@ -161,8 +216,11 @@ release() {
   git add VERSION CHANGELOG.md
   git commit -m "Release v$new_version"
   git tag "v$new_version"
-  git switch main
-  git merge --ff-only "$branch"
+  if ! git -C "$main_checkout" merge --ff-only "$release_branch"; then
+    git tag -d "v$new_version" >/dev/null 2>&1 || true
+    git reset --hard "$pre_release_head" >/dev/null
+    die "fast-forward merge failed; release commit and tag were rolled back"
+  fi
 
   cat <<EOF
 release: prepared v$new_version on local main

@@ -20,4 +20,4 @@ Input: a work unit whose worktree branch `wt/<slug>` passed the gate.
 ## Rules
 
 - A reviewer thread is used exactly once. Re-reviews get new threads — a reviewer that already approved a direction is anchored.
-- Record the final verdict in `work/<slug>/plan.md → Review` as `Verdict: APPROVE|REVISE` and flip its status.
+- Record the final verdict in `work/<slug>/plan.md → Review` as `Code-review verdict: APPROVE|REVISE` and flip its status.
