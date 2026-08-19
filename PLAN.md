@@ -8,7 +8,7 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 
 ## Now
 
-- Two dogfood cycles shipped: `work/ci-workflow` (CI green) and `work/trip-release` (/4-release stage + merge-authority amendment, merged 2026-08-17). Loop is now plan → implement → review → release; next release cuts 2026.8.1 and starts the k=4 Confirm-delta promotion clock.
+- Nothing in flight. Next unit comes from `work/bootstrap-retro.md`'s remaining candidates. First `/4-release` cuts 2026.8.1 and starts the k=4 Confirm-delta promotion clock.
 
 ## Decisions
 
@@ -21,5 +21,5 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 
 ## Risks
 
-- The agent loop is untested end-to-end — everything above the shell layer is hypothesis until the dogfood cycle runs.
 - Correlated validators: orchestrator and reviewers are both Claude; deterministic checks carry the weight, agent agreement corroborates.
+- `/4-release` has never run for real — its tests pass, but the first live release (2026.8.1) is the actual validation.

@@ -1,6 +1,6 @@
 # CI: run the deterministic layer on PRs
 
-**Slug:** ci-workflow · **Date:** 2026-08-15 · **Status:** reviewed — APPROVE, merge-ready (gate PASS, commit 2b5964c)
+**Slug:** ci-workflow · **Date:** 2026-08-15 · **Status:** merged
 
 ## Goal
 
