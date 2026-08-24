@@ -1,6 +1,6 @@
 # Work profile — Atlassian/Bitbucket adaptation
 
-**Slug:** work-profile · **Date:** 2026-08-24 · **Status:** implemented
+**Slug:** work-profile · **Date:** 2026-08-24 · **Status:** merged
 
 ## Goal
 
