@@ -1,0 +1,21 @@
+image: ubuntu:latest
+
+pipelines:
+  branches:
+    main:
+      - step:
+          name: Deterministic layer
+          script:
+            - apt-get update && apt-get install -y shellcheck git
+            - git config --global user.email "ci@example.com" && git config --global user.name "CI"
+            - bash tests/test-scripts.sh
+            - bash scripts/gate.sh
+  pull-requests:
+    "**":
+      - step:
+          name: Deterministic layer
+          script:
+            - apt-get update && apt-get install -y shellcheck git
+            - git config --global user.email "ci@example.com" && git config --global user.name "CI"
+            - bash tests/test-scripts.sh
+            - bash scripts/gate.sh

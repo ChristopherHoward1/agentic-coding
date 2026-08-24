@@ -1,6 +1,6 @@
 # The one knob. Everything vendor- or project-specific lives here.
 
-profile: software            # software | machine-learning | database
+profile: software            # software | machine-learning | database | work
 
 models:
   orchestrator: inherit      # the main Claude Code session
@@ -11,6 +11,11 @@ implementer:
   runtime: codex             # codex | claude | custom
   # Command receives the handoff on stdin, runs inside the worktree.
   command: 'codex exec --sandbox workspace-write -'
+  # Claude Code implementer alternative:
+  # command: 'claude -p --dangerously-skip-permissions'
+
+review:
+  human_pr_review: self      # self | platform-team
 
 gate:
   command: scripts/gate.sh

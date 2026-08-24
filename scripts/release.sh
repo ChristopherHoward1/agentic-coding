@@ -11,8 +11,9 @@ Usage:
   scripts/release.sh check-version <new-version> [current-version]
   scripts/release.sh next-version [current-version]
 
-The full release path never pushes. It commits, tags, fast-forward merges to
-local main, then stops for the Owner-confirmed push step.
+The full release path never pushes. In self-review mode it commits, tags,
+fast-forward merges to local main, then stops for the Owner-confirmed push step.
+In platform-team mode it commits the bump on the release branch for PR review.
 EOF
 }
 
@@ -170,6 +171,27 @@ check_ff_possible() {
     || die "main cannot fast-forward to $release_branch"
 }
 
+human_pr_review_mode() {
+  local mode
+
+  mode=$(awk '/^review:/{f=1;next} f&&/human_pr_review:/{print $2; exit}' config.yaml)
+  mode=${mode:-self}
+  case "$mode" in
+    self|platform-team) printf '%s\n' "$mode" ;;
+    *) die "invalid review.human_pr_review '$mode' (expected self or platform-team)" ;;
+  esac
+}
+
+check_origin_main_ancestor() {
+  local release_branch="$1"
+
+  git fetch origin main
+  git rev-parse --verify --quiet origin/main >/dev/null \
+    || die "missing origin/main after fetch"
+  git merge-base --is-ancestor origin/main "$release_branch" \
+    || die "$release_branch is stale; rebase/sync your branch onto origin/main"
+}
+
 rollback_release() {
   local status=$?
   local pre_release_head="$1"
@@ -194,6 +216,7 @@ release() {
   local new_version
   local release_note
   local pre_release_head
+  local review_mode
 
   main_checkout=$(worktree_for_branch main) \
     || die "main must be checked out in the primary worktree"
@@ -206,19 +229,28 @@ release() {
   cd "$release_checkout"
   current_version=$(<VERSION)
   new_version=$(next_version "$current_version")
+  review_mode=$(human_pr_review_mode)
 
   check_verdict "$plan_path"
   check_clean_worktree "$release_checkout" "$release_branch"
   check_clean_worktree "$main_checkout" "main checkout"
-  check_ff_possible "$main_checkout" "$release_branch"
-  git rev-parse --verify --quiet "refs/tags/v$new_version" >/dev/null \
-    && die "tag v$new_version already exists"
+  if [[ "$review_mode" == self ]]; then
+    check_ff_possible "$main_checkout" "$release_branch"
+    git rev-parse --verify --quiet "refs/tags/v$new_version" >/dev/null \
+      && die "tag v$new_version already exists"
+  else
+    check_origin_main_ancestor "$release_branch"
+  fi
   check_gate
   check_clean_worktree "$release_checkout" "$release_branch"
   check_archi_fresh
   check_version_exceeds "$new_version" "$current_version"
   check_clean_worktree "$main_checkout" "main checkout"
-  check_ff_possible "$main_checkout" "$release_branch"
+  if [[ "$review_mode" == self ]]; then
+    check_ff_possible "$main_checkout" "$release_branch"
+  else
+    check_origin_main_ancestor "$release_branch"
+  fi
 
   release_note=$(extract_release_note "$plan_path")
   pre_release_head=$(git rev-parse HEAD)
@@ -229,14 +261,24 @@ release() {
 
   git add VERSION CHANGELOG.md
   git commit -m "Release v$new_version"
-  git tag "v$new_version"
-  git -C "$main_checkout" merge --ff-only "$release_branch"
+  if [[ "$review_mode" == self ]]; then
+    git tag "v$new_version"
+    git -C "$main_checkout" merge --ff-only "$release_branch"
+  fi
   trap - ERR
 
-  cat <<EOF
+  if [[ "$review_mode" == self ]]; then
+    cat <<EOF
 release: prepared v$new_version on local main
 release: stopped before push; push requires Owner confirmation in-session
 EOF
+  else
+    cat <<EOF
+release: prepared v$new_version on $release_branch
+release: no tag created; local main untouched
+release: push $release_branch, open a Bitbucket PR, and have a platform engineer merge it
+EOF
+  fi
 }
 
 if [[ $# -eq 0 ]]; then

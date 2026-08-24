@@ -58,6 +58,7 @@ setup_release_fixture() {
   local verdict_line="$3"
   local gate_mode="$4"
   local archi_mode="$5"
+  local review_mode="${6:-self}"
   local tmp_root="$TMP/$name"
 
   REL_PRIMARY="$tmp_root/primary"
@@ -84,10 +85,19 @@ if [[ -f GATE_FAIL ]]; then
   echo "GATE: FAIL"
   exit 1
 fi
+if compgen -G "scripts/gate.d/*.sh" >/dev/null; then
+  for hook in scripts/gate.d/*.sh; do
+    bash "$hook"
+  done
+fi
 echo "GATE: PASS"
 EOF
     chmod +x scripts/release.sh scripts/gate.sh
-    printf 'name: fixture\n' >config.yaml
+    {
+      printf 'name: fixture\n'
+      printf 'review:\n'
+      printf '  human_pr_review: %s\n' "$review_mode"
+    } >config.yaml
     printf 'merge rules\n' >CLAUDE.md
     printf '%s\n' "$version" >VERSION
     printf '# Changelog\n\nAll notable changes to this project are documented in this file.\n\n' >CHANGELOG.md
@@ -204,6 +214,74 @@ check "release rolls back cleanly when tag creation fails after prechecks" bash 
 
 setup_release_fixture release-happy-primary 2026.8.9 "Code-review verdict: APPROVE" pass fresh
 check "release can be invoked from primary checkout" bash -c "cd '$REL_PRIMARY' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo && [ \"\$(cat VERSION)\" = 2026.8.10 ]"
+
+setup_release_fixture release-platform-single 2026.8.9 "Code-review verdict: APPROVE" pass fresh platform-team
+origin_before=$(git -C "$REL_PRIMARY" rev-parse origin/main)
+main_before=$(git -C "$REL_PRIMARY" rev-parse main)
+check "platform-team release commits bump on branch without touching main or tagging" bash -c "
+  cd '$REL_WORKTREE' &&
+  PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo &&
+  [ \"\$(git -C '$REL_PRIMARY' rev-parse main)\" = '$main_before' ] &&
+  [ \"\$(git -C '$REL_PRIMARY' rev-parse origin/main)\" = '$origin_before' ] &&
+  [ \"\$(cat VERSION)\" = 2026.8.10 ] &&
+  [ \"\$(git log -1 --format=%s)\" = 'Release v2026.8.10' ] &&
+  ! git rev-parse --verify --quiet refs/tags/v2026.8.10
+"
+
+setup_release_fixture release-platform-sequential 2026.8.9 "Code-review verdict: APPROVE" pass fresh platform-team
+check "platform-team release refuses stale branch, then computes next micro after sync" bash -c "
+  set -e
+  cd '$REL_WORKTREE'
+  PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo
+  git push -q origin wt/demo:main
+  rel_b='$TMP/release-platform-sequential/b-wt'
+  git -C '$REL_PRIMARY' branch wt/b main
+  git -C '$REL_PRIMARY' worktree add -q \"\$rel_b\" wt/b
+  git -C \"\$rel_b\" config user.email tester@example.com
+  git -C \"\$rel_b\" config user.name Tester
+  mkdir -p \"\$rel_b/work/b\"
+  sed 's/# Demo/# B/' '$REL_WORKTREE/work/demo/plan.md' > \"\$rel_b/work/b/plan.md\"
+  git -C \"\$rel_b\" add work/b/plan.md
+  GIT_AUTHOR_DATE='2026-08-16T10:00:30Z' GIT_COMMITTER_DATE='2026-08-16T10:00:30Z' git -C \"\$rel_b\" commit -qm 'add b plan'
+  stale_out='$TMP/platform-stale.out'
+  if PATH='$REL_FAKEBIN':\$PATH bash \"\$rel_b/scripts/release.sh\" b >\"\$stale_out\" 2>&1; then
+    exit 1
+  fi
+  grep -q 'rebase/sync your branch onto origin/main' \"\$stale_out\"
+  git -C \"\$rel_b\" fetch -q origin main
+  git -C \"\$rel_b\" rebase -q origin/main
+  cd \"\$rel_b\"
+  PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh b
+  [ \"\$(cat VERSION)\" = 2026.8.11 ] &&
+  [ \"\$(git log -1 --format=%s)\" = 'Release v2026.8.11' ] &&
+  ! git rev-parse --verify --quiet refs/tags/v2026.8.11
+"
+
+setup_release_fixture release-platform-mid-gate 2026.8.9 "Code-review verdict: APPROVE" pass fresh platform-team
+mkdir -p "$REL_WORKTREE/scripts/gate.d"
+cat >"$REL_WORKTREE/scripts/gate.d/move-origin-main.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+repo='$REL_PRIMARY'
+printf 'platform merge during gate\n' >> "\$repo/platform.txt"
+git -C "\$repo" add platform.txt
+GIT_AUTHOR_DATE='2026-08-16T10:02:00Z' GIT_COMMITTER_DATE='2026-08-16T10:02:00Z' git -C "\$repo" commit -qm 'platform merge during gate'
+git -C "\$repo" push -q origin main
+EOF
+chmod +x "$REL_WORKTREE/scripts/gate.d/move-origin-main.sh"
+(
+  cd "$REL_WORKTREE" || exit 1
+  git add scripts/gate.d/move-origin-main.sh
+  GIT_AUTHOR_DATE="2026-08-16T10:00:30Z" GIT_COMMITTER_DATE="2026-08-16T10:00:30Z" git commit -qm "add mid-gate hook"
+)
+check "platform-team release catches origin/main moving during gate" bash -c "
+  cd '$REL_WORKTREE'
+  mid_gate_out='$TMP/platform-mid-gate.out'
+  if PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo >\"\$mid_gate_out\" 2>&1; then
+    exit 1
+  fi
+  grep -q 'rebase/sync your branch onto origin/main' \"\$mid_gate_out\"
+"
 
 # --- gate.sh runs and exits cleanly on this repo
 check "gate.sh runs on this repo" bash scripts/gate.sh
