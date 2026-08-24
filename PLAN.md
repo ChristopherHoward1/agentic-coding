@@ -8,7 +8,7 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 
 ## Now
 
-- Nothing in flight. Next unit comes from `work/bootstrap-retro.md`'s remaining candidates. First `/4-release` cuts 2026.8.1 and starts the k=4 Confirm-delta promotion clock.
+- `work/work-profile` landing in this release (2026.8.1) — the first live `/4-release`, starting the k=4 Confirm-delta promotion clock. After it: candidates from `work/bootstrap-retro.md`.
 
 ## Decisions
 
@@ -18,6 +18,7 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 - 2026-08-16 — Merge autonomy: confirm-then-push (C), auto-promoting to full TRIP (A) after 4 releases where the confirm changed nothing — `work/trip-release`
 - 2026-08-16 — CalVer, not SemVer; all release preconditions enforced by `release.sh` exit codes, never skill prose — `work/trip-release`
 - 2026-08-16 — Release validates ARCHI freshness but never regenerates it; `/compact` stays the only ARCHI pipeline — `work/trip-release`
+- 2026-08-24 — `work` profile for Atlassian/Bitbucket: config-selected release topology (self ff-merges main; platform-team fetch-guards `origin/main` + pushes a branch for PR), one template not a fork — `work/work-profile`
 
 ## Risks
 
