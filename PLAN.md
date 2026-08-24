@@ -8,7 +8,8 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 
 ## Now
 
-- `work/work-profile` landing in this release (2026.8.1) — the first live `/4-release`, starting the k=4 Confirm-delta promotion clock. After it: candidates from `work/bootstrap-retro.md`.
+- `work/work-profile` released as 2026.8.1 (k=4 Confirm-delta clock: 1/4, delta none).
+- `work/fan-implement` (approved, plan-reviewer APPROVE round 2) — opt-in best-of-N implement mode (`implementer.fan`); reduces per-run variance, does **not** close the correlated-validator risk. Next: `/2-implement`. After it: candidates from `work/bootstrap-retro.md`.
 
 ## Decisions
 
