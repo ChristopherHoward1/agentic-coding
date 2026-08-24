@@ -1,6 +1,6 @@
 # Work profile — Atlassian/Bitbucket adaptation
 
-**Slug:** work-profile · **Date:** 2026-08-24 · **Status:** approved
+**Slug:** work-profile · **Date:** 2026-08-24 · **Status:** implemented
 
 ## Goal
 
@@ -87,3 +87,6 @@ Release note: Add `work` profile with a config-selected release topology (self v
 **Round 4 (plan-reviewer, APPROVE):** two non-blocking implementation notes folded in — `bitbucket-pipelines.yml` mirrors `ci.yml` step-for-step incl. the git-identity step; `next_version` is read once (guard doesn't rebase, so VERSION is stable across the two checks).
 
 Plan verdict: APPROVE
+
+**Code review (code-reviewer, APPROVE):** all 7 acceptance criteria met; gate 20/20; shellcheck clean; footprint exact. Confirmed self mode byte-identical to main, the platform-team guard runs before+after the gate, no tag/no main-merge in platform-team, and the three new tests are non-vacuous (mid-gate test pushes a competing commit to origin during the gate and proves the post-gate re-check catches it). No blocking findings.
+Code-review verdict: APPROVE
