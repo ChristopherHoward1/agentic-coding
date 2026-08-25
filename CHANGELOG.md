@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.8.5] - 2026-08-25
+
+- /2-implement starts implementation branches from origin/main and seeds the plan onto the single-agent worktree — no manual rebase or plan-commit before release.
+- Confirm-delta: none
+
 ## [2026.8.4] - 2026-08-25
 
 - machine-learning profile ships a concrete notebook-collision policy (strip-outputs gate hook + ownership convention) for multi-author ML repos.
