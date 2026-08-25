@@ -23,7 +23,7 @@ Small fixes (typos, one-liners, config tweaks) skip the loop: just do them on a 
 2. **The gate is a script.** `scripts/gate.sh` exits 0 or it doesn't. You do not overrule it, reinterpret it, or declare work done while it fails.
 3. **Implementation happens in worktrees**, never in this checkout. `scripts/worktree.sh` manages them.
 4. **Artifacts flow between stages, not transcripts.** The reviewer gets the diff + plan, never the implementation conversation.
-5. **Release is a script.** `scripts/release.sh` owns release preconditions, versioning, changelog assembly, the release commit, tag, and local fast-forward merge. It never pushes.
+5. **Release is a script.** `scripts/release.sh` owns release preconditions, versioning, changelog assembly, and the release commit on the branch. It never pushes and never touches `main`; tagging happens in `/4-release` after the PR merges via `tag-after-merge`.
 
 ## Context tiers
 

@@ -8,12 +8,15 @@ usage() {
   cat <<'EOF'
 Usage:
   scripts/release.sh <slug> [--confirm-delta <text>]
+  scripts/release.sh tag-after-merge <slug>
   scripts/release.sh check-version <new-version> [current-version]
   scripts/release.sh next-version [current-version]
 
-The full release path never pushes. In self-review mode it commits, tags,
-fast-forward merges to local main, then stops for the Owner-confirmed push step.
-In platform-team mode it commits the bump on the release branch for PR review.
+The release path never pushes, never tags, and never touches main. It commits
+the version bump on the release branch for PR review.
+
+After the PR merges, tag-after-merge verifies origin/main is the release commit
+and creates the local version tag. The tag push is a separate confirmed step.
 EOF
 }
 
@@ -161,27 +164,6 @@ check_clean_worktree() {
     || die "$label has untracked files"
 }
 
-check_ff_possible() {
-  local main_checkout="$1"
-  local release_branch="$2"
-
-  git -C "$main_checkout" rev-parse --verify --quiet "$release_branch" >/dev/null \
-    || die "missing release branch: $release_branch"
-  git -C "$main_checkout" merge-base --is-ancestor main "$release_branch" \
-    || die "main cannot fast-forward to $release_branch"
-}
-
-human_pr_review_mode() {
-  local mode
-
-  mode=$(awk '/^review:/{f=1;next} f&&/human_pr_review:/{print $2; exit}' config.yaml)
-  mode=${mode:-self}
-  case "$mode" in
-    self|platform-team) printf '%s\n' "$mode" ;;
-    *) die "invalid review.human_pr_review '$mode' (expected self or platform-team)" ;;
-  esac
-}
-
 check_origin_main_ancestor() {
   local release_branch="$1"
 
@@ -195,13 +177,11 @@ check_origin_main_ancestor() {
 rollback_release() {
   local status=$?
   local pre_release_head="$1"
-  local new_version="$2"
 
   trap - ERR
   set +e
-  git tag -d "v$new_version" >/dev/null 2>&1
   git reset --hard "$pre_release_head" >/dev/null 2>&1
-  echo "release: irreversible step failed; release commit and tag changes were rolled back" >&2
+  echo "release: irreversible step failed; release commit was rolled back" >&2
   exit "$status"
 }
 
@@ -210,15 +190,13 @@ release() {
   local confirm_delta="$2"
   local plan_path="work/$slug/plan.md"
   local release_branch="wt/$slug"
-  local main_checkout
   local release_checkout
   local current_version
   local new_version
   local release_note
   local pre_release_head
-  local review_mode
 
-  main_checkout=$(worktree_for_branch main) \
+  worktree_for_branch main >/dev/null \
     || die "main must be checked out in the primary worktree"
   release_checkout=$(worktree_for_branch "$release_branch") \
     || die "$release_branch must be checked out in a linked worktree"
@@ -229,56 +207,63 @@ release() {
   cd "$release_checkout"
   current_version=$(<VERSION)
   new_version=$(next_version "$current_version")
-  review_mode=$(human_pr_review_mode)
 
   check_verdict "$plan_path"
   check_clean_worktree "$release_checkout" "$release_branch"
-  check_clean_worktree "$main_checkout" "main checkout"
-  if [[ "$review_mode" == self ]]; then
-    check_ff_possible "$main_checkout" "$release_branch"
-    git rev-parse --verify --quiet "refs/tags/v$new_version" >/dev/null \
-      && die "tag v$new_version already exists"
-  else
-    check_origin_main_ancestor "$release_branch"
-  fi
+  check_origin_main_ancestor "$release_branch"
   check_gate
   check_clean_worktree "$release_checkout" "$release_branch"
   check_archi_fresh
   check_version_exceeds "$new_version" "$current_version"
-  check_clean_worktree "$main_checkout" "main checkout"
-  if [[ "$review_mode" == self ]]; then
-    check_ff_possible "$main_checkout" "$release_branch"
-  else
-    check_origin_main_ancestor "$release_branch"
-  fi
+  check_origin_main_ancestor "$release_branch"
 
   release_note=$(extract_release_note "$plan_path")
   pre_release_head=$(git rev-parse HEAD)
-  trap 'rollback_release "$pre_release_head" "$new_version"' ERR
+  trap 'rollback_release "$pre_release_head"' ERR
 
   printf '%s\n' "$new_version" >VERSION
   prepend_changelog "$new_version" "$release_note" "$confirm_delta"
 
   git add VERSION CHANGELOG.md
   git commit -m "Release v$new_version"
-  if [[ "$review_mode" == self ]]; then
-    git tag "v$new_version"
-    git -C "$main_checkout" merge --ff-only "$release_branch"
-  fi
   trap - ERR
 
-  if [[ "$review_mode" == self ]]; then
-    cat <<EOF
-release: prepared v$new_version on local main
-release: stopped before push; push requires Owner confirmation in-session
-EOF
-  else
-    cat <<EOF
+  cat <<EOF
 release: prepared v$new_version on $release_branch
 release: no tag created; local main untouched
-release: push $release_branch, open a Bitbucket PR, and have a platform engineer merge it
+release: push $release_branch, open a PR, and merge it after review
 EOF
-  fi
+}
+
+tag_after_merge() {
+  local slug="$1"
+  local release_branch="wt/$slug"
+  local release_checkout
+  local version
+  local origin_version
+  local origin_subject
+
+  release_checkout=$(worktree_for_branch "$release_branch") \
+    || die "$release_branch must be checked out in a linked worktree"
+  [[ -f "$release_checkout/VERSION" ]] || die "missing VERSION in $release_branch"
+
+  git fetch origin main
+  git rev-parse --verify --quiet origin/main >/dev/null \
+    || die "missing origin/main after fetch"
+
+  version=$(<"$release_checkout/VERSION")
+  origin_version=$(git show origin/main:VERSION) \
+    || die "origin/main does not contain VERSION"
+  origin_subject=$(git log -1 --format=%s origin/main)
+
+  [[ "$origin_version" == "$version" && "$origin_subject" == "Release v$version" ]] \
+    || die "origin/main is not Release v$version (VERSION is $origin_version; subject is '$origin_subject')"
+
+  git rev-parse --verify --quiet "refs/tags/v$version" >/dev/null \
+    && die "tag v$version already exists"
+
+  git tag "v$version" origin/main
+  printf 'release: created local tag v%s on origin/main\n' "$version"
 }
 
 if [[ $# -eq 0 ]]; then
@@ -287,6 +272,10 @@ if [[ $# -eq 0 ]]; then
 fi
 
 case "$1" in
+  tag-after-merge)
+    [[ $# -eq 2 ]] || { usage; exit 2; }
+    tag_after_merge "$2"
+    ;;
   check-version)
     [[ $# -eq 2 || $# -eq 3 ]] || { usage; exit 2; }
     current=${3:-$(<VERSION)}

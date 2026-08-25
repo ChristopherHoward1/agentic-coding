@@ -58,7 +58,6 @@ setup_release_fixture() {
   local verdict_line="$3"
   local gate_mode="$4"
   local archi_mode="$5"
-  local review_mode="${6:-self}"
   local tmp_root="$TMP/$name"
 
   REL_PRIMARY="$tmp_root/primary"
@@ -93,11 +92,7 @@ fi
 echo "GATE: PASS"
 EOF
     chmod +x scripts/release.sh scripts/gate.sh
-    {
-      printf 'name: fixture\n'
-      printf 'review:\n'
-      printf '  human_pr_review: %s\n' "$review_mode"
-    } >config.yaml
+    printf 'name: fixture\n' >config.yaml
     printf 'merge rules\n' >CLAUDE.md
     printf '%s\n' "$version" >VERSION
     printf '# Changelog\n\nAll notable changes to this project are documented in this file.\n\n' >CHANGELOG.md
@@ -173,52 +168,21 @@ check_fails "release refuses when ARCHI.md is stale" bash -c "cd '$REL_WORKTREE'
 setup_release_fixture release-version-regresses 2026.9.0 "Code-review verdict: APPROVE" pass fresh
 check_fails "release refuses when computed version does not exceed VERSION" bash -c "cd '$REL_WORKTREE' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo"
 
-setup_release_fixture release-happy 2026.8.9 "Code-review verdict: APPROVE" pass fresh
-origin_before=$(git -C "$REL_PRIMARY" rev-parse origin/main)
-check "release happy path lands fast-forward on primary main and stops before push" bash -c "
-  cd '$REL_WORKTREE' &&
-  PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo &&
-  [ \"\$(git -C '$REL_PRIMARY' branch --show-current)\" = main ] &&
-  [ \"\$(cat '$REL_PRIMARY/VERSION')\" = 2026.8.10 ] &&
-  git -C '$REL_PRIMARY' merge-base --is-ancestor wt/demo main &&
-  git -C '$REL_PRIMARY' rev-parse --verify --quiet refs/tags/v2026.8.10 &&
-  [ \"\$(git -C '$REL_PRIMARY' rev-parse origin/main)\" = '$origin_before' ]
-"
-
-setup_release_fixture release-tag-race-rolls-back 2026.8.9 "Code-review verdict: APPROVE" pass fresh
-release_head_before=$(git -C "$REL_WORKTREE" rev-parse HEAD)
-real_git=$(command -v git)
-tag_fail_bin="$TMP/tag-fail-bin"
-mkdir -p "$tag_fail_bin"
-cat >"$tag_fail_bin/git" <<EOF
-#!/usr/bin/env bash
-if [[ "\$1" == tag && "\${2:-}" == v2026.8.10 ]]; then
-  "$real_git" tag v2026.8.10 HEAD~1
-fi
-"$real_git" "\$@"
-EOF
-chmod +x "$tag_fail_bin/git"
-check "release rolls back cleanly when tag creation fails after prechecks" bash -c "
-  cd '$REL_WORKTREE' &&
-  PATH='$tag_fail_bin:$REL_FAKEBIN':\$PATH bash scripts/release.sh demo >/dev/null 2>&1 &&
-  exit 1
-  status=\$?
-  [ \"\$status\" -ne 0 ] &&
-  [ \"\$(git rev-parse HEAD)\" = '$release_head_before' ] &&
-  [ \"\$(cat VERSION)\" = 2026.8.9 ] &&
-  git diff --quiet &&
-  git diff --cached --quiet &&
-  [ -z \"\$(git ls-files --others --exclude-standard)\" ] &&
-  ! git rev-parse --verify --quiet refs/tags/v2026.8.10
-"
-
 setup_release_fixture release-happy-primary 2026.8.9 "Code-review verdict: APPROVE" pass fresh
-check "release can be invoked from primary checkout" bash -c "cd '$REL_PRIMARY' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo && [ \"\$(cat VERSION)\" = 2026.8.10 ]"
+main_before=$(git -C "$REL_PRIMARY" rev-parse main)
+check "release can be invoked from primary checkout" bash -c "
+  cd '$REL_PRIMARY' &&
+  PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo &&
+  [ \"\$(git -C '$REL_PRIMARY' rev-parse main)\" = '$main_before' ] &&
+  [ \"\$(cat '$REL_PRIMARY/VERSION')\" = 2026.8.9 ] &&
+  [ \"\$(cat '$REL_WORKTREE/VERSION')\" = 2026.8.10 ] &&
+  ! git -C '$REL_WORKTREE' rev-parse --verify --quiet refs/tags/v2026.8.10
+"
 
-setup_release_fixture release-platform-single 2026.8.9 "Code-review verdict: APPROVE" pass fresh platform-team
+setup_release_fixture release-single 2026.8.9 "Code-review verdict: APPROVE" pass fresh
 origin_before=$(git -C "$REL_PRIMARY" rev-parse origin/main)
 main_before=$(git -C "$REL_PRIMARY" rev-parse main)
-check "platform-team release commits bump on branch without touching main or tagging" bash -c "
+check "release commits bump on branch without touching main, origin/main, or tagging" bash -c "
   cd '$REL_WORKTREE' &&
   PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo &&
   [ \"\$(git -C '$REL_PRIMARY' rev-parse main)\" = '$main_before' ] &&
@@ -228,13 +192,13 @@ check "platform-team release commits bump on branch without touching main or tag
   ! git rev-parse --verify --quiet refs/tags/v2026.8.10
 "
 
-setup_release_fixture release-platform-sequential 2026.8.9 "Code-review verdict: APPROVE" pass fresh platform-team
-check "platform-team release refuses stale branch, then computes next micro after sync" bash -c "
+setup_release_fixture release-sequential 2026.8.9 "Code-review verdict: APPROVE" pass fresh
+check "release refuses stale branch, then computes next micro after sync" bash -c "
   set -e
   cd '$REL_WORKTREE'
   PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo
   git push -q origin wt/demo:main
-  rel_b='$TMP/release-platform-sequential/b-wt'
+  rel_b='$TMP/release-sequential/b-wt'
   git -C '$REL_PRIMARY' branch wt/b main
   git -C '$REL_PRIMARY' worktree add -q \"\$rel_b\" wt/b
   git -C \"\$rel_b\" config user.email tester@example.com
@@ -243,7 +207,7 @@ check "platform-team release refuses stale branch, then computes next micro afte
   sed 's/# Demo/# B/' '$REL_WORKTREE/work/demo/plan.md' > \"\$rel_b/work/b/plan.md\"
   git -C \"\$rel_b\" add work/b/plan.md
   GIT_AUTHOR_DATE='2026-08-16T10:00:30Z' GIT_COMMITTER_DATE='2026-08-16T10:00:30Z' git -C \"\$rel_b\" commit -qm 'add b plan'
-  stale_out='$TMP/platform-stale.out'
+  stale_out='$TMP/release-stale.out'
   if PATH='$REL_FAKEBIN':\$PATH bash \"\$rel_b/scripts/release.sh\" b >\"\$stale_out\" 2>&1; then
     exit 1
   fi
@@ -257,15 +221,15 @@ check "platform-team release refuses stale branch, then computes next micro afte
   ! git rev-parse --verify --quiet refs/tags/v2026.8.11
 "
 
-setup_release_fixture release-platform-mid-gate 2026.8.9 "Code-review verdict: APPROVE" pass fresh platform-team
+setup_release_fixture release-mid-gate 2026.8.9 "Code-review verdict: APPROVE" pass fresh
 mkdir -p "$REL_WORKTREE/scripts/gate.d"
 cat >"$REL_WORKTREE/scripts/gate.d/move-origin-main.sh" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 repo='$REL_PRIMARY'
-printf 'platform merge during gate\n' >> "\$repo/platform.txt"
-git -C "\$repo" add platform.txt
-GIT_AUTHOR_DATE='2026-08-16T10:02:00Z' GIT_COMMITTER_DATE='2026-08-16T10:02:00Z' git -C "\$repo" commit -qm 'platform merge during gate'
+printf 'merge during gate\n' >> "\$repo/remote-change.txt"
+git -C "\$repo" add remote-change.txt
+GIT_AUTHOR_DATE='2026-08-16T10:02:00Z' GIT_COMMITTER_DATE='2026-08-16T10:02:00Z' git -C "\$repo" commit -qm 'merge during gate'
 git -C "\$repo" push -q origin main
 EOF
 chmod +x "$REL_WORKTREE/scripts/gate.d/move-origin-main.sh"
@@ -274,13 +238,56 @@ chmod +x "$REL_WORKTREE/scripts/gate.d/move-origin-main.sh"
   git add scripts/gate.d/move-origin-main.sh
   GIT_AUTHOR_DATE="2026-08-16T10:00:30Z" GIT_COMMITTER_DATE="2026-08-16T10:00:30Z" git commit -qm "add mid-gate hook"
 )
-check "platform-team release catches origin/main moving during gate" bash -c "
+check "release catches origin/main moving during gate" bash -c "
   cd '$REL_WORKTREE'
-  mid_gate_out='$TMP/platform-mid-gate.out'
+  mid_gate_out='$TMP/release-mid-gate.out'
   if PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo >\"\$mid_gate_out\" 2>&1; then
     exit 1
   fi
   grep -q 'rebase/sync your branch onto origin/main' \"\$mid_gate_out\"
+"
+
+setup_release_fixture release-tag-after-merge-happy 2026.8.9 "Code-review verdict: APPROVE" pass fresh
+real_git=$(command -v git)
+push_log="$TMP/tag-after-merge-push.log"
+tag_guard_bin="$TMP/tag-after-merge-bin"
+mkdir -p "$tag_guard_bin"
+cat >"$tag_guard_bin/git" <<EOF
+#!/usr/bin/env bash
+if [[ "\$1" == push ]]; then
+  printf 'unexpected push\n' >> "$push_log"
+  exit 99
+fi
+"$real_git" "\$@"
+EOF
+chmod +x "$tag_guard_bin/git"
+check "tag-after-merge creates local tag on origin/main and pushes nothing" bash -c "
+  cd '$REL_WORKTREE' &&
+  PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo &&
+  git push -q origin wt/demo:main &&
+  PATH='$tag_guard_bin:$REL_FAKEBIN':\$PATH bash scripts/release.sh tag-after-merge demo &&
+  [ \"\$(git rev-parse refs/tags/v2026.8.10)\" = \"\$(git rev-parse origin/main)\" ] &&
+  [ ! -s '$push_log' ]
+"
+
+setup_release_fixture release-tag-after-merge-wrong-commit 2026.8.9 "Code-review verdict: APPROVE" pass fresh
+check "tag-after-merge refuses when origin/main advanced past the release" bash -c "
+  set -e
+  cd '$REL_WORKTREE'
+  PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo
+  git push -q origin wt/demo:main
+  git -C '$REL_PRIMARY' fetch -q origin main
+  git -C '$REL_PRIMARY' reset -q --hard origin/main
+  printf 'next change\n' > '$REL_PRIMARY/after-release.txt'
+  git -C '$REL_PRIMARY' add after-release.txt
+  GIT_AUTHOR_DATE='2026-08-16T10:03:00Z' GIT_COMMITTER_DATE='2026-08-16T10:03:00Z' git -C '$REL_PRIMARY' commit -qm 'Next change'
+  git -C '$REL_PRIMARY' push -q origin main
+  wrong_out='$TMP/tag-after-merge-wrong.out'
+  if PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh tag-after-merge demo >\"\$wrong_out\" 2>&1; then
+    exit 1
+  fi
+  grep -q 'origin/main is not Release v2026.8.10' \"\$wrong_out\" &&
+  ! git rev-parse --verify --quiet refs/tags/v2026.8.10
 "
 
 # --- gate.sh runs and exits cleanly on this repo
