@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.8.3] - 2026-08-25
+
+- Add opt-in best-of-N implement mode (`implementer.fan`) — N Claude samples in isolated worktrees, gate-filtered, winner picked by a fresh selector; default N=1 unchanged.
+- Confirm-delta: none
+
 ## [2026.8.2] - 2026-08-25
 
 - Collapse to a single PR-merge release topology under protected `main` — `release.sh` never touches `main`, `/4-release` pushes the branch for a PR and tags after it merges; the `self` direct-push mode and `review.human_pr_review` knob are removed.
