@@ -8,7 +8,7 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 
 ## Now
 
-- `work/work-profile` released as 2026.8.1 (k=4 Confirm-delta clock: 1/4, delta none).
+- k=4 Confirm-delta clock: **2/4** (2026.8.1 + 2026.8.2, both delta none) — 2 more clean releases promote to full TRIP.
 - `work/fan-implement` (approved, plan-reviewer APPROVE round 2) — opt-in best-of-N implement mode (`implementer.fan`); reduces per-run variance, does **not** close the correlated-validator risk. Next: `/2-implement`. After it: candidates from `work/bootstrap-retro.md`.
 
 ## Decisions
@@ -19,9 +19,10 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 - 2026-08-16 — Merge autonomy: confirm-then-push (C), auto-promoting to full TRIP (A) after 4 releases where the confirm changed nothing — `work/trip-release`
 - 2026-08-16 — CalVer, not SemVer; all release preconditions enforced by `release.sh` exit codes, never skill prose — `work/trip-release`
 - 2026-08-16 — Release validates ARCHI freshness but never regenerates it; `/compact` stays the only ARCHI pipeline — `work/trip-release`
-- 2026-08-24 — `work` profile for Atlassian/Bitbucket: config-selected release topology (self ff-merges main; platform-team fetch-guards `origin/main` + pushes a branch for PR), one template not a fork — `work/work-profile`
+- 2026-08-24 — `work` profile for Atlassian/Bitbucket: config-selected release topology (self ff-merges main; platform-team fetch-guards `origin/main` + pushes a branch for PR), one template not a fork — `work/work-profile` *(topology superseded 2026-08-25)*
+- 2026-08-25 — One universal PR-merge release topology under protected `main`; `self` direct-push + `review.human_pr_review` knob removed; tagging moves post-merge to `release.sh tag-after-merge` (verify-then-tag, no push) — `work/pr-merge-topology`
 
 ## Risks
 
 - Correlated validators: orchestrator and reviewers are both Claude; deterministic checks carry the weight, agent agreement corroborates.
-- `/4-release` has never run for real — its tests pass, but the first live release (2026.8.1) is the actual validation.
+- The PR-merge flow's `tag-after-merge` verify assumes the PR lands as a fast-forward/rebase so `origin/main`'s tip stays the `Release v<version>` commit; a merge-commit or squash strategy would (correctly) fail the guard and block tagging.

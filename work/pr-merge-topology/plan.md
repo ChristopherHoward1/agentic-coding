@@ -1,6 +1,6 @@
 # PR-merge as the only release topology
 
-**Slug:** pr-merge-topology · **Date:** 2026-08-25 · **Status:** implemented
+**Slug:** pr-merge-topology · **Date:** 2026-08-25 · **Status:** merged
 
 ## Goal
 
