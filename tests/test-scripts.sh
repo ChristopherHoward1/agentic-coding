@@ -226,6 +226,60 @@ check_fails "worktree add without slug fails" bash -c "cd '$SB' && bash wt.sh ad
 # --- agent-exec.sh argument validation
 check_fails "agent-exec rejects missing handoff" bash scripts/agent-exec.sh /tmp nonexistent-handoff.md
 
+# --- opt-in notebook cleanliness hook
+NB_REPO="$TMP/notebook-clean"
+git init -q -b main "$NB_REPO"
+(
+  cd "$NB_REPO" || exit 1
+  git config user.email tester@example.com
+  git config user.name Tester
+  mkdir -p scripts/gate.d notebooks/cb
+  cp "$ROOT/scripts/gate.d/examples/nb-clean.sh" scripts/gate.d/nb-clean.sh
+  cat >notebooks/cb/dirty.ipynb <<'EOF'
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": ["trained\n"]
+    }
+   ],
+   "source": ["print('trained')\n"]
+  }
+ ],
+ "metadata": {},
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+EOF
+  cat >notebooks/cb/clean.ipynb <<'EOF'
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": ["print('clean')\n"]
+  }
+ ],
+ "metadata": {},
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+EOF
+  git add -A
+  git commit -qm notebooks
+)
+check_fails "notebook hook flags dirty tracked notebook" bash -c "cd '$NB_REPO' && bash scripts/gate.d/nb-clean.sh"
+cp "$NB_REPO/notebooks/cb/clean.ipynb" "$NB_REPO/notebooks/cb/dirty.ipynb"
+check "notebook hook passes cleaned tracked notebook" bash -c "cd '$NB_REPO' && bash scripts/gate.d/nb-clean.sh"
+
 # --- fan-exec.sh dispatch/adopt in a hermetic repo with a canned implementer
 setup_fan_fixture fan-basic
 fan_manifest="$TMP/fan-manifest.out"

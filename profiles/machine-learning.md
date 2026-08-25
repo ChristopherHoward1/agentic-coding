@@ -8,7 +8,7 @@ For projects where model/data quality — not just code correctness — defines 
 - **GROUND_TRUTH_SOURCE** — where labels/truth come from, and their known limits.
 - **EVAL_COMMAND** — the command that produces the metric. This goes in `scripts/gate.d/eval.sh` when cheap enough to run per-change; otherwise it runs at /3-review.
 - **DATA_REGIME** — offline vs. online; what data the system sees in production vs. training.
-- **NOTEBOOK_STRATEGY** — notebooks are exploratory-only (default) or first-class; if first-class, name how they're reviewed and executed headlessly.
+- **NOTEBOOK_STRATEGY** — notebooks are exploratory-only by default: they do not gate correctness and are not reviewed as product artifacts. Shared or correctness-critical logic moves to a `.py` module covered by the normal gate. Notebooks are single-author scratch files under an owner namespace such as `notebooks/<initials>/...`; two people do not co-edit the same notebook. To keep JSON diffs mergeable, copy `scripts/gate.d/examples/nb-clean.sh` to `scripts/gate.d/nb-clean.sh` in ML/CV repos that track notebooks; it fails on tracked `*.ipynb` files with non-empty `outputs` or `execution_count`. Fix notebooks with `nbstripout --install` or `jupyter nbconvert --clear-output --inplace <notebook.ipynb>`.
 
 ## Adds to the loop
 
