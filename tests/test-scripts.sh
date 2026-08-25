@@ -131,16 +131,19 @@ setup_fan_fixture() {
   local tmp_root="$TMP/$name"
 
   FAN_PRIMARY="$tmp_root/primary"
+  FAN_REMOTE="$tmp_root/origin.git"
   FAN_WTS="$tmp_root/wts"
   FAN_IMPL="$tmp_root/canned-implementer.sh"
   FAN_HANDOFF="$FAN_PRIMARY/work/demo/handoff.md"
 
   mkdir -p "$tmp_root"
   git init -q -b main "$FAN_PRIMARY"
+  git init -q --bare "$FAN_REMOTE"
   (
     cd "$FAN_PRIMARY" || exit 1
     git config user.email tester@example.com
     git config user.name Tester
+    git remote add origin "$FAN_REMOTE"
 
     mkdir -p scripts work/demo
     cp "$ROOT/scripts/worktree.sh" scripts/worktree.sh
@@ -191,10 +194,11 @@ implementer:
 worktrees:
   dir: $FAN_WTS
 EOF
-    printf '# Demo plan\n' >work/demo/plan.md
-    printf 'handoff\n' >work/demo/handoff.md
     git add config.yaml scripts
     git commit -qm init
+    git push -q -u origin main
+    printf '# Demo plan\n' >work/demo/plan.md
+    printf 'handoff\n' >work/demo/handoff.md
   )
 }
 
@@ -222,6 +226,114 @@ check "worktree branch checked out" bash -c "cd '$WT_PATH' && [ \"\$(git branch 
 check "worktree.sh works FROM INSIDE a worktree (.git-as-file)" bash -c "cd '$WT_PATH' && bash wt.sh list"
 check "worktree remove" bash -c "cd '$SB' && bash wt.sh remove demo"
 check_fails "worktree add without slug fails" bash -c "cd '$SB' && bash wt.sh add"
+
+BASE_FEATURE="$TMP/base-feature"
+BASE_FEATURE_REMOTE="$TMP/base-feature.git"
+git init -q -b main "$BASE_FEATURE"
+git init -q --bare "$BASE_FEATURE_REMOTE"
+(
+  cd "$BASE_FEATURE" || exit 1
+  git config user.email tester@example.com
+  git config user.name Tester
+  git remote add origin "$BASE_FEATURE_REMOTE"
+  mkdir -p scripts
+  cp "$ROOT/scripts/worktree.sh" scripts/worktree.sh
+  printf 'worktrees:\n  dir: ../base-feature-wts\n' >config.yaml
+  printf 'main\n' >main.txt
+  git add -A
+  git commit -qm main
+  git push -q -u origin main
+  git switch -q -c feature
+  printf 'feature\n' >feature.txt
+  git add feature.txt
+  git commit -qm feature
+)
+BASE_FEATURE_WT=$(cd "$BASE_FEATURE" && bash scripts/worktree.sh add clean-base 2>/dev/null)
+check "worktree add bases new branch on origin/main from feature branch" bash -c "
+  cd '$BASE_FEATURE' &&
+  [ \"\$(git merge-base wt/clean-base origin/main)\" = \"\$(git rev-parse origin/main)\" ] &&
+  ! git -C '$BASE_FEATURE_WT' rev-parse --verify --quiet HEAD:feature.txt
+"
+
+NO_ORIGIN="$TMP/no-origin-main"
+git init -q -b main "$NO_ORIGIN"
+(
+  cd "$NO_ORIGIN" || exit 1
+  git config user.email tester@example.com
+  git config user.name Tester
+  mkdir -p scripts
+  cp "$ROOT/scripts/worktree.sh" scripts/worktree.sh
+  printf 'worktrees:\n  dir: ../no-origin-wts\n' >config.yaml
+  git add -A
+  git commit -qm init
+)
+NO_ORIGIN_HEAD=$(git -C "$NO_ORIGIN" rev-parse HEAD)
+NO_ORIGIN_WT=$(cd "$NO_ORIGIN" && bash scripts/worktree.sh add no-origin 2>/dev/null)
+check "worktree add falls back to HEAD without origin/main" bash -c "
+  [ -d '$NO_ORIGIN_WT' ] &&
+  [ \"\$(git -C '$NO_ORIGIN' rev-parse wt/no-origin)\" = '$NO_ORIGIN_HEAD' ]
+"
+
+STALE_REPO="$TMP/stale-origin-main"
+STALE_REMOTE="$TMP/stale-origin-main.git"
+git init -q -b main "$STALE_REPO"
+git init -q --bare "$STALE_REMOTE"
+(
+  cd "$STALE_REPO" || exit 1
+  git config user.email tester@example.com
+  git config user.name Tester
+  git remote add origin "$STALE_REMOTE"
+  mkdir -p scripts
+  cp "$ROOT/scripts/worktree.sh" scripts/worktree.sh
+  printf 'worktrees:\n  dir: ../stale-wts\n' >config.yaml
+  printf 'base\n' >base.txt
+  git add -A
+  git commit -qm base
+  git push -q -u origin main
+  printf 'head only\n' >head-only.txt
+  git add head-only.txt
+  git commit -qm head-only
+  git remote set-url origin "$TMP/missing-remote.git"
+)
+STALE_WT=$(cd "$STALE_REPO" && bash scripts/worktree.sh add stale-base 2>/dev/null)
+check "worktree add uses stale origin/main when fetch fails" bash -c "
+  cd '$STALE_REPO' &&
+  [ \"\$(git rev-parse wt/stale-base)\" = \"\$(git rev-parse origin/main)\" ] &&
+  ! git -C '$STALE_WT' rev-parse --verify --quiet HEAD:head-only.txt
+"
+
+SEED_REPO="$TMP/seed-plan"
+SEED_REMOTE="$TMP/seed-plan.git"
+git init -q -b main "$SEED_REPO"
+git init -q --bare "$SEED_REMOTE"
+(
+  cd "$SEED_REPO" || exit 1
+  git config user.email tester@example.com
+  git config user.name Tester
+  git remote add origin "$SEED_REMOTE"
+  mkdir -p scripts work/seeded
+  cp "$ROOT/scripts/worktree.sh" scripts/worktree.sh
+  printf 'worktrees:\n  dir: ../seed-wts\n' >config.yaml
+  git add config.yaml scripts
+  git commit -qm init
+  git push -q -u origin main
+  printf '# Seeded plan\n' >work/seeded/plan.md
+)
+SEED_WT=$(cd "$SEED_REPO" && bash scripts/worktree.sh add seeded 2>/dev/null)
+check "worktree add commits plan.md and leaves worktree clean" bash -c "
+  cd '$SEED_REPO' &&
+  [ -n \"\$(git ls-tree -r --name-only wt/seeded -- work/seeded/plan.md)\" ] &&
+  [ \"\$(git -C '$SEED_WT' status --porcelain)\" = '' ]
+"
+SEED_PLAN_COMMITS_BEFORE=$(git -C "$SEED_REPO" log --format=%s wt/seeded | grep -c '^Record plan for seeded$')
+git -C "$SEED_REPO" worktree remove "$SEED_WT" >/dev/null
+SEED_WT_RESUME=$(cd "$SEED_REPO" && bash scripts/worktree.sh add seeded 2>/dev/null)
+SEED_PLAN_COMMITS_AFTER=$(git -C "$SEED_REPO" log --format=%s wt/seeded | grep -c '^Record plan for seeded$')
+check "worktree add resume path does not duplicate plan commit" bash -c "
+  [ -d '$SEED_WT_RESUME' ] &&
+  [ '$SEED_PLAN_COMMITS_BEFORE' = 1 ] &&
+  [ '$SEED_PLAN_COMMITS_AFTER' = 1 ]
+"
 
 # --- agent-exec.sh argument validation
 check_fails "agent-exec rejects missing handoff" bash scripts/agent-exec.sh /tmp nonexistent-handoff.md
@@ -323,7 +435,8 @@ check "fan adopt preserves auto-committed sample work and cleans samples" bash -
   git diff --name-only main...wt/demo >'$fan_no_commit_diff' &&
   grep -Fx result.txt '$fan_no_commit_diff' &&
   grep -Fx branch.txt '$fan_no_commit_diff' &&
-  ! grep -E '^work/demo/' '$fan_no_commit_diff' &&
+  grep -Fx work/demo/plan.md '$fan_no_commit_diff' &&
+  diff -u <(printf 'work/demo/plan.md\n') <(grep -E '^work/demo/' '$fan_no_commit_diff') &&
   ! git show-ref --verify --quiet refs/heads/wt/demo-fan-1 &&
   ! git show-ref --verify --quiet refs/heads/wt/demo-fan-2 &&
   ! git show-ref --verify --quiet refs/heads/wt/demo-fan-3 &&
