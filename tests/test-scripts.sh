@@ -149,8 +149,8 @@ setup_fan_fixture() {
 #!/usr/bin/env bash
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)" || exit 1
-[[ -f result.txt ]] || exit 1
-grep -qx pass result.txt
+tracked_result=$(git show HEAD:result.txt 2>/dev/null) || exit 1
+[[ "$tracked_result" == pass ]]
 EOF
     chmod +x scripts/*.sh
 
