@@ -1,6 +1,6 @@
 # fan-implement — best-of-N Claude implementer
 
-**Slug:** fan-implement · **Date:** 2026-08-24 · **Status:** approved
+**Slug:** fan-implement · **Date:** 2026-08-24 · **Status:** reviewed — merge-ready
 
 ## Goal
 
@@ -74,3 +74,12 @@ Release note: Add opt-in best-of-N implement mode (`implementer.fan`) — N Clau
 **Round 2 (plan-reviewer, APPROVE):** two implementation-time notes folded in — (a) N>1 skips step 1 so `wt/<slug>` doesn't exist when `adopt`'s `git branch -f` runs (force-update errors on a checked-out branch); (b) dispatch is intentionally sequential — dropped the "parallel" implication and noted N× wall-clock. Cosmetic `models.fan_selector` doc line added to the config footprint so it isn't treated as creep.
 
 Plan verdict: APPROVE
+
+**Code-review (post-implementation):** 5 rounds, all fresh code-reviewer threads (sonnet, cold, read-only).
+- R1 REVISE → empty-array `${passers[@]}` crash on 0-survivor path under bash 3.2 `set -u`; loud seeding; 0-survivor test gap.
+- R2 REVISE → adopt lost uncommitted implementer work (`git branch -f` moves to last commit only; dirty `worktree remove` aborts). Fix: dispatch auto-commits samples.
+- R3 REVISE → gate ran *before* the auto-commit, so `git ls-files`-based shellcheck missed uncommitted new `.sh`. Fix: commit-before-gate.
+- R4 REVISE → adopt `worktree remove` lacked `--force` (gate writes untracked artifacts post-commit) and aborted cleanup on first failure; seeded `work/<slug>/` swept into adopted diff. Owner authorized rounds 4 and 5 past the 3-round ceiling.
+- R5 **APPROVE** — 26/26 gate, 6 new hermetic fan-exec cases. Non-blocking: no locked-worktree-failure test; no mid-dispatch partial-failure rollback (both house-convention-consistent).
+
+Code-review verdict: APPROVE
