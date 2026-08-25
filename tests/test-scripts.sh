@@ -126,6 +126,7 @@ EOF
 setup_fan_fixture() {
   local name="$1"
   local pass_mode="${2:-some}"
+  local commit_mode="${3:-commit}"
   local tmp_root="$TMP/$name"
 
   FAN_PRIMARY="$tmp_root/primary"
@@ -170,14 +171,16 @@ else
   printf 'fail\n' >result.txt
 fi
 printf '%s\n' "$branch" >branch.txt
-git add result.txt branch.txt work/demo/plan.md
-git commit -qm "implement $branch"
+if [[ "${FAN_COMMIT_MODE:-commit}" == commit ]]; then
+  git add result.txt branch.txt work/demo/plan.md
+  git commit -qm "implement $branch"
+fi
 EOF
     chmod +x "$FAN_IMPL"
 
     cat >config.yaml <<EOF
 implementer:
-  command: 'FAN_PASS_MODE=$pass_mode $FAN_IMPL'
+  command: 'FAN_PASS_MODE=$pass_mode FAN_COMMIT_MODE=$commit_mode $FAN_IMPL'
 worktrees:
   dir: $FAN_WTS
 EOF
@@ -229,6 +232,31 @@ check "fan adopt repoints canonical branch and cleans samples" bash -c "
   bash scripts/fan-exec.sh adopt demo wt/demo-fan-3 &&
   [ \"\$(git rev-parse wt/demo)\" = \"\$(git -C '$FAN_WTS/demo' rev-parse HEAD)\" ] &&
   [ \"\$(cat '$FAN_WTS/demo/branch.txt')\" = 'wt/demo-fan-3' ] &&
+  ! git show-ref --verify --quiet refs/heads/wt/demo-fan-1 &&
+  ! git show-ref --verify --quiet refs/heads/wt/demo-fan-2 &&
+  ! git show-ref --verify --quiet refs/heads/wt/demo-fan-3 &&
+  [ ! -e '$FAN_WTS/demo-fan-1' ] &&
+  [ ! -e '$FAN_WTS/demo-fan-2' ] &&
+  [ ! -e '$FAN_WTS/demo-fan-3' ]
+"
+setup_fan_fixture fan-no-commit some no-commit
+fan_no_commit_manifest="$TMP/fan-no-commit-manifest.out"
+check "fan dispatch auto-commits non-committing sample work" bash -c "
+  cd '$FAN_PRIMARY' &&
+  bash scripts/fan-exec.sh dispatch demo '$FAN_HANDOFF' 3 >'$fan_no_commit_manifest' &&
+  diff -u <(printf 'wt/demo-fan-2\nwt/demo-fan-3\n') '$fan_no_commit_manifest' &&
+  [ \"\$(git show wt/demo-fan-2:result.txt)\" = pass ] &&
+  [ \"\$(git show wt/demo-fan-2:branch.txt)\" = wt/demo-fan-2 ] &&
+  [ \"\$(git -C '$FAN_WTS/demo-fan-2' status --porcelain)\" = '' ] &&
+  [ \"\$(git log -1 --format=%s wt/demo-fan-2)\" = 'Fan sample implementation for wt/demo-fan-2' ]
+"
+check "fan adopt preserves auto-committed sample work and cleans samples" bash -c "
+  cd '$FAN_PRIMARY' &&
+  bash scripts/fan-exec.sh adopt demo wt/demo-fan-2 &&
+  [ \"\$(git rev-parse wt/demo)\" = \"\$(git -C '$FAN_WTS/demo' rev-parse HEAD)\" ] &&
+  [ \"\$(cat '$FAN_WTS/demo/result.txt')\" = pass ] &&
+  [ \"\$(cat '$FAN_WTS/demo/branch.txt')\" = 'wt/demo-fan-2' ] &&
+  [ \"\$(git -C '$FAN_WTS/demo' status --porcelain)\" = '' ] &&
   ! git show-ref --verify --quiet refs/heads/wt/demo-fan-1 &&
   ! git show-ref --verify --quiet refs/heads/wt/demo-fan-2 &&
   ! git show-ref --verify --quiet refs/heads/wt/demo-fan-3 &&

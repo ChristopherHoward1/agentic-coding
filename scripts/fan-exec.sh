@@ -40,11 +40,21 @@ seed_work_dir() {
   fi
 }
 
+commit_sample_changes() {
+  local wt="$1"
+  local branch="$2"
+
+  if [[ -n "$(git -C "$wt" status --porcelain)" ]]; then
+    git -C "$wt" add -A || exit 1
+    git -C "$wt" commit -qm "Fan sample implementation for $branch" || exit 1
+  fi
+}
+
 dispatch() {
   local slug="${1:-}"
   local handoff="${2:-}"
   local n="${3:-}"
-  local k wt branch gate_status
+  local k wt branch agent_status gate_status
   local passers=()
 
   [[ -n "$slug" && -n "$handoff" && -n "$n" ]] || usage
@@ -56,15 +66,18 @@ dispatch() {
     wt=$(scripts/worktree.sh add "$slug-fan-$k") || exit 1
     seed_work_dir "$slug" "$wt"
 
-    if scripts/agent-exec.sh "$wt" "$handoff"; then
+    scripts/agent-exec.sh "$wt" "$handoff"
+    agent_status=$?
+    if [[ $agent_status -eq 0 ]]; then
       (
         cd "$wt" || exit 1
         bash scripts/gate.sh
       )
       gate_status=$?
     else
-      gate_status=$?
+      gate_status=$agent_status
     fi
+    commit_sample_changes "$wt" "$branch"
 
     if [[ $gate_status -eq 0 ]]; then
       passers+=("$branch")
