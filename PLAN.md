@@ -8,8 +8,8 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 
 ## Now
 
-- k=4 Confirm-delta clock: **2/4** (2026.8.1 + 2026.8.2, both delta none) — 2 more clean releases promote to full TRIP.
-- `work/fan-implement` (approved, plan-reviewer APPROVE round 2) — opt-in best-of-N implement mode (`implementer.fan`); reduces per-run variance, does **not** close the correlated-validator risk. Next: `/2-implement`. After it: candidates from `work/bootstrap-retro.md`.
+- k=4 Confirm-delta clock: **3/4** (2026.8.1 + 2026.8.2 + 2026.8.3, all delta none) — 1 more clean release promotes to full TRIP.
+- Next candidates: `work/bootstrap-retro.md` (incl. the N=1 manual-seeding gap surfaced by `work/fan-implement`).
 
 ## Decisions
 
