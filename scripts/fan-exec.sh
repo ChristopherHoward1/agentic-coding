@@ -14,6 +14,7 @@ usage() {
 }
 
 worktree_dir() {
+  # Keep this naive config parse in sync with scripts/worktree.sh.
   awk '/^worktrees:/{f=1;next} f&&/dir:/{print $2; exit}' config.yaml
 }
 
@@ -68,6 +69,7 @@ dispatch() {
 
     scripts/agent-exec.sh "$wt" "$handoff"
     agent_status=$?
+    commit_sample_changes "$wt" "$branch"
     if [[ $agent_status -eq 0 ]]; then
       (
         cd "$wt" || exit 1
@@ -77,7 +79,6 @@ dispatch() {
     else
       gate_status=$agent_status
     fi
-    commit_sample_changes "$wt" "$branch"
 
     if [[ $gate_status -eq 0 ]]; then
       passers+=("$branch")
