@@ -44,10 +44,13 @@ seed_work_dir() {
 commit_sample_changes() {
   local wt="$1"
   local branch="$2"
+  local slug="$3"
 
   if [[ -n "$(git -C "$wt" status --porcelain)" ]]; then
-    git -C "$wt" add -A || exit 1
-    git -C "$wt" commit -qm "Fan sample implementation for $branch" || exit 1
+    git -C "$wt" add -A -- . ":(exclude)work/$slug" || exit 1
+    if ! git -C "$wt" diff --cached --quiet; then
+      git -C "$wt" commit -qm "Fan sample implementation for $branch" || exit 1
+    fi
   fi
 }
 
@@ -69,7 +72,7 @@ dispatch() {
 
     scripts/agent-exec.sh "$wt" "$handoff"
     agent_status=$?
-    commit_sample_changes "$wt" "$branch"
+    commit_sample_changes "$wt" "$branch" "$slug"
     if [[ $agent_status -eq 0 ]]; then
       (
         cd "$wt" || exit 1
@@ -96,6 +99,7 @@ adopt() {
   local slug="${1:-}"
   local sample="${2:-}"
   local sample_branch wt_dir wt_path ref branch
+  local cleanup_failed=0
   local branches=()
 
   [[ -n "$slug" && -n "$sample" ]] || usage
@@ -112,7 +116,10 @@ adopt() {
   wt_dir=${wt_dir:-../$(basename "$ROOT")-worktrees}
   for wt_path in "$wt_dir"/"$slug"-fan-*; do
     [[ -e "$wt_path" ]] || continue
-    git worktree remove "$wt_path" || exit 1
+    if ! git worktree remove --force "$wt_path"; then
+      echo "Error: failed to remove fan worktree: $wt_path" >&2
+      cleanup_failed=1
+    fi
   done
 
   while IFS= read -r ref; do
@@ -120,9 +127,14 @@ adopt() {
     branches+=("$branch")
   done < <(git for-each-ref --format='%(refname)' "refs/heads/wt/$slug-fan-*")
 
-  if [[ ${#branches[@]} -gt 0 ]]; then
-    git branch -D "${branches[@]}" || exit 1
-  fi
+  for branch in "${branches[@]}"; do
+    if ! git branch -D "$branch"; then
+      echo "Error: failed to delete fan branch: $branch" >&2
+      cleanup_failed=1
+    fi
+  done
+
+  [[ $cleanup_failed -eq 0 ]] || exit 1
 }
 
 cmd="${1:-}"

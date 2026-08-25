@@ -127,6 +127,7 @@ setup_fan_fixture() {
   local name="$1"
   local pass_mode="${2:-some}"
   local commit_mode="${3:-commit}"
+  local gate_dirty="${4:-clean}"
   local tmp_root="$TMP/$name"
 
   FAN_PRIMARY="$tmp_root/primary"
@@ -150,8 +151,14 @@ setup_fan_fixture() {
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)" || exit 1
 tracked_result=$(git show HEAD:result.txt 2>/dev/null) || exit 1
-[[ "$tracked_result" == pass ]]
+[[ "$tracked_result" == pass ]] || exit 1
 EOF
+    if [[ "$gate_dirty" == dirty ]]; then
+      cat >>scripts/gate.sh <<'EOF'
+mkdir -p .pytest_cache
+: >.pytest_cache/x
+EOF
+    fi
     chmod +x scripts/*.sh
 
     cat >"$FAN_IMPL" <<'EOF'
@@ -172,7 +179,7 @@ else
 fi
 printf '%s\n' "$branch" >branch.txt
 if [[ "${FAN_COMMIT_MODE:-commit}" == commit ]]; then
-  git add result.txt branch.txt work/demo/plan.md
+  git add result.txt branch.txt
   git commit -qm "implement $branch"
 fi
 EOF
@@ -186,7 +193,7 @@ worktrees:
 EOF
     printf '# Demo plan\n' >work/demo/plan.md
     printf 'handoff\n' >work/demo/handoff.md
-    git add -A
+    git add config.yaml scripts
     git commit -qm init
   )
 }
@@ -247,9 +254,11 @@ check "fan dispatch auto-commits non-committing sample work" bash -c "
   diff -u <(printf 'wt/demo-fan-2\nwt/demo-fan-3\n') '$fan_no_commit_manifest' &&
   [ \"\$(git show wt/demo-fan-2:result.txt)\" = pass ] &&
   [ \"\$(git show wt/demo-fan-2:branch.txt)\" = wt/demo-fan-2 ] &&
-  [ \"\$(git -C '$FAN_WTS/demo-fan-2' status --porcelain)\" = '' ] &&
+  [ -z \"\$(git ls-tree -r --name-only wt/demo-fan-2 -- work/demo)\" ] &&
+  [ -f '$FAN_WTS/demo-fan-2/work/demo/plan.md' ] &&
   [ \"\$(git log -1 --format=%s wt/demo-fan-2)\" = 'Fan sample implementation for wt/demo-fan-2' ]
 "
+fan_no_commit_diff="$TMP/fan-no-commit-diff.out"
 check "fan adopt preserves auto-committed sample work and cleans samples" bash -c "
   cd '$FAN_PRIMARY' &&
   bash scripts/fan-exec.sh adopt demo wt/demo-fan-2 &&
@@ -257,6 +266,25 @@ check "fan adopt preserves auto-committed sample work and cleans samples" bash -
   [ \"\$(cat '$FAN_WTS/demo/result.txt')\" = pass ] &&
   [ \"\$(cat '$FAN_WTS/demo/branch.txt')\" = 'wt/demo-fan-2' ] &&
   [ \"\$(git -C '$FAN_WTS/demo' status --porcelain)\" = '' ] &&
+  git diff --name-only main...wt/demo >'$fan_no_commit_diff' &&
+  grep -Fx result.txt '$fan_no_commit_diff' &&
+  grep -Fx branch.txt '$fan_no_commit_diff' &&
+  ! grep -E '^work/demo/' '$fan_no_commit_diff' &&
+  ! git show-ref --verify --quiet refs/heads/wt/demo-fan-1 &&
+  ! git show-ref --verify --quiet refs/heads/wt/demo-fan-2 &&
+  ! git show-ref --verify --quiet refs/heads/wt/demo-fan-3 &&
+  [ ! -e '$FAN_WTS/demo-fan-1' ] &&
+  [ ! -e '$FAN_WTS/demo-fan-2' ] &&
+  [ ! -e '$FAN_WTS/demo-fan-3' ]
+"
+setup_fan_fixture fan-dirty-gate some no-commit dirty
+fan_dirty_gate_manifest="$TMP/fan-dirty-gate-manifest.out"
+check "fan adopt force-cleans dirty sample worktrees and branches" bash -c "
+  cd '$FAN_PRIMARY' &&
+  bash scripts/fan-exec.sh dispatch demo '$FAN_HANDOFF' 3 >'$fan_dirty_gate_manifest' &&
+  diff -u <(printf 'wt/demo-fan-2\nwt/demo-fan-3\n') '$fan_dirty_gate_manifest' &&
+  [ -f '$FAN_WTS/demo-fan-2/.pytest_cache/x' ] &&
+  bash scripts/fan-exec.sh adopt demo wt/demo-fan-3 &&
   ! git show-ref --verify --quiet refs/heads/wt/demo-fan-1 &&
   ! git show-ref --verify --quiet refs/heads/wt/demo-fan-2 &&
   ! git show-ref --verify --quiet refs/heads/wt/demo-fan-3 &&
