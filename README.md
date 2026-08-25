@@ -20,35 +20,27 @@ Each stage produces an **artifact** (a plan, a diff, a release commit), and each
 flowchart TD
     Owner([Owner: what to build]):::human --> Draft
 
-    subgraph P1["/1-plan"]
-        Draft["Orchestrator drafts<br/>work/slug/plan.md"] --> PRev{{plan-reviewer<br/>fresh · cold · read-only}}:::grill
-        PRev -- "REVISE" --> Draft
-    end
+    Draft["<b>/1-plan</b><br/>Orchestrator drafts work/slug/plan.md"] --> PRev{{"plan-reviewer<br/>fresh · cold · read-only"}}:::grill
+    PRev -- "REVISE" --> Draft
     PRev -- "Plan verdict: APPROVE" --> Impl
 
-    subgraph P2["/2-implement · isolated worktree wt/slug"]
-        Impl[Implementer writes code<br/>configurable · default Codex] --> Gate{"scripts/gate.sh<br/>exit 0 or not"}
-        Gate -- "fail — output IS the retry prompt" --> Impl
-    end
+    Impl["<b>/2-implement</b><br/>implementer writes code in isolated worktree wt/slug<br/>configurable · default Codex"] --> Gate{"scripts/gate.sh<br/>exit 0 or not"}
+    Gate -- "fail — output IS the retry prompt" --> Impl
     Gate -- "pass" --> CRev
 
-    subgraph P3["/3-review"]
-        CRev{{code-reviewer<br/>NEW fresh thread · different model<br/>sees diff + plan only}}:::grill
-        CRev -- "REVISE — back to the implementer" --> Impl
-    end
+    CRev{{"<b>/3-review</b><br/>code-reviewer · NEW fresh thread · different model<br/>sees diff + plan only"}}:::grill
+    CRev -- "REVISE — back to the implementer" --> Impl
     CRev -- "Code-review verdict: APPROVE" --> Rel
 
-    subgraph P4["/4-release"]
-        Rel[release.sh<br/>re-runs gate + preconditions<br/>bumps version on branch] --> Merge["Owner merges PR<br/>rebase / fast-forward"]:::human
-        Merge --> Tag[tag-after-merge<br/>verify origin/main, then tag]
-    end
+    Rel["<b>/4-release</b><br/>release.sh re-runs gate + preconditions<br/>bumps version on branch"] --> Merge["Owner merges PR<br/>rebase / fast-forward"]:::human
+    Merge --> Tag["tag-after-merge<br/>verify origin/main, then tag"]
     Tag --> Done([tagged release]):::human
 
     classDef grill fill:#f9e6f2,stroke:#b34a8c,stroke-width:2px,color:#000;
     classDef human fill:#e8f0ff,stroke:#3a6ea5,stroke-width:2px,color:#000;
 ```
 
-`{{hexagons}}` are the **adversarial checkpoints** — an agent whose only job is to try to break the previous agent's work. Blue nodes are the **Owner**. Everything else is the Orchestrator driving deterministic machinery.
+The four **`/slash`-command stages** are the loop. `{{Hexagons}}` are the **adversarial checkpoints** — an agent whose only job is to try to break the previous agent's work. Blue nodes are the **Owner**. Everything else is the Orchestrator driving deterministic machinery.
 
 Trivial fixes (typos, one-liners, config tweaks) skip the loop — you just do them on a branch. The loop is for work with enough surface area to get wrong.
 
