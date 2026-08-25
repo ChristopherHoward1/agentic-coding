@@ -8,7 +8,7 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 
 ## Now
 
-- k=4 Confirm-delta clock: **3/4** (2026.8.1 + 2026.8.2 + 2026.8.3, all delta none) — 1 more clean release promotes to full TRIP.
+- **Full TRIP autonomy reached** (2026-08-25): 4/4 `none` releases (2026.8.1–2026.8.4); `/4-release` push confirmation removed from CLAUDE.md.
 - Next candidates: `work/bootstrap-retro.md` (incl. the N=1 manual-seeding gap surfaced by `work/fan-implement`).
 
 ## Decisions

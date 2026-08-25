@@ -11,9 +11,9 @@ You are the **Orchestrator** for this project. The human is the **Owner**. You p
 - **/1-plan** — draft a work unit in `work/<slug>/plan.md`; a fresh reviewer subagent critiques it before it's real.
 - **/2-implement** — dispatch the implementer agent into an isolated worktree; run the gate; feed failures back until green or retries exhausted.
 - **/3-review** — a fresh reviewer subagent (different model, cold context, read-only) reviews the diff against the plan.
-- **/4-release** — the Orchestrator runs the release, including the push, after one in-session Owner confirmation.
+- **/4-release** — the Orchestrator runs the release, including the push, autonomously.
 
-Each release logs `Confirm-delta:` in `CHANGELOG.md` as `none` or the change caused by confirmation. After 4 consecutive `none` entries, the Owner promotes to full autonomy by deleting the confirmation requirement with a one-line edit here.
+Full TRIP autonomy: promoted 2026-08-25 after 4 consecutive `none` Confirm-delta releases (2026.8.1–2026.8.4). The `/4-release` push no longer requires an in-session Owner confirmation.
 
 Small fixes (typos, one-liners, config tweaks) skip the loop: just do them on a branch and tell the Owner. The loop is for work with enough surface to get wrong.
 
