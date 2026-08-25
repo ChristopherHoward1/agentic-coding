@@ -25,7 +25,19 @@ case "$cmd" in
     if git show-ref --verify --quiet "refs/heads/wt/$slug"; then
       git worktree add "$path" "wt/$slug" >&2
     else
-      git worktree add -b "wt/$slug" "$path" >&2
+      git fetch origin --quiet 2>/dev/null || true
+      if git show-ref --verify --quiet refs/remotes/origin/main; then
+        git worktree add -b "wt/$slug" "$path" origin/main >&2
+      else
+        git worktree add -b "wt/$slug" "$path" >&2
+      fi
+    fi
+    if [[ -f "$ROOT/work/$slug/plan.md" ]] &&
+      [[ -z "$(git -C "$path" ls-tree -r --name-only HEAD -- "work/$slug/plan.md")" ]]; then
+      mkdir -p "$path/work/$slug"
+      cp "$ROOT/work/$slug/plan.md" "$path/work/$slug/plan.md"
+      git -C "$path" add -- "work/$slug/plan.md"
+      git -C "$path" commit -q -m "Record plan for $slug"
     fi
     # stdout carries only the path, so callers can capture it
     cd "$path" && pwd -P
