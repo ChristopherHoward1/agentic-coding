@@ -9,13 +9,13 @@ Bash (`set -uo pipefail`, macOS/Linux) and Markdown. No compiled language, no pa
 ## Layout
 
 - `CLAUDE.md` / `ARCHI.md` / `PLAN.md` — the hot context tier (loaded every session, ~300-line budget).
-- `config.yaml` — the single knob: profile, per-role models, implementer runtime, gate command, worktree dir.
-- `skills/` — the loop stages (`1-plan`, `2-implement`, `3-review`, `4-release`) plus `init` and `compact`. Each is a `SKILL.md`; `1-plan` and `2-implement` carry `prompts/*.tpl` (plan, handoff, followup). Exposed to Claude Code via the `.claude/skills → ../skills` symlink.
-- `.claude/agents/` — fresh-subagent definitions (`plan-reviewer.md`, `code-reviewer.md`): read-only tools, separate model, cold context.
-- `scripts/` — the deterministic layer: `gate.sh` (stack-detecting check runner), `worktree.sh` (isolated-checkout lifecycle), `agent-exec.sh` (dispatches the implementer into a worktree), `release.sh` (release preconditions + version/changelog/commit on the release branch; never tags, never touches `main`, never pushes; a `tag-after-merge` subcommand tags post-merge). `gate.d/test-scripts.sh` wires the smoke suite into the gate.
+- `config.yaml` — the single knob: profile, per-role models (incl. `fan_selector`), implementer runtime, `implementer.fan` (best-of-N sample count; default 1 = single-agent), gate command, worktree dir.
+- `skills/` — the loop stages (`1-plan`, `2-implement`, `3-review`, `4-release`) plus `init` and `compact`. Each is a `SKILL.md`; `1-plan` and `2-implement` carry `prompts/*.tpl` (plan, handoff, followup). `2-implement` also documents Fan Mode (N>1): dispatch N samples, gate-filter, adopt a winner. Exposed to Claude Code via the `.claude/skills → ../skills` symlink.
+- `.claude/agents/` — fresh-subagent definitions (`plan-reviewer.md`, `code-reviewer.md`, `fan-selector.md`): read-only tools, separate model, cold context.
+- `scripts/` — the deterministic layer: `gate.sh` (stack-detecting check runner), `worktree.sh` (isolated-checkout lifecycle), `agent-exec.sh` (dispatches the implementer into a worktree), `fan-exec.sh` (best-of-N: `dispatch` spawns N sample worktrees, seeds `work/<slug>/`, auto-commits each sample before the gate, prints a manifest of gate-passers; `adopt` retargets `wt/<slug>` to a chosen sample and force-cleans all `<slug>-fan-*` worktrees/branches), `release.sh` (release preconditions + version/changelog/commit on the release branch; never tags, never touches `main`, never pushes; a `tag-after-merge` subcommand tags post-merge). `gate.d/test-scripts.sh` wires the smoke suite into the gate.
 - `VERSION` / `CHANGELOG.md` — CalVer (`YYYY.M.MICRO`) + Keep-a-Changelog; written only by `release.sh`.
 - `profiles/` — `software` (base), `machine-learning`, `database`, `work` (Atlassian/Bitbucket: Claude implementer, Bitbucket CI, Jira reference-only); selected by `config.yaml`'s `profile:`.
-- `tests/test-scripts.sh` — smoke tests for the shell layer, incl. release refusals/rollback and the PR-merge flow (bump-on-branch, the `origin/main` collision guard, mid-gate re-check, `tag-after-merge` happy + wrong-commit refusal) over a real worktree + bare-remote topology.
+- `tests/test-scripts.sh` — smoke tests for the shell layer, incl. release refusals/rollback and the PR-merge flow (bump-on-branch, the `origin/main` collision guard, mid-gate re-check, `tag-after-merge` happy + wrong-commit refusal) plus hermetic fan-exec cases (canned implementer: manifest = gate-passers only, empty on all-fail, commit-before-gate ordering, dirty-worktree adopt cleanup, seed kept out of the adopted diff) over a real worktree + bare-remote topology.
 - CI: `.github/workflows/ci.yml` (GitHub) and `bitbucket-pipelines.yml` (Bitbucket) both run the smoke suite + gate; the `work` profile keeps the Bitbucket one.
 - `knowledge/` — cold-tier docs, loaded only on citation (empty but for a README); `work/<slug>/` — one directory per work unit (`plan.md` etc.).
 - `AGENTS.md` — the contract the implementer subagent reads.
@@ -26,6 +26,7 @@ Bash (`set -uo pipefail`, macOS/Linux) and Markdown. No compiled language, no pa
 - **`scripts/gate.sh`** — run from anywhere in the tree; `cd`s to repo root, auto-detects stacks (Node/Python/Shell/Rust/Go), runs applicable checks + `gate.d/*.sh` hooks. Exit 0 = pass.
 - **`scripts/release.sh <slug> [--confirm-delta <text>]`** — the release driver; also `check-version` / `next-version` / `tag-after-merge` subcommands. One universal PR-merge topology: fetch-guards `origin/main` (before and after the gate), commits the bump on the release branch, never merges/tags/pushes `main`. After the PR merges, `tag-after-merge <slug>` fetches, verifies `origin/main`'s tip is this release (its `VERSION` and `Release v<version>` subject), and creates the tag locally — the push stays `/4-release`'s Owner-confirmed step.
 - **`scripts/worktree.sh add|remove|list <slug>`** — manages worktrees under `../agentic-coding-worktrees`; **`scripts/agent-exec.sh <worktree> <handoff>`** — feeds a handoff to the implementer runtime inside one.
+- **`scripts/fan-exec.sh dispatch <slug> <handoff> <N>` / `adopt <slug> <sample-branch>`** — the best-of-N primitive behind `2-implement`'s Fan Mode; sequential (N× wall-clock), activated only when `implementer.fan > 1`.
 
 ## Conventions
 
@@ -40,4 +41,4 @@ Bash (`set -uo pipefail`, macOS/Linux) and Markdown. No compiled language, no pa
 
 ## Verification
 
-`bash scripts/gate.sh` — shellcheck over all tracked `*.sh` plus the `gate.d/` hook running `tests/test-scripts.sh` (20 checks, incl. the PR-merge release flow + `tag-after-merge`). CI runs the gate on push. Currently green.
+`bash scripts/gate.sh` — shellcheck over all tracked `*.sh` plus the `gate.d/` hook running `tests/test-scripts.sh` (26 checks, incl. the PR-merge release flow + `tag-after-merge` and the hermetic fan-exec suite). CI runs the gate on push. Currently green.
