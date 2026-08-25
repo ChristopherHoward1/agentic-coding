@@ -33,7 +33,10 @@ seed_work_dir() {
   if [[ -d "$ROOT/work/$slug" ]]; then
     mkdir -p "$wt/work"
     rm -rf "$wt/work/$slug"
-    cp -R "$ROOT/work/$slug" "$wt/work/"
+    cp -R "$ROOT/work/$slug" "$wt/work/" || {
+      echo "Error: failed to seed work/$slug into $wt" >&2
+      exit 1
+    }
   fi
 }
 
@@ -70,7 +73,9 @@ dispatch() {
     fi
   done
 
-  printf '%s\n' "${passers[@]}"
+  if [[ ${#passers[@]} -gt 0 ]]; then
+    printf '%s\n' "${passers[@]}"
+  fi
 }
 
 adopt() {
