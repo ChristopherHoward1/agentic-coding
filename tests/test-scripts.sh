@@ -123,6 +123,68 @@ EOF
   write_release_fixture_date "$REL_FAKEBIN" "2026.8" "2026-08-16"
 }
 
+setup_fan_fixture() {
+  local name="$1"
+  local tmp_root="$TMP/$name"
+
+  FAN_PRIMARY="$tmp_root/primary"
+  FAN_WTS="$tmp_root/wts"
+  FAN_IMPL="$tmp_root/canned-implementer.sh"
+  FAN_HANDOFF="$FAN_PRIMARY/work/demo/handoff.md"
+
+  mkdir -p "$tmp_root"
+  git init -q -b main "$FAN_PRIMARY"
+  (
+    cd "$FAN_PRIMARY" || exit 1
+    git config user.email tester@example.com
+    git config user.name Tester
+
+    mkdir -p scripts work/demo
+    cp "$ROOT/scripts/worktree.sh" scripts/worktree.sh
+    cp "$ROOT/scripts/agent-exec.sh" scripts/agent-exec.sh
+    cp "$ROOT/scripts/fan-exec.sh" scripts/fan-exec.sh
+    cat >scripts/gate.sh <<'EOF'
+#!/usr/bin/env bash
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)" || exit 1
+[[ -f result.txt ]] || exit 1
+grep -qx pass result.txt
+EOF
+    chmod +x scripts/*.sh
+
+    cat >"$FAN_IMPL" <<'EOF'
+#!/usr/bin/env bash
+set -uo pipefail
+cat >/dev/null
+branch=$(git branch --show-current)
+git config user.email tester@example.com
+git config user.name Tester
+if [[ ! -f work/demo/plan.md ]]; then
+  printf 'missing-seed\n' >result.txt
+elif [[ "$branch" == wt/demo-fan-2 || "$branch" == wt/demo-fan-3 ]]; then
+  printf 'pass\n' >result.txt
+else
+  printf 'fail\n' >result.txt
+fi
+printf '%s\n' "$branch" >branch.txt
+git add result.txt branch.txt work/demo/plan.md
+git commit -qm "implement $branch"
+EOF
+    chmod +x "$FAN_IMPL"
+
+    cat >config.yaml <<EOF
+implementer:
+  command: '$FAN_IMPL'
+worktrees:
+  dir: $FAN_WTS
+EOF
+    printf '# Demo plan\n' >work/demo/plan.md
+    printf 'handoff\n' >work/demo/handoff.md
+    git add -A
+    git commit -qm init
+  )
+}
+
 # --- shellcheck the scripts themselves (gate.sh covers this too; belt+braces)
 if command -v shellcheck >/dev/null; then
   check "shellcheck scripts" shellcheck scripts/*.sh tests/*.sh
@@ -150,6 +212,27 @@ check_fails "worktree add without slug fails" bash -c "cd '$SB' && bash wt.sh ad
 
 # --- agent-exec.sh argument validation
 check_fails "agent-exec rejects missing handoff" bash scripts/agent-exec.sh /tmp nonexistent-handoff.md
+
+# --- fan-exec.sh dispatch/adopt in a hermetic repo with a canned implementer
+setup_fan_fixture fan-basic
+fan_manifest="$TMP/fan-manifest.out"
+check "fan dispatch manifest lists only gate passers" bash -c "
+  cd '$FAN_PRIMARY' &&
+  bash scripts/fan-exec.sh dispatch demo '$FAN_HANDOFF' 3 >'$fan_manifest' &&
+  diff -u <(printf 'wt/demo-fan-2\nwt/demo-fan-3\n') '$fan_manifest'
+"
+check "fan adopt repoints canonical branch and cleans samples" bash -c "
+  cd '$FAN_PRIMARY' &&
+  bash scripts/fan-exec.sh adopt demo wt/demo-fan-3 &&
+  [ \"\$(git rev-parse wt/demo)\" = \"\$(git -C '$FAN_WTS/demo' rev-parse HEAD)\" ] &&
+  [ \"\$(cat '$FAN_WTS/demo/branch.txt')\" = 'wt/demo-fan-3' ] &&
+  ! git show-ref --verify --quiet refs/heads/wt/demo-fan-1 &&
+  ! git show-ref --verify --quiet refs/heads/wt/demo-fan-2 &&
+  ! git show-ref --verify --quiet refs/heads/wt/demo-fan-3 &&
+  [ ! -e '$FAN_WTS/demo-fan-1' ] &&
+  [ ! -e '$FAN_WTS/demo-fan-2' ] &&
+  [ ! -e '$FAN_WTS/demo-fan-3' ]
+"
 
 # --- release.sh version comparison
 check "release version compare accepts .10 over .9" bash scripts/release.sh check-version 2026.8.10 2026.8.9
