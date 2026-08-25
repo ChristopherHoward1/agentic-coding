@@ -125,6 +125,7 @@ EOF
 
 setup_fan_fixture() {
   local name="$1"
+  local pass_mode="${2:-some}"
   local tmp_root="$TMP/$name"
 
   FAN_PRIMARY="$tmp_root/primary"
@@ -161,6 +162,8 @@ git config user.email tester@example.com
 git config user.name Tester
 if [[ ! -f work/demo/plan.md ]]; then
   printf 'missing-seed\n' >result.txt
+elif [[ "${FAN_PASS_MODE:-some}" == all-fail ]]; then
+  printf 'fail\n' >result.txt
 elif [[ "$branch" == wt/demo-fan-2 || "$branch" == wt/demo-fan-3 ]]; then
   printf 'pass\n' >result.txt
 else
@@ -174,7 +177,7 @@ EOF
 
     cat >config.yaml <<EOF
 implementer:
-  command: '$FAN_IMPL'
+  command: 'FAN_PASS_MODE=$pass_mode $FAN_IMPL'
 worktrees:
   dir: $FAN_WTS
 EOF
@@ -232,6 +235,13 @@ check "fan adopt repoints canonical branch and cleans samples" bash -c "
   [ ! -e '$FAN_WTS/demo-fan-1' ] &&
   [ ! -e '$FAN_WTS/demo-fan-2' ] &&
   [ ! -e '$FAN_WTS/demo-fan-3' ]
+"
+setup_fan_fixture fan-all-fail all-fail
+fan_empty_manifest="$TMP/fan-empty-manifest.out"
+check "fan dispatch emits empty manifest and exits 0 with no survivors" bash -c "
+  cd '$FAN_PRIMARY' &&
+  bash scripts/fan-exec.sh dispatch demo '$FAN_HANDOFF' 3 >'$fan_empty_manifest' &&
+  [ ! -s '$fan_empty_manifest' ]
 "
 
 # --- release.sh version comparison
