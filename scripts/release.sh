@@ -107,6 +107,8 @@ check_verdict() {
   local plan_path="$1"
   grep -qx 'Code-review verdict: APPROVE' "$plan_path" \
     || die "$plan_path must contain exact line: Code-review verdict: APPROVE"
+  grep -qx 'Codex-review verdict: APPROVE' "$plan_path" \
+    || die "$plan_path must contain exact line: Codex-review verdict: APPROVE"
 }
 
 check_gate() {

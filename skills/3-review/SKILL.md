@@ -9,15 +9,16 @@ Input: a work unit whose worktree branch `wt/<slug>` passed the gate.
 
 ## Steps
 
-1. **Assemble artifacts, not transcripts:** the diff (`git diff main...wt/<slug>`), the plan path, and nothing else. The reviewer must never see the implementation conversation or your own commentary on the diff.
-2. **Spawn the reviewer.** Launch the `code-reviewer` agent (fresh thread) with the diff, the plan path, and the worktree path, instructed to review per its own definition.
+1. **Assemble artifacts, not transcripts:** the diff (`git diff main...wt/<slug>`), the plan path, and nothing else. Reviewers must never see the implementation conversation or your own commentary on the diff.
+2. **Spawn both reviewers.** Launch the `code-reviewer` agent (fresh thread) with the diff, the plan path, and the worktree path, instructed to review per its own definition. From the primary checkout, run `scripts/codex-review.sh <slug>` so Codex reviews the branch plan and diff from cold, read-only context and writes `work/<slug>/codex-review.md`.
 3. **Route findings:**
-   - Substantive findings → back to the implementer via `/2-implement`'s followup flow (same worktree).
+   - Substantive findings from either reviewer → back to the implementer via `/2-implement`'s followup flow (same worktree).
    - Trivial mechanical fixes (typo-grade) → you may fix them directly, but then the re-review in step 4 is mandatory, because you just became a writer.
-4. **Re-review after any change:** spawn a *new* fresh code-reviewer thread on the updated diff. Repeat until APPROVE or 3 rounds — after 3, escalate the open findings to the Owner rather than grinding.
-5. **Hand off to release:** on APPROVE, report the verdict, findings summary (resolved and open), and gate status to the Owner, then proceed to `/4-release`. `/4-release` stops for the Owner's push confirmation under the release model.
+4. **Re-review after any change:** spawn a *new* fresh code-reviewer thread and re-run `scripts/codex-review.sh <slug>` on the updated diff. Repeat until both approve or 3 rounds total — after 3, escalate the open findings to the Owner rather than grinding.
+5. **Record the approved result on the worktree branch:** when both reviewers approve, edit `work/<slug>/plan.md` in the worktree to include both `Code-review verdict: APPROVE` and `Codex-review verdict: APPROVE`, flip its status, and sync the current plan body. Commit that plan update in a single commit with `git -C <worktree> add work/<slug>/plan.md` and `git -C <worktree> commit ...`. Never copy the whole plan file from the primary checkout into the worktree, because that can clobber the sentinels.
+6. **Hand off to release:** report both verdicts, findings summary (resolved and open), and gate status to the Owner, then proceed through the full `/4-release` TRIP.
 
 ## Rules
 
-- A reviewer thread is used exactly once. Re-reviews get new threads — a reviewer that already approved a direction is anchored.
-- Record the final verdict in `work/<slug>/plan.md → Review` as `Code-review verdict: APPROVE|REVISE` and flip its status.
+- A reviewer thread or Codex reviewer run is used exactly once. Re-reviews get new fresh reviews — a reviewer that already approved a direction is anchored.
+- Record final verdicts in the worktree plan's Review section as `Code-review verdict: APPROVE|REVISE` and `Codex-review verdict: APPROVE|REQUEST CHANGES`.

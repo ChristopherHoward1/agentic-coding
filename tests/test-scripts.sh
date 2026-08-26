@@ -19,6 +19,30 @@ check_fails() {
     echo "ok: $desc"; pass=$((pass+1))
   fi
 }
+check_exit() {
+  local desc="$1"
+  local expected="$2"
+  local stderr_substring="$3"
+  shift 3
+  local err
+  local status
+
+  err=$(mktemp)
+  if "$@" >/dev/null 2>"$err"; then
+    status=0
+  else
+    status=$?
+  fi
+
+  if [[ "$status" -eq "$expected" ]] \
+    && { [[ -z "$stderr_substring" ]] || grep -q -- "$stderr_substring" "$err"; }; then
+    echo "ok: $desc"; pass=$((pass+1))
+  else
+    echo "FAIL: $desc (exit $status, expected $expected; stderr: $(tr '\n' ' ' <"$err"))"
+    fail=$((fail+1))
+  fi
+  rm -f "$err"
+}
 
 ROOT=$(git rev-parse --show-toplevel)
 cd "$ROOT" || exit 1
@@ -58,6 +82,7 @@ setup_release_fixture() {
   local verdict_line="$3"
   local gate_mode="$4"
   local archi_mode="$5"
+  local codex_verdict_line="${6-Codex-review verdict: APPROVE}"
   local tmp_root="$TMP/$name"
 
   REL_PRIMARY="$tmp_root/primary"
@@ -102,6 +127,7 @@ EOF
       printf 'Release note: Demo release note.\n\n'
       printf '## Review\n\n'
       printf '%s\n' "$verdict_line"
+      [[ -n "$codex_verdict_line" ]] && printf '%s\n' "$codex_verdict_line"
     } >work/demo/plan.md
     [[ "$gate_mode" == fail ]] && printf 'fail\n' >GATE_FAIL
   )
@@ -121,6 +147,112 @@ EOF
     git -C "$REL_WORKTREE" config user.name Tester
   )
   write_release_fixture_date "$REL_FAKEBIN" "2026.8" "2026-08-16"
+}
+
+setup_codex_review_fixture() {
+  local name="$1"
+  local command_mode="$2"
+  local tmp_root="$TMP/$name"
+
+  COD_PRIMARY="$tmp_root/primary"
+  COD_WORKTREE="$tmp_root/demo-wt"
+  COD_REVIEWER="$tmp_root/canned-reviewer.sh"
+
+  mkdir -p "$tmp_root"
+  git init -q -b main "$COD_PRIMARY"
+  (
+    cd "$COD_PRIMARY" || exit 1
+    git config user.email tester@example.com
+    git config user.name Tester
+    mkdir -p scripts work/demo
+    cp "$ROOT/scripts/codex-review.sh" scripts/codex-review.sh
+    chmod +x scripts/codex-review.sh
+    printf 'base\n' >base.txt
+    printf '# Primary plan\n' >work/demo/plan.md
+    git add -A
+    git commit -qm main
+    git branch wt/demo
+    git worktree add -q "$COD_WORKTREE" wt/demo
+    git -C "$COD_WORKTREE" config user.email tester@example.com
+    git -C "$COD_WORKTREE" config user.name Tester
+  )
+
+  cat >"$COD_REVIEWER" <<'EOF'
+#!/usr/bin/env bash
+set -uo pipefail
+cat >/dev/null
+case "${1:-approve}" in
+  approve)
+    printf 'looks fine\n'
+    printf 'Codex verdict: APPROVE\n'
+    ;;
+  indented-approve)
+    printf 'looks fine\n'
+    printf '  Codex verdict: APPROVE\n'
+    ;;
+  request)
+    printf 'needs work\n'
+    printf 'Codex verdict: REQUEST CHANGES\n'
+    ;;
+  missing)
+    printf 'no machine verdict here\n'
+    ;;
+esac
+EOF
+  chmod +x "$COD_REVIEWER"
+
+  (
+    cd "$COD_WORKTREE" || exit 1
+    mkdir -p work/demo
+    printf '# Demo\n\n## Goal\n\nReview me.\n' >work/demo/plan.md
+    printf 'feature\n' >feature.txt
+    case "$command_mode" in
+      normal)
+        cat >config.yaml <<EOF
+reviewer:
+  command: '$COD_REVIEWER approve'
+EOF
+        ;;
+      indented)
+        cat >config.yaml <<EOF
+reviewer:
+  command: '$COD_REVIEWER indented-approve'
+EOF
+        ;;
+      request)
+        cat >config.yaml <<EOF
+reviewer:
+  command: '$COD_REVIEWER request'
+EOF
+        ;;
+      missing-verdict)
+        cat >config.yaml <<EOF
+reviewer:
+  command: '$COD_REVIEWER missing'
+EOF
+        ;;
+      absent)
+        printf 'name: fixture\n' >config.yaml
+        ;;
+      later-command)
+        cat >config.yaml <<'EOF'
+reviewer:
+  note: none
+gate:
+  command: scripts/gate.sh
+EOF
+        ;;
+      commented)
+        cat >config.yaml <<EOF
+reviewer:
+  # command: '$COD_REVIEWER request'
+  command: '$COD_REVIEWER approve'
+EOF
+        ;;
+    esac
+    git add -A
+    git commit -qm "fixture $command_mode"
+  )
 }
 
 setup_fan_fixture() {
@@ -210,6 +342,42 @@ fi
 # --- worktree.sh lifecycle in a throwaway repo
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
+
+# --- codex-review.sh pure-reader contract with a canned reviewer
+check "codex-review reads plan body from branch" grep -F "git show \"\$branch:\$plan_path\"" scripts/codex-review.sh
+check "codex-review reads config from branch" grep -F "git show \"\$branch:config.yaml\"" scripts/codex-review.sh
+check "codex-review prompt names exact verdict format" grep -F 'Codex verdict: REQUEST CHANGES' scripts/codex-review.sh
+
+setup_codex_review_fixture codex-approve normal
+check_exit "codex-review approve exits 0" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+check "codex-review writes stdout artifact" grep -Fx 'Codex verdict: APPROVE' "$COD_PRIMARY/work/demo/codex-review.md"
+
+setup_codex_review_fixture codex-indented indented
+check_exit "codex-review accepts indented approve verdict" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+
+setup_codex_review_fixture codex-request request
+check_exit "codex-review request-changes exits 1" 1 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+
+setup_codex_review_fixture codex-missing-verdict missing-verdict
+check_exit "codex-review missing verdict exits 2" 2 "no verdict" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+
+setup_codex_review_fixture codex-command-absent absent
+check_exit "codex-review missing reviewer.command exits 2" 2 "reviewer.command" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+
+setup_codex_review_fixture codex-later-command later-command
+check_exit "codex-review parser stops before later command" 2 "reviewer.command" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+
+setup_codex_review_fixture codex-commented-command commented
+check_exit "codex-review ignores commented command and uses real one" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+
+setup_codex_review_fixture codex-artifact-only normal
+check_exit "codex-review artifact-only run exits 0" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+check "codex-review only dirties primary artifact" bash -c "
+  cd '$COD_PRIMARY' &&
+  diff -u <(printf '?? work/demo/codex-review.md\n') <(git status --porcelain)
+"
+check "codex-review leaves worktree branch clean" bash -c "[ \"\$(git -C '$COD_WORKTREE' status --porcelain)\" = '' ]"
+
 (
   cd "$TMP"
   git init -q -b main sandbox && cd sandbox
@@ -474,6 +642,9 @@ check_fails "release version compare rejects .9 after .10" bash scripts/release.
 # --- release.sh refusals and happy path in the mandated worktree topology
 setup_release_fixture release-no-verdict 2026.8.9 "Plan verdict: APPROVE" pass fresh
 check_fails "release refuses without code-review approval" bash -c "cd '$REL_WORKTREE' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo"
+
+setup_release_fixture release-no-codex-verdict 2026.8.9 "Code-review verdict: APPROVE" pass fresh ""
+check_exit "release refuses without codex-review approval" 1 "Codex-review verdict: APPROVE" bash -c "cd '$REL_WORKTREE' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo"
 
 setup_release_fixture release-gate-fails 2026.8.9 "Code-review verdict: APPROVE" fail fresh
 check_fails "release refuses when gate fails" bash -c "cd '$REL_WORKTREE' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo"

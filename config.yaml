@@ -16,6 +16,9 @@ implementer:
   # Claude Code implementer alternative:
   # command: 'claude -p --dangerously-skip-permissions'
 
+reviewer:
+  command: 'codex exec --sandbox read-only -'
+
 gate:
   command: scripts/gate.sh
   max_retries: 2             # failed-gate feedback loops before escalating to the Owner
