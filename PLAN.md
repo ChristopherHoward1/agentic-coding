@@ -9,7 +9,7 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 ## Now
 
 - **Full TRIP autonomy reached** (2026-08-25): 4/4 `none` releases (2026.8.1–2026.8.4); `/4-release` push confirmation removed from CLAUDE.md.
-- Next candidates: `work/bootstrap-retro.md` (incl. the N=1 manual-seeding gap surfaced by `work/fan-implement`).
+- Next candidates: `work/bootstrap-retro.md` logged items (codex-as-reviewer decorrelation, `/2-implement` batching) — deferred until real use demands them. (The N=1 manual-seeding gap shipped in v2026.8.5.)
 
 ## Decisions
 
