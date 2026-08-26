@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.8.6] - 2026-08-26
+
+- Release now requires a second, read-only codex review — cross-vendor approval enforced by `release.sh`, not prose. (Binds from the next unit onward.)
+- Confirm-delta: none
+
 ## [2026.8.5] - 2026-08-25
 
 - /2-implement starts implementation branches from origin/main and seeds the plan onto the single-agent worktree — no manual rebase or plan-commit before release.
