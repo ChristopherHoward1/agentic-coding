@@ -22,6 +22,11 @@ branch="wt/$slug"
 plan_path="work/$slug/plan.md"
 root=$(git rev-parse --show-toplevel) || die2 "not inside a git checkout"
 artifact="$root/work/$slug/codex-review.md"
+current_branch=$(git symbolic-ref --quiet --short HEAD || true)
+
+if [[ "$current_branch" == "$branch" ]]; then
+  die2 "run from the primary checkout, not the $branch worktree"
+fi
 
 git rev-parse --verify --quiet "$branch" >/dev/null \
   || die2 "missing branch: $branch"
@@ -60,14 +65,13 @@ reviewer_command=$(
 [[ -d "$root/work/$slug" ]] || die2 "missing work directory: $root/work/$slug"
 
 prompt=$(mktemp)
-trap 'rm -f "$prompt"' EXIT
+artifact_tmp=""
+trap 'rm -f "$prompt" "$artifact_tmp"' EXIT
 
 {
   printf "You are an independent code reviewer for work unit \`%s\`.\n\n" "$slug"
   printf 'Review the plan body and diff below. Report substantive findings first.\n'
-  printf 'Your final line must be exactly one of:\n'
-  printf 'Codex verdict: APPROVE\n'
-  printf 'Codex verdict: REQUEST CHANGES\n\n'
+  printf '\n'
   printf '%s\n' "--- PLAN ($branch:$plan_path) ---"
 } >"$prompt"
 
@@ -78,11 +82,25 @@ printf '\n%s\n' "--- DIFF (main...$branch) ---" >>"$prompt"
 git diff "main...$branch" >>"$prompt" \
   || die2 "cannot diff main...$branch"
 
-bash -c "$reviewer_command" <"$prompt" >"$artifact"
+{
+  printf '\n'
+  printf 'Your final line must be exactly one of:\n'
+  printf 'Codex verdict: APPROVE\n'
+  printf 'Codex verdict: REQUEST CHANGES\n'
+} >>"$prompt"
+
+artifact_tmp=$(mktemp "$root/work/$slug/.codex-review.XXXXXX") \
+  || die2 "cannot create temporary artifact in $root/work/$slug"
+
+bash -c "$reviewer_command" <"$prompt" >"$artifact_tmp"
 reviewer_status=$?
 if [[ "$reviewer_status" -ne 0 ]]; then
   die2 "reviewer command failed (exit $reviewer_status)"
 fi
+
+mv "$artifact_tmp" "$artifact" \
+  || die2 "cannot write artifact: $artifact"
+artifact_tmp=""
 
 verdict_line=$(grep -E '^[[:space:]]*Codex verdict:' "$artifact" | tail -n 1 || true)
 if [[ -z "$verdict_line" ]]; then
