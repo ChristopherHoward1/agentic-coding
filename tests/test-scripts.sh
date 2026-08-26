@@ -127,7 +127,9 @@ EOF
       printf 'Release note: Demo release note.\n\n'
       printf '## Review\n\n'
       printf '%s\n' "$verdict_line"
-      [[ -n "$codex_verdict_line" ]] && printf '%s\n' "$codex_verdict_line"
+      if [[ -n "$codex_verdict_line" ]]; then
+        printf '%s\n' "$codex_verdict_line"
+      fi
     } >work/demo/plan.md
     [[ "$gate_mode" == fail ]] && printf 'fail\n' >GATE_FAIL
   )
@@ -157,6 +159,7 @@ setup_codex_review_fixture() {
   COD_PRIMARY="$tmp_root/primary"
   COD_WORKTREE="$tmp_root/demo-wt"
   COD_REVIEWER="$tmp_root/canned-reviewer.sh"
+  COD_MARKER="$tmp_root/reviewer-invoked"
 
   mkdir -p "$tmp_root"
   git init -q -b main "$COD_PRIMARY"
@@ -180,6 +183,9 @@ setup_codex_review_fixture() {
   cat >"$COD_REVIEWER" <<'EOF'
 #!/usr/bin/env bash
 set -uo pipefail
+if [[ -n "${COD_REVIEWER_MARKER:-}" ]]; then
+  printf 'invoked\n' >>"$COD_REVIEWER_MARKER"
+fi
 cat >/dev/null
 case "${1:-approve}" in
   approve)
@@ -196,6 +202,11 @@ case "${1:-approve}" in
     ;;
   missing)
     printf 'no machine verdict here\n'
+    ;;
+  approve-then-fail)
+    printf 'looks fine\n'
+    printf 'Codex verdict: APPROVE\n'
+    exit 42
     ;;
 esac
 EOF
@@ -247,6 +258,19 @@ EOF
 reviewer:
   # command: '$COD_REVIEWER request'
   command: '$COD_REVIEWER approve'
+EOF
+        ;;
+      missing-plan)
+        cat >config.yaml <<EOF
+reviewer:
+  command: 'COD_REVIEWER_MARKER=$COD_MARKER $COD_REVIEWER approve'
+EOF
+        git rm -q -f work/demo/plan.md
+        ;;
+      reviewer-fails)
+        cat >config.yaml <<EOF
+reviewer:
+  command: '$COD_REVIEWER approve-then-fail'
 EOF
         ;;
     esac
@@ -369,6 +393,13 @@ check_exit "codex-review parser stops before later command" 2 "reviewer.command"
 
 setup_codex_review_fixture codex-commented-command commented
 check_exit "codex-review ignores commented command and uses real one" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+
+setup_codex_review_fixture codex-missing-plan missing-plan
+check_exit "codex-review missing branch plan exits 2 before reviewer" 2 "cannot read plan" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+check "codex-review does not invoke reviewer when branch plan is missing" test ! -e "$COD_MARKER"
+
+setup_codex_review_fixture codex-reviewer-fails reviewer-fails
+check_exit "codex-review reviewer failure exits 2 before verdict parsing" 2 "reviewer command failed (exit 42)" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
 
 setup_codex_review_fixture codex-artifact-only normal
 check_exit "codex-review artifact-only run exits 0" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
