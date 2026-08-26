@@ -8,7 +8,8 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 
 ## Now
 
-- **`work/codex-reviewer` implemented** (2026-08-26): dual-vendor review shipped — both sentinels APPROVE (opus + live codex), gate 54/54, in `/4-release`. Next: `work/retro-stage` (approved plan, awaiting dispatch). Reviewer subagents moved sonnet→opus (PR #12, awaiting Owner merge).
+- **Shipped 2026-08-26:** v2026.8.6 `work/codex-reviewer` (dual-vendor review, release-enforced) and v2026.8.7 `work/retro-stage` (`/5-retro`; marker arms next release). Reviewers on opus.
+- Next candidate: `loop-hardening` — named in `work/retro-stage/retro.md` (marker guard/validation, /5-retro resume+cleanup, dispatch disconnect detection).
 - **Full TRIP autonomy reached** (2026-08-25): 4/4 `none` releases (2026.8.1–2026.8.4); `/4-release` push confirmation removed from CLAUDE.md.
 - Remaining candidate: `/2-implement` batching — deferred until real use demands it.
 
@@ -23,6 +24,7 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 - 2026-08-24 — `work` profile for Atlassian/Bitbucket: config-selected release topology (self ff-merges main; platform-team fetch-guards `origin/main` + pushes a branch for PR), one template not a fork — `work/work-profile` *(topology superseded 2026-08-25)*
 - 2026-08-25 — One universal PR-merge release topology under protected `main`; `self` direct-push + `review.human_pr_review` knob removed; tagging moves post-merge to `release.sh tag-after-merge` (verify-then-tag, no push) — `work/pr-merge-topology`
 - 2026-08-26 — /5-retro stage; release.sh refuses unit N until unit N−1's retro exists non-empty — work/retro-stage
+- 2026-08-26 — README loop/skills sections are release-note-owned: checked at /4-release step 3, fixed via the small-fix path — `work/retro-stage/retro.md`
 
 ## Risks
 
