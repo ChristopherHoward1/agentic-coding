@@ -15,6 +15,7 @@ Input: a work unit slug.
    - Non-zero → report the script output and stop.
 3. **Push the release branch and open the PR** against `main` autonomously; never push `main` directly. `main` stays protected, so a PR + merge is still required.
 4. **After the PR merges,** run `bash scripts/release.sh tag-after-merge <slug>`. If it exits non-zero, report the output and stop. If it succeeds, run `git push origin v<version>`.
+5. **Invoke `/5-retro`** for the released unit.
 
 ## Rules
 

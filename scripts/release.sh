@@ -176,6 +176,19 @@ check_origin_main_ancestor() {
     || die "$release_branch is stale; rebase/sync your branch onto origin/main"
 }
 
+check_previous_retro() {
+  local marker="work/.last-released"
+  local previous_slug
+  local previous_retro
+
+  [[ -f "$marker" ]] || return 0
+
+  previous_slug=$(<"$marker")
+  previous_retro="work/$previous_slug/retro.md"
+  [[ -s "$previous_retro" ]] \
+    || die "$previous_slug has no retro.md; run /5-retro for $previous_slug, or sync onto origin/main"
+}
+
 rollback_release() {
   local status=$?
   local pre_release_head="$1"
@@ -183,6 +196,7 @@ rollback_release() {
   trap - ERR
   set +e
   git reset --hard "$pre_release_head" >/dev/null 2>&1
+  git clean -f work/.last-released >/dev/null 2>&1
   echo "release: irreversible step failed; release commit was rolled back" >&2
   exit "$status"
 }
@@ -213,6 +227,7 @@ release() {
   check_verdict "$plan_path"
   check_clean_worktree "$release_checkout" "$release_branch"
   check_origin_main_ancestor "$release_branch"
+  check_previous_retro
   check_gate
   check_clean_worktree "$release_checkout" "$release_branch"
   check_archi_fresh
@@ -225,8 +240,9 @@ release() {
 
   printf '%s\n' "$new_version" >VERSION
   prepend_changelog "$new_version" "$release_note" "$confirm_delta"
+  printf '%s\n' "$slug" >work/.last-released
 
-  git add VERSION CHANGELOG.md
+  git add VERSION CHANGELOG.md work/.last-released
   git commit -m "Release v$new_version"
   trap - ERR
 
