@@ -11,7 +11,7 @@ No custom runtime. No ceremony that doesn't catch a defect.
 ## The loop
 
 ```
-/1-plan  →  /2-implement  →  /3-review  →  /4-release  →  /5-retro
+/1-plan  →  /2-implement  →  /3-review  →  /4-release
 ```
 
 Each stage produces an **artifact** (a plan, a diff, a release commit), and each artifact is handed to an independent checker before it advances. Feedback flows *backward* until the checker is satisfied; work only moves *forward* on an explicit verdict.
@@ -34,13 +34,13 @@ flowchart TD
 
     Rel["<b>/4-release</b><br/>release.sh re-runs gate + preconditions<br/>bumps version on branch"] --> Merge["Owner merges PR<br/>rebase / fast-forward"]:::human
     Merge --> Tag["tag-after-merge<br/>verify origin/main, then tag"]
-    Tag --> Retro["<b>/5-retro</b><br/>lessons routed: gate.d / knowledge / PLAN.md<br/>next release blocked until retro exists"] --> Done([tagged release]):::human
+    Tag --> Done([tagged release]):::human
 
     classDef grill fill:#f9e6f2,stroke:#b34a8c,stroke-width:2px,color:#000;
     classDef human fill:#e8f0ff,stroke:#3a6ea5,stroke-width:2px,color:#000;
 ```
 
-The five **`/slash`-command stages** are the loop. `{{Hexagons}}` are the **adversarial checkpoints** — an agent whose only job is to try to break the previous agent's work. Blue nodes are the **Owner**. Everything else is the Orchestrator driving deterministic machinery.
+The four **`/slash`-command stages** are the loop. `{{Hexagons}}` are the **adversarial checkpoints** — an agent whose only job is to try to break the previous agent's work. Blue nodes are the **Owner**. Everything else is the Orchestrator driving deterministic machinery.
 
 Trivial fixes (typos, one-liners, config tweaks) skip the loop — you just do them on a branch. The loop is for work with enough surface area to get wrong.
 
@@ -102,7 +102,7 @@ AGENTS.md            the implementer's contract
 config.yaml          the one knob: profile, model per role, implementer command, gate + worktree settings
 
 skills/              the loop as skills:
-                       1-plan · 2-implement · 3-review · 4-release · 5-retro · init · compact
+                       1-plan · 2-implement · 3-review · 4-release · init · compact
                        (1-plan & 2-implement carry prompts/*.tpl)
 .claude/agents/      the checkers (read-only, own models, cold context):
                        plan-reviewer · code-reviewer · fan-selector
