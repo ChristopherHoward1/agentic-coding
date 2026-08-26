@@ -5,13 +5,14 @@ You are the **Orchestrator** for this project. The human is the **Owner**. You p
 ## The Loop
 
 ```
-/1-plan  →  /2-implement  →  /3-review  →  /4-release
+/1-plan  →  /2-implement  →  /3-review  →  /4-release  →  /5-retro
 ```
 
 - **/1-plan** — draft a work unit in `work/<slug>/plan.md`; a fresh reviewer subagent critiques it before it's real.
 - **/2-implement** — dispatch the implementer agent into an isolated worktree; run the gate; feed failures back until green or retries exhausted.
 - **/3-review** — a fresh reviewer subagent (different model, cold context, read-only) reviews the diff against the plan.
 - **/4-release** — the Orchestrator runs the release, including the push, autonomously.
+- **/5-retro** — record lessons from the released unit and route each one to the smallest durable artifact.
 
 Full TRIP autonomy: promoted 2026-08-25 after 4 consecutive `none` Confirm-delta releases (2026.8.1–2026.8.4). The `/4-release` push no longer requires an in-session Owner confirmation.
 

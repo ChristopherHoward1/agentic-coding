@@ -83,6 +83,8 @@ setup_release_fixture() {
   local gate_mode="$4"
   local archi_mode="$5"
   local codex_verdict_line="${6-Codex-review verdict: APPROVE}"
+  local marker_slug="${7-}"
+  local retro_content="${8-__missing__}"
   local tmp_root="$TMP/$name"
 
   REL_PRIMARY="$tmp_root/primary"
@@ -132,6 +134,13 @@ EOF
       fi
     } >work/demo/plan.md
     [[ "$gate_mode" == fail ]] && printf 'fail\n' >GATE_FAIL
+    if [[ -n "$marker_slug" ]]; then
+      printf '%s\n' "$marker_slug" >work/.last-released
+      if [[ "$retro_content" != __missing__ ]]; then
+        mkdir -p "work/$marker_slug"
+        printf '%s' "$retro_content" >"work/$marker_slug/retro.md"
+      fi
+    fi
   )
   commit_fixture "$REL_PRIMARY" "2026-08-16T10:00:00Z" source
   printf 'architecture\n' >"$REL_PRIMARY/ARCHI.md"
@@ -718,6 +727,69 @@ check "release commits bump on branch without touching main, origin/main, or tag
   ! git rev-parse --verify --quiet refs/tags/v2026.8.10
 "
 
+setup_release_fixture release-marker-written 2026.8.9 "Code-review verdict: APPROVE" pass fresh
+check "release writes last-released marker into release commit" bash -c "
+  cd '$REL_WORKTREE' &&
+  PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo &&
+  [ \"\$(cat work/.last-released)\" = demo ] &&
+  [ \"\$(git show HEAD:work/.last-released)\" = demo ]
+"
+
+setup_release_fixture release-marker-rollback 2026.8.9 "Code-review verdict: APPROVE" pass fresh
+cat >"$REL_PRIMARY/.git/hooks/pre-commit" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+chmod +x "$REL_PRIMARY/.git/hooks/pre-commit"
+check "release rollback removes first-time last-released marker" bash -c "
+  cd '$REL_WORKTREE'
+  rollback_out='$TMP/release-marker-rollback.out'
+  if PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo >\"\$rollback_out\" 2>&1; then
+    exit 1
+  fi
+  grep -q 'rolled back' \"\$rollback_out\" &&
+  [ ! -e work/.last-released ] &&
+  [ \"\$(git status --porcelain)\" = '' ]
+"
+
+setup_release_fixture release-prev-no-retro 2026.8.9 "Code-review verdict: APPROVE" pass fresh "Codex-review verdict: APPROVE" previous
+check_exit "release refuses marker with missing retro" 1 "has no retro.md" bash -c "cd '$REL_WORKTREE' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo"
+
+setup_release_fixture release-prev-empty-retro 2026.8.9 "Code-review verdict: APPROVE" pass fresh "Codex-review verdict: APPROVE" previous ""
+check_exit "release refuses marker with empty retro" 1 "has no retro.md" bash -c "cd '$REL_WORKTREE' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo"
+
+setup_release_fixture release-prev-retro 2026.8.9 "Code-review verdict: APPROVE" pass fresh "Codex-review verdict: APPROVE" previous "learned"
+check "release proceeds when previous retro is non-empty" bash -c "
+  cd '$REL_WORKTREE' &&
+  PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo &&
+  [ \"\$(cat work/.last-released)\" = demo ]
+"
+
+setup_release_fixture release-no-marker 2026.8.9 "Code-review verdict: APPROVE" pass fresh
+check "release proceeds without last-released marker" bash -c "
+  cd '$REL_WORKTREE' &&
+  PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo &&
+  [ \"\$(cat work/.last-released)\" = demo ]
+"
+
+setup_release_fixture release-stale-before-retro 2026.8.9 "Code-review verdict: APPROVE" pass fresh "Codex-review verdict: APPROVE" previous
+(
+  cd "$REL_PRIMARY" || exit 1
+  printf 'remote change\n' >remote-change.txt
+  git add remote-change.txt
+  GIT_AUTHOR_DATE="2026-08-16T10:03:00Z" GIT_COMMITTER_DATE="2026-08-16T10:03:00Z" git commit -qm "advance main"
+  git push -q origin main
+)
+check "release reports stale branch before missing retro" bash -c "
+  cd '$REL_WORKTREE'
+  stale_retro_out='$TMP/release-stale-before-retro.out'
+  if PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo >\"\$stale_retro_out\" 2>&1; then
+    exit 1
+  fi
+  grep -q 'is stale' \"\$stale_retro_out\" &&
+  ! grep -q 'has no retro.md' \"\$stale_retro_out\"
+"
+
 setup_release_fixture release-sequential 2026.8.9 "Code-review verdict: APPROVE" pass fresh
 check "release refuses stale branch, then computes next micro after sync" bash -c "
   set -e
@@ -738,6 +810,13 @@ check "release refuses stale branch, then computes next micro after sync" bash -
     exit 1
   fi
   grep -q 'rebase/sync your branch onto origin/main' \"\$stale_out\"
+  git -C '$REL_PRIMARY' fetch -q origin main
+  git -C '$REL_PRIMARY' reset -q --hard origin/main
+  mkdir -p '$REL_PRIMARY/work/demo'
+  printf 'learned\n' > '$REL_PRIMARY/work/demo/retro.md'
+  git -C '$REL_PRIMARY' add work/demo/retro.md
+  GIT_AUTHOR_DATE='2026-08-16T10:01:30Z' GIT_COMMITTER_DATE='2026-08-16T10:01:30Z' git -C '$REL_PRIMARY' commit -qm 'Retro demo'
+  git -C '$REL_PRIMARY' push -q origin main
   git -C \"\$rel_b\" fetch -q origin main
   git -C \"\$rel_b\" rebase -q origin/main
   cd \"\$rel_b\"
