@@ -29,7 +29,7 @@ git rev-parse --verify --quiet "$branch" >/dev/null \
 config=$(git show "$branch:config.yaml") \
   || die2 "cannot read config.yaml from $branch"
 
-command=$(
+reviewer_command=$(
   awk '
     /^[^[:space:]#][^:]*:/ {
       if (f) exit
@@ -40,9 +40,12 @@ command=$(
     }
     f && /^[[:space:]]*command:/ {
       sub(/^[[:space:]]*command:[[:space:]]*/, "")
-      sub(/[[:space:]]*#.*$/, "")
-      sub(/^'\''/, "")
-      sub(/'\''[[:space:]]*$/, "")
+      if ($0 ~ /^'\''/) {
+        sub(/^'\''/, "")
+        sub(/'\''[[:space:]]*$/, "")
+      } else {
+        sub(/[[:space:]]*#.*$/, "")
+      }
       print
       found = 1
       exit
@@ -53,8 +56,11 @@ command=$(
   ' <<<"$config"
 ) || die2 "reviewer.command missing in $branch:config.yaml"
 
-[[ -n "$command" ]] || die2 "reviewer.command empty in $branch:config.yaml"
+[[ -n "$reviewer_command" ]] || die2 "reviewer.command empty in $branch:config.yaml"
 [[ -d "$root/work/$slug" ]] || die2 "missing work directory: $root/work/$slug"
+
+prompt=$(mktemp)
+trap 'rm -f "$prompt"' EXIT
 
 {
   printf "You are an independent code reviewer for work unit \`%s\`.\n\n" "$slug"
@@ -62,11 +68,21 @@ command=$(
   printf 'Your final line must be exactly one of:\n'
   printf 'Codex verdict: APPROVE\n'
   printf 'Codex verdict: REQUEST CHANGES\n\n'
-  printf '--- PLAN (%s:%s) ---\n' "$branch" "$plan_path"
-  git show "$branch:$plan_path" || exit 2
-  printf '\n--- DIFF (main...%s) ---\n' "$branch"
-  git diff "main...$branch" || exit 2
-} | bash -c "$command" >"$artifact"
+  printf '%s\n' "--- PLAN ($branch:$plan_path) ---"
+} >"$prompt"
+
+git show "$branch:$plan_path" >>"$prompt" \
+  || die2 "cannot read plan from $branch:$plan_path"
+
+printf '\n%s\n' "--- DIFF (main...$branch) ---" >>"$prompt"
+git diff "main...$branch" >>"$prompt" \
+  || die2 "cannot diff main...$branch"
+
+bash -c "$reviewer_command" <"$prompt" >"$artifact"
+reviewer_status=$?
+if [[ "$reviewer_status" -ne 0 ]]; then
+  die2 "reviewer command failed (exit $reviewer_status)"
+fi
 
 verdict_line=$(grep -E '^[[:space:]]*Codex verdict:' "$artifact" | tail -n 1 || true)
 if [[ -z "$verdict_line" ]]; then
