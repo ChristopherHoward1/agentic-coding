@@ -35,7 +35,7 @@ check_exit() {
   fi
 
   if [[ "$status" -eq "$expected" ]] \
-    && { [[ -z "$stderr_substring" ]] || grep -q -- "$stderr_substring" "$err"; }; then
+    && { [[ -z "$stderr_substring" ]] || grep -Fq -- "$stderr_substring" "$err"; }; then
     echo "ok: $desc"; pass=$((pass+1))
   else
     echo "FAIL: $desc (exit $status, expected $expected; stderr: $(tr '\n' ' ' <"$err"))"
@@ -371,6 +371,7 @@ trap 'rm -rf "$TMP"' EXIT
 check "codex-review reads plan body from branch" grep -F "git show \"\$branch:\$plan_path\"" scripts/codex-review.sh
 check "codex-review reads config from branch" grep -F "git show \"\$branch:config.yaml\"" scripts/codex-review.sh
 check "codex-review prompt names exact verdict format" grep -F 'Codex verdict: REQUEST CHANGES' scripts/codex-review.sh
+check "codex-review emits verdict instruction after diff" awk '/--- DIFF/ {d=1} d && /Your final line must/ {found=1} END {exit !found}' scripts/codex-review.sh
 
 setup_codex_review_fixture codex-approve normal
 check_exit "codex-review approve exits 0" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
@@ -399,7 +400,14 @@ check_exit "codex-review missing branch plan exits 2 before reviewer" 2 "cannot 
 check "codex-review does not invoke reviewer when branch plan is missing" test ! -e "$COD_MARKER"
 
 setup_codex_review_fixture codex-reviewer-fails reviewer-fails
+printf 'previous artifact\nCodex verdict: REQUEST CHANGES\n' >"$COD_PRIMARY/work/demo/codex-review.md"
 check_exit "codex-review reviewer failure exits 2 before verdict parsing" 2 "reviewer command failed (exit 42)" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+check "codex-review reviewer failure preserves previous artifact" bash -c "
+  diff -u <(printf 'previous artifact\nCodex verdict: REQUEST CHANGES\n') '$COD_PRIMARY/work/demo/codex-review.md'
+"
+
+setup_codex_review_fixture codex-from-worktree normal
+check_exit "codex-review refuses wt checkout as root" 2 "primary checkout" bash -c "cd '$COD_WORKTREE' && bash '$COD_PRIMARY/scripts/codex-review.sh' demo"
 
 setup_codex_review_fixture codex-artifact-only normal
 check_exit "codex-review artifact-only run exits 0" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
