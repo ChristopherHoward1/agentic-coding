@@ -1,6 +1,6 @@
 # Codex as second reviewer
 
-**Slug:** codex-reviewer · **Date:** 2026-08-26 · **Status:** approved
+**Slug:** codex-reviewer · **Date:** 2026-08-26 · **Status:** implemented
 
 ## Goal
 
@@ -72,3 +72,12 @@ Round 3 (plan-reviewer, opus, fresh): REVISE — adopted the reviewer's simpler 
 Round 4 (plan-reviewer, opus, fresh): REVISE — three findings, all applied: (1) config read moved to `git show wt/<slug>:config.yaml` — with a working-tree read the dogfood deterministically exits 2 (no `reviewer:` block in the primary) or dirties the release checkout; branch-sourced config removes the case entirely, exact dogfood command now in Verification, plus a worktree-clean AC; (2) awk key match anchored (`/^[[:space:]]*command:/`, `#`-rejected) with a commented-alternative test — checked, not policed by convention; (3) SKILL.md's sentinel-recording mechanics (worktree plan, single commit, never whole-file copy) made explicit and greppable — `fb4b0e0`'s whole-file shape is the hazard, not the precedent.
 Round 5 (plan-reviewer, opus, fresh): **APPROVE** — round-4 applications verified against the code; four nitpick-grade notes, adopted as implementation notes: (1) fixture's second verdict may be an *appended defaulted* param (`${6:-…}`) instead of a signature insertion — implementer's call, fewer churned lines; (2) artifact path pinned to `$(git rev-parse --show-toplevel)/work/<slug>/` (cwd-relative write was a silent-misplacement hazard); (3) SKILL.md's recording step also syncs the current plan body into the same worktree commit that carries both sentinels — otherwise the two vendors can judge different plan revisions; (4) optional `git rev-parse --verify wt/<slug>` precheck for an honest error on a missing branch.
 Plan verdict: APPROVE
+
+## Code review
+
+Round 1 (code-reviewer opus fresh + live codex, both REQUEST CHANGES): dead `|| exit 2` pipeline-subshell guards (APPROVE-of-nothing on missing plan), unchecked reviewer exit status (both vendors independently), `printf '--'` delimiter failure. Fixed in `f987f4a`.
+Round 2 (both fresh, both REQUEST CHANGES, converged): failing reviewer left an approval-looking audit artifact (temp-file+mv fix), exit-code contract absent from SKILL.md, verdict instruction moved to prompt tail. Fixed in `409c67d`.
+Round 3 (both fresh): codex APPROVE (live run, exit 0) + opus APPROVE (54/54 gate, all criteria met; dogfood artifact current). Non-blocking findings logged for retro: awk block-termination weaker than spec on colon-less top-level lines; branch-sourced `reviewer.command` is executable branch content (plan-sanctioned, needs a PLAN.md risk line); last-match verdict flippable by diff-quoting; primary-guard misses unrelated worktrees; README scripts inventory omits codex-review.sh.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
