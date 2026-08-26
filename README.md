@@ -30,7 +30,7 @@ flowchart TD
 
     CRev{{"<b>/3-review</b><br/>code-reviewer · NEW fresh thread · different model<br/>sees diff + plan only"}}:::grill
     CRev -- "REVISE — back to the implementer" --> Impl
-    CRev -- "Code-review verdict: APPROVE" --> Rel
+    CRev -- "Code-review verdict: APPROVE<br/>Codex-review verdict: APPROVE" --> Rel
 
     Rel["<b>/4-release</b><br/>release.sh re-runs gate + preconditions<br/>bumps version on branch"] --> Merge["Owner merges PR<br/>rebase / fast-forward"]:::human
     Merge --> Tag["tag-after-merge<br/>verify origin/main, then tag"]
