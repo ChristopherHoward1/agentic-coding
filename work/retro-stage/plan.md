@@ -1,6 +1,6 @@
 # /5-retro — the learning stage
 
-**Slug:** retro-stage · **Date:** 2026-08-26 · **Status:** approved
+**Slug:** retro-stage · **Date:** 2026-08-26 · **Status:** implemented
 
 ## Goal
 
@@ -70,3 +70,12 @@ Round 4 (plan-reviewer, opus, fresh): **APPROVE** — four non-blocking findings
 
 Round 3 (plan-reviewer, opus, fresh): REVISE — all five applied: (1) retro moved into a worktree via `worktree.sh add retro-<slug>` — the main-checkout flow violated invariant 3 and a live release precondition; (2) non-empty check (`[[ -s ]]`) + empty-file refusal case — existence-only was defeated by `touch`; (3) insertion point named exactly (between pre-gate ancestor check and `check_gate`) + ordering-falsifying stale-and-missing-retro test; (4) footprint honest about fixture machinery (optional params, pre-commit-hook rollback forcing, no existing rollback test; ARCHI's stale coverage claim flagged as retro fodder); (5) `/compact`-on-retro-branch rule and its AC dropped — `check_archi_fresh` already forces it by exit code.
 Plan verdict: APPROVE
+
+## Code review
+
+Round 1 (code-reviewer opus fresh + codex via released codex-review.sh): opus APPROVE with non-blocking findings (dead git-clean insurance, README four-stage staleness, marker-deletion bypass, whitespace retro, no /5-retro resume path); codex REQUEST CHANGES (ARCHI stale — scheduled /compact). Docs refreshed in `cd1311c`.
+Round 2 (both fresh): codex REQUEST CHANGES — README edit was outside the approved footprint; reverted in `e316f0b`. Opus APPROVE (final read at `e316f0b`, gate 61/61, mutation-tested the refusal matrix).
+Round 3 (both fresh, final diff `e316f0b`): codex APPROVE + opus APPROVE (all ACs met, footprint clean). Non-blocking findings logged for /5-retro: README five-stage follow-up (small fix, not retro-branch-eligible), marker-deletion bypass hardening candidate, marker content validation, /5-retro resume + worktree cleanup, retro-PR-must-merge-before-next-release wording, duplicate no-marker test.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
