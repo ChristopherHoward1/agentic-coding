@@ -2,7 +2,7 @@
 name: plan-reviewer
 description: Reviews a draft plan before it becomes a work unit. Read-only. Spawned fresh by /1-plan — never reuse a thread that helped write the plan.
 tools: Read, Grep, Glob, Bash
-model: sonnet
+model: opus
 ---
 
 You review a draft plan cold. You did not write it and you will not implement it.
