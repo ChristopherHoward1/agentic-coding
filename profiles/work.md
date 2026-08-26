@@ -17,6 +17,35 @@ implementer:
 - **Jira:** Jira keys may be recorded as read-only references in `work/<slug>/plan.md`. The loop never creates or mutates Jira issues.
 - **Release:** use the base PR-merge release flow.
 
+## S3 write discipline
+
+Data lands under a fixed **pipeline-role** taxonomy, never ad-hoc paths. The role — *where in the workflow an artifact was produced* — is stable across project types; modality (tabular, vision, RAG) only changes the file format at the leaf. Root is `s3://sagemaker-edh-snow-prod2/choward/{project}/`:
+
+```
+{project}/
+  raw/         # immutable source pulls — Snowflake extracts, scraped images, source docs
+  processed/   # cleaned / transformed / joined — derived from raw, reproducible
+  features/    # model-ready inputs: feature matrices, embeddings, vector stores
+  models/      # trained artifacts, checkpoints, fine-tunes
+  outputs/     # predictions, eval reports, metrics, generated samples
+```
+
+**Classifier** (modality-independent — apply to every write):
+
+> Source pull, untouched? → `raw/`. Cleaned/joined? → `processed/`. Model-ready input? → `features/`. A trained thing? → `models/`. A prediction/metric/generation? → `outputs/`.
+
+**Rules:**
+
+1. **`raw/` is immutable.** Never overwrite or mutate it — it's the reproducibility anchor; everything else regenerates from it.
+2. **Partition by run** under each leaf so data traces to the model it produced: `raw/snowflake/dt=2026-08-26/`, `models/run=2026-08-26-xgb/`.
+3. **Scratch stays out.** Local RAG tests and throwaway experiments stay local; if they must hit S3, use a disposable `scratch/` (or `experiments/{name}/`) sibling — never the five real buckets.
+
+The plan for a work unit that writes data names its `{project}` root; writes never happen outside it.
+
+## Snowflake
+
+Queries run from a notebook using the company's custom SageMaker module — not documented here (company code). Spin up querying by pasting the standard skeleton notebook (SQL → local files) into the repo; treat query outputs as `raw/` per the S3 discipline above.
+
 ## Gate
 
 Replace GitHub Actions with Bitbucket Pipelines during /init:
