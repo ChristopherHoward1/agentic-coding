@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.8.7] - 2026-08-26
+
+- New `/5-retro` stage — release.sh now refuses to release a unit until the previous unit's retro exists and is non-empty; lessons route into gate hooks, knowledge/ docs, or PLAN.md decisions.
+- Confirm-delta: none
+
 ## [2026.8.6] - 2026-08-26
 
 - Release now requires a second, read-only codex review — cross-vendor approval enforced by `release.sh`, not prose. (Binds from the next unit onward.)
