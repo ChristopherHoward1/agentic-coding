@@ -12,6 +12,7 @@ WORKTREE=${1:?usage: agent-exec.sh <worktree-path> <handoff-file>}
 HANDOFF=${2:?usage: agent-exec.sh <worktree-path> <handoff-file>}
 
 [[ -d "$WORKTREE" ]] || { echo "Error: worktree not found: $WORKTREE" >&2; exit 1; }
+WORKTREE=$(cd "$WORKTREE" && pwd -P)
 [[ -s "$HANDOFF" ]] || { echo "Error: handoff missing or empty: $HANDOFF" >&2; exit 1; }
 
 CMD=$(awk "/^implementer:/{f=1;next} f&&/command:/{sub(/^[[:space:]]*command:[[:space:]]*'/,\"\");sub(/'[[:space:]]*\$/,\"\");print;exit}" "$ROOT/config.yaml")

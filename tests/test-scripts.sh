@@ -304,7 +304,7 @@ setup_agent_exec_fixture() {
   local tmp_root="$TMP/$name"
 
   AGENT_PRIMARY="$tmp_root/primary"
-  AGENT_WORKTREE="$tmp_root/demo-wt"
+  AGENT_WORKTREE="$tmp_root/wts/demo-wt"
   AGENT_IMPL="$tmp_root/canned-implementer.sh"
   AGENT_HANDOFF="$tmp_root/handoff.md"
 
@@ -350,6 +350,7 @@ EOF
     printf 'base\n' >base.txt
     git add -A
     git commit -qm init
+    mkdir -p "$tmp_root/wts"
     git branch wt/demo
     git worktree add -q "$AGENT_WORKTREE" wt/demo
     git -C "$AGENT_WORKTREE" config user.email tester@example.com
@@ -629,6 +630,9 @@ check_fails "agent-exec rejects missing handoff" bash scripts/agent-exec.sh /tmp
 
 setup_agent_exec_fixture agent-commit commit
 check_exit "agent-exec exits 0 when implementer commits" 0 "" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF'"
+
+setup_agent_exec_fixture agent-relative-worktree commit
+check_exit "agent-exec exits 0 with relative worktree path when implementer commits" 0 "" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '../wts/demo-wt' '$AGENT_HANDOFF'"
 
 setup_agent_exec_fixture agent-cd-elsewhere-commit cd-elsewhere-commit
 check_exit "agent-exec exits 0 when implementer cd's elsewhere then commits" 0 "" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF'"
@@ -912,6 +916,16 @@ setup_release_fixture release-bootstrap-multiline-marker 2026.8.9 "Code-review v
   GIT_AUTHOR_DATE="2026-08-16T10:00:30Z" GIT_COMMITTER_DATE="2026-08-16T10:00:30Z" git commit -qm "multiline bootstrap marker"
 )
 check_exit "release refuses multi-line bootstrap last-released marker" 1 "malformed" bash -c "cd '$REL_WORKTREE' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo"
+
+setup_release_fixture release-bootstrap-symlink-marker 2026.8.9 "Code-review verdict: APPROVE" pass fresh
+(
+  cd "$REL_WORKTREE" || exit 1
+  printf 'previous\n' >"$TMP/release-bootstrap-symlink-target"
+  ln -sf "$TMP/release-bootstrap-symlink-target" work/.last-released
+  git add work/.last-released
+  GIT_AUTHOR_DATE="2026-08-16T10:00:30Z" GIT_COMMITTER_DATE="2026-08-16T10:00:30Z" git commit -qm "symlink bootstrap marker"
+)
+check_exit "release refuses symlinked bootstrap last-released marker" 1 "marker is a symlink" bash -c "cd '$REL_WORKTREE' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo"
 
 setup_release_fixture release-no-marker 2026.8.9 "Code-review verdict: APPROVE" pass fresh
 check "release proceeds without last-released marker" bash -c "
