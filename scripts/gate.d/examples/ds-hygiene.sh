@@ -11,11 +11,7 @@ cd "$(git rev-parse --show-toplevel)" || exit 1
 file_size_bytes() {
   local path="$1"
 
-  if stat -f %z "$path" >/dev/null 2>&1; then
-    stat -f %z "$path"
-  else
-    stat -c %s "$path"
-  fi
+  stat -c %s "$path" 2>/dev/null || stat -f %z "$path"
 }
 
 is_data_artifact() {
