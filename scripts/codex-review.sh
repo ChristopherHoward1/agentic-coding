@@ -31,8 +31,8 @@ fi
 git rev-parse --verify --quiet "$branch" >/dev/null \
   || die2 "missing branch: $branch"
 
-config=$(git show "$branch:config.yaml") \
-  || die2 "cannot read config.yaml from $branch"
+config=$(git show "main:config.yaml") \
+  || die2 "cannot read config.yaml from main"
 
 reviewer_command=$(
   awk '
@@ -59,9 +59,9 @@ reviewer_command=$(
       if (!found) exit 1
     }
   ' <<<"$config"
-) || die2 "reviewer.command missing in $branch:config.yaml"
+) || die2 "reviewer.command missing in main:config.yaml"
 
-[[ -n "$reviewer_command" ]] || die2 "reviewer.command empty in $branch:config.yaml"
+[[ -n "$reviewer_command" ]] || die2 "reviewer.command empty in main:config.yaml"
 [[ -d "$root/work/$slug" ]] || die2 "missing work directory: $root/work/$slug"
 
 prompt=$(mktemp)
