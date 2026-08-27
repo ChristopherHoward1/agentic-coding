@@ -57,3 +57,5 @@ Replace GitHub Actions with Bitbucket Pipelines during /init:
 - Add `bitbucket-pipelines.yml`.
 - Delete `.github/workflows/ci.yml`.
 - Keep the deterministic commands equivalent: install `shellcheck`, set a git identity, run `bash tests/test-scripts.sh`, then run `bash scripts/gate.sh`.
+
+Declare durable gate tool prerequisites under `gate.required_tools` in `config.yaml` as a colon-separated scalar, for example `shellcheck:ruff`. `GATE_REQUIRED_TOOLS` may override it for one command, but do not export it across a larger test or gate run.
