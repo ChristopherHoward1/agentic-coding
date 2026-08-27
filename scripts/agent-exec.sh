@@ -20,6 +20,7 @@ CMD=$(awk "/^implementer:/{f=1;next} f&&/command:/{sub(/^[[:space:]]*command:[[:
 
 HANDOFF_ABS=$(cd "$(dirname "$HANDOFF")" && pwd -P)/$(basename "$HANDOFF")
 HEAD_BEFORE=$(git -C "$WORKTREE" rev-parse HEAD)
+STATUS_BEFORE=$(git -C "$WORKTREE" status --porcelain)
 
 echo "Dispatching implementer in $WORKTREE" >&2
 echo "  $CMD < $HANDOFF_ABS" >&2
@@ -33,7 +34,7 @@ if [[ "$status" -ne 0 ]]; then
 fi
 
 HEAD_AFTER=$(git -C "$WORKTREE" rev-parse HEAD)
-if [[ "$HEAD_AFTER" == "$HEAD_BEFORE" && -z "$(git -C "$WORKTREE" status --porcelain)" ]]; then
+if [[ -z "$STATUS_BEFORE" && "$HEAD_AFTER" == "$HEAD_BEFORE" && -z "$(git -C "$WORKTREE" status --porcelain)" ]]; then
   echo "Error: implementer produced no new commit and left no worktree changes" >&2
   exit 1
 fi
