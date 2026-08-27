@@ -182,6 +182,7 @@ check_previous_retro() {
   local previous_retro
 
   if git show origin/main:"$marker" >/dev/null 2>&1; then
+    [[ ! -L "$marker" ]] || die "previous release marker is a symlink"
     [[ -f "$marker" ]] || die "previous release marker deleted; restore $marker from origin/main"
     git show origin/main:"$marker" | cmp -s - "$marker" \
       || die "previous release marker differs from origin/main; if this branch already carries its release commit, merge its PR instead of re-running release"

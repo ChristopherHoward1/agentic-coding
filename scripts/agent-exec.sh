@@ -31,8 +31,8 @@ if [[ "$status" -ne 0 ]]; then
   exit "$status"
 fi
 
-HEAD_AFTER=$(git rev-parse HEAD)
-if [[ "$HEAD_AFTER" == "$HEAD_BEFORE" && -z "$(git status --porcelain)" ]]; then
+HEAD_AFTER=$(git -C "$WORKTREE" rev-parse HEAD)
+if [[ "$HEAD_AFTER" == "$HEAD_BEFORE" && -z "$(git -C "$WORKTREE" status --porcelain)" ]]; then
   echo "Error: implementer produced no new commit and left no worktree changes" >&2
   exit 1
 fi
