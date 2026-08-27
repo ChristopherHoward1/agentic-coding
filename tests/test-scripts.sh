@@ -757,6 +757,33 @@ setup_gate_fixture gate-config-required
 )
 check "gate reads required_tools from config.yaml" bash -c "cd '$GATE_REPO' && out=\$(PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); status=\$?; [[ \"\$status\" -ne 0 ]] && grep -Fq 'configtool' <<<\"\$out\""
 
+setup_gate_fixture gate-commented-required
+(
+  cd "$GATE_REPO" || exit 1
+  printf 'gate:\n  command: scripts/gate.sh\n  # required_tools: shellcheck\n' >config.yaml
+  git add config.yaml
+  git commit -qm config
+)
+check "gate ignores commented-out required_tools" bash -c "cd '$GATE_REPO' && out=\$(PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); status=\$?; [[ \"\$status\" -eq 0 ]] && ! grep -Fq 'missing required tool' <<<\"\$out\""
+
+setup_gate_fixture gate-unrelated-required
+(
+  cd "$GATE_REPO" || exit 1
+  printf 'gate:\n  command: scripts/gate.sh\nother:\n  required_tools: should_not_apply\n' >config.yaml
+  git add config.yaml
+  git commit -qm config
+)
+check "gate ignores required_tools outside gate section" bash -c "cd '$GATE_REPO' && out=\$(PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); status=\$?; [[ \"\$status\" -eq 0 ]] && ! grep -Fq 'should_not_apply' <<<\"\$out\""
+
+setup_gate_fixture gate-empty-env-overrides-config
+(
+  cd "$GATE_REPO" || exit 1
+  printf 'gate:\n  required_tools: shellcheck\n' >config.yaml
+  git add config.yaml
+  git commit -qm config
+)
+check "gate treats empty GATE_REQUIRED_TOOLS as no required tools" bash -c "cd '$GATE_REPO' && out=\$(GATE_REQUIRED_TOOLS= PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); status=\$?; [[ \"\$status\" -eq 0 ]] && ! grep -Fq 'missing required tool' <<<\"\$out\""
+
 # --- agent-exec.sh argument validation
 check_fails "agent-exec rejects missing handoff" bash scripts/agent-exec.sh /tmp nonexistent-handoff.md
 

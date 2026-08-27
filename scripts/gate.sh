@@ -17,9 +17,28 @@ run() {
   fi
 }
 
-required_tools=${GATE_REQUIRED_TOOLS:-}
-if [[ -z "$required_tools" && -f config.yaml ]]; then
-  required_tools=$(awk '/^gate:/{f=1;next} f&&/required_tools:/{print $2; exit}' config.yaml)
+required_tools=
+if [[ ${GATE_REQUIRED_TOOLS+set} ]]; then
+  required_tools=$GATE_REQUIRED_TOOLS
+elif [[ -f config.yaml ]]; then
+  required_tools=$(awk '
+    /^[[:space:]]*#/ { next }
+    /^[^[:space:]#][^:]*:/ {
+      f = ($0 ~ /^gate:[[:space:]]*($|#)/)
+      next
+    }
+    f && /^[[:space:]]*required_tools:/ {
+      sub(/^[[:space:]]*required_tools:[[:space:]]*/, "")
+      sub(/[[:space:]]+#.*$/, "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+      if (($0 ~ /^".*"$/) || ($0 ~ /^'\''.*'\''$/)) {
+        sub(/^["'\'']/, "")
+        sub(/["'\'']$/, "")
+      }
+      print
+      exit
+    }
+  ' config.yaml)
 fi
 
 missing_required=()
@@ -37,6 +56,7 @@ if [[ ${#missing_required[@]} -gt 0 ]]; then
   for tool in "${missing_required[@]}"; do
     echo "✗ missing required tool: $tool"
   done
+  echo "GATE: FAIL — fix everything marked ✗ above."
   exit 1
 fi
 
