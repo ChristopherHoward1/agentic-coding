@@ -444,6 +444,37 @@ EOF
   )
 }
 
+setup_gate_fixture() {
+  local name="$1"
+  local tmp_root="$TMP/$name"
+
+  GATE_REPO="$tmp_root/repo"
+  GATE_BIN="$tmp_root/bin"
+  mkdir -p "$GATE_REPO/scripts" "$GATE_BIN"
+  git init -q -b main "$GATE_REPO"
+  (
+    cd "$GATE_REPO" || exit 1
+    git config user.email tester@example.com
+    git config user.name Tester
+    cp "$ROOT/scripts/gate.sh" scripts/gate.sh
+    git add -A
+    git commit -qm init
+  )
+  ln -sf /bin/bash "$GATE_BIN/bash"
+  ln -sf "$(command -v git)" "$GATE_BIN/git"
+  ln -sf "$(command -v awk)" "$GATE_BIN/awk"
+}
+
+write_fake_tool() {
+  local path="$1"
+  mkdir -p "$(dirname "$path")"
+  cat >"$path" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "$path"
+}
+
 # --- shellcheck the scripts themselves (gate.sh covers this too; belt+braces)
 if command -v shellcheck >/dev/null; then
   check "shellcheck scripts" shellcheck scripts/*.sh tests/*.sh
@@ -630,6 +661,101 @@ check "worktree add resume path does not duplicate plan commit" bash -c "
   [ '$SEED_PLAN_COMMITS_BEFORE' = 1 ] &&
   [ '$SEED_PLAN_COMMITS_AFTER' = 1 ]
 "
+
+# --- gate.sh tool visibility and required-tool preflight
+setup_gate_fixture gate-node-missing
+(
+  cd "$GATE_REPO" || exit 1
+  printf '{"scripts":{"lint":"true"}}\n' >package.json
+  git add package.json
+  git commit -qm node-marker
+)
+check "gate reports skipped node when package.json exists and node is missing" bash -c "cd '$GATE_REPO' && out=\$(PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); grep -Fq '⊘ skipped: node (not installed)' <<<\"\$out\""
+
+setup_gate_fixture gate-all-skips
+(
+  cd "$GATE_REPO" || exit 1
+  mkdir -p tests
+  printf '{"scripts":{"lint":"true"}}\n' >package.json
+  printf '[project]\nname = "fixture"\n' >pyproject.toml
+  printf 'fn main() {}\n' >Cargo.toml
+  printf 'module example.com/fixture\n' >go.mod
+  printf 'def test_fixture():\n    assert True\n' >tests/test_fixture.py
+  printf '#!/usr/bin/env bash\ntrue\n' >script.sh
+  git add -A
+  git commit -qm all-markers
+)
+check "gate reports skipped lines for every missing guarded tool" bash -c "cd '$GATE_REPO' && out=\$(PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); for tool in node ruff pytest shellcheck cargo go; do grep -Fq \"⊘ skipped: \$tool (not installed)\" <<<\"\$out\" || exit 1; done"
+
+setup_gate_fixture gate-shell-only
+(
+  cd "$GATE_REPO" || exit 1
+  printf '#!/usr/bin/env bash\ntrue\n' >script.sh
+  git add script.sh
+  git commit -qm shell-only
+)
+check "gate does not report absent cargo go or node in shell-only repo" bash -c "cd '$GATE_REPO' && out=\$(PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); ! grep -Eq 'skipped: (cargo|go|node)' <<<\"\$out\""
+
+setup_gate_fixture gate-python-no-tests
+(
+  cd "$GATE_REPO" || exit 1
+  printf '[project]\nname = "fixture"\n' >pyproject.toml
+  git add pyproject.toml
+  git commit -qm python-no-tests
+)
+check "gate does not report skipped pytest when no tests match" bash -c "cd '$GATE_REPO' && out=\$(PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); grep -Fq '⊘ skipped: ruff (not installed)' <<<\"\$out\" && ! grep -Fq 'skipped: pytest' <<<\"\$out\""
+
+setup_gate_fixture gate-node-runs
+write_fake_tool "$GATE_BIN/node"
+write_fake_tool "$GATE_BIN/npm"
+(
+  cd "$GATE_REPO" || exit 1
+  printf '{"scripts":{"lint":"true"}}\n' >package.json
+  git add package.json
+  git commit -qm node-runs
+)
+check "gate does not report skipped node when node check runs" bash -c "cd '$GATE_REPO' && out=\$(PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); grep -Fq '▶ npm run --silent lint' <<<\"\$out\" && ! grep -Fq 'skipped: node' <<<\"\$out\""
+
+setup_gate_fixture gate-required-present
+write_fake_tool "$GATE_BIN/fixturetool"
+check "gate required tool passes when fake executable is on PATH" bash -c "cd '$GATE_REPO' && GATE_REQUIRED_TOOLS=fixturetool PATH='$GATE_BIN' bash scripts/gate.sh"
+
+setup_gate_fixture gate-required-missing
+check "gate required tool fails and names missing executable" bash -c "cd '$GATE_REPO' && out=\$(GATE_REQUIRED_TOOLS=fixturetool PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); status=\$?; [[ \"\$status\" -ne 0 ]] && grep -Fq 'fixturetool' <<<\"\$out\""
+
+setup_gate_fixture gate-required-two-missing
+check "gate required tool preflight reports every missing executable" bash -c "cd '$GATE_REPO' && out=\$(GATE_REQUIRED_TOOLS=one:two PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); status=\$?; [[ \"\$status\" -ne 0 ]] && grep -Fq 'one' <<<\"\$out\" && grep -Fq 'two' <<<\"\$out\""
+
+setup_gate_fixture gate-required-no-run-lines
+(
+  cd "$GATE_REPO" || exit 1
+  printf '{"scripts":{"lint":"true"}}\n' >package.json
+  git add package.json
+  git commit -qm node-marker
+)
+check "gate required tool preflight aborts before stack checks" bash -c "cd '$GATE_REPO' && out=\$(GATE_REQUIRED_TOOLS=missingtool PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); status=\$?; [[ \"\$status\" -ne 0 ]] && ! grep -Fq '▶' <<<\"\$out\""
+
+setup_gate_fixture gate-no-config
+check "gate runs without config.yaml or GATE_REQUIRED_TOOLS" bash -c "cd '$GATE_REPO' && out=\$(PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); status=\$?; [[ \"\$status\" -eq 0 ]] && ! grep -Fq 'config.yaml' <<<\"\$out\""
+
+setup_gate_fixture gate-env-overrides-config
+write_fake_tool "$GATE_BIN/presenttool"
+(
+  cd "$GATE_REPO" || exit 1
+  printf 'gate:\n  required_tools: missing_from_config\n' >config.yaml
+  git add config.yaml
+  git commit -qm config
+)
+check "gate uses GATE_REQUIRED_TOOLS instead of config required_tools" bash -c "cd '$GATE_REPO' && GATE_REQUIRED_TOOLS=presenttool PATH='$GATE_BIN' bash scripts/gate.sh"
+
+setup_gate_fixture gate-config-required
+(
+  cd "$GATE_REPO" || exit 1
+  printf 'gate:\n  required_tools: configtool\n' >config.yaml
+  git add config.yaml
+  git commit -qm config
+)
+check "gate reads required_tools from config.yaml" bash -c "cd '$GATE_REPO' && out=\$(PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); status=\$?; [[ \"\$status\" -ne 0 ]] && grep -Fq 'configtool' <<<\"\$out\""
 
 # --- agent-exec.sh argument validation
 check_fails "agent-exec rejects missing handoff" bash scripts/agent-exec.sh /tmp nonexistent-handoff.md

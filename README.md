@@ -131,4 +131,4 @@ knowledge/           cold-tier reference docs — earned, not designed (starts e
 
 - **Claude Code** — the Orchestrator and the reviewer subagents.
 - **An implementer CLI** — default `codex`; set `implementer.command` in `config.yaml` to use anything else (including Claude Code itself).
-- **`git`, `bash`**, and whatever your project's gate needs (`shellcheck`, `ruff`, `pytest`, `cargo`, `go`, …). The gate auto-detects the stacks present.
+- **`git`, `bash`**, and whatever your project's gate needs (`shellcheck`, `ruff`, `pytest`, `cargo`, `go`, …); declare hard prerequisites with `gate.required_tools`. The gate auto-detects the stacks present.
