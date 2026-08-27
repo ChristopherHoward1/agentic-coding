@@ -26,7 +26,6 @@ if [[ ${GATE_REQUIRED_TOOLS+set} ]]; then
   required_tools=$GATE_REQUIRED_TOOLS
 elif [[ -f config.yaml ]]; then
   required_tools=$(awk '
-    /^[[:space:]]*#/ { next }
     /^[^[:space:]#][^:]*:/ {
       f = ($0 ~ /^gate:[[:space:]]*($|#)/)
       next
