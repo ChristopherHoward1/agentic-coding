@@ -1,6 +1,6 @@
 # Gate tool preflight — a skipped check must not read as a passed check
 
-**Slug:** gate-tool-preflight · **Date:** 2026-08-27 · **Status:** approved
+**Slug:** gate-tool-preflight · **Date:** 2026-08-27 · **Status:** implemented
 
 ## Goal
 
@@ -83,3 +83,33 @@ Applied:
 9. **Env-leak hazard** in the nested gate invocation — recorded under Implementation hazards.
 
 Plan verdict: APPROVE (revised draft; Owner-approved 2026-08-27 after the reviewer's REVISE findings were applied in full).
+
+### Code review — three rounds, dual vendor
+
+Each round used fresh reviewer threads on both vendors; an approving reviewer is anchored and was never reused.
+
+**Round 1** — Claude APPROVE (with findings), codex APPROVE. Claude rebuilt the branch standalone and killed every new assertion with hand-built mutants, independently validating the implementer's self-reported mutation testing. Two defects routed back rather than released on the verdict:
+- Unanchored awk matched a *commented-out* `# required_tools:` line, yielding the literal `required_tools:` as a required tool — commenting out the knob bricked the gate until you found the comment.
+- `GATE_REQUIRED_TOOLS=` (explicitly empty) did not override config, because the guard tested emptiness rather than presence — exactly the SageMaker diagnostic-run case in the Goal.
+- Plus: preflight abort exited with no `GATE:` terminator line.
+
+Fixed in `d4755e0`, which also reset section scoping and stripped quotes, covering the two secondary mis-parses.
+
+**Round 2** — codex APPROVE, Claude REVISE. Two blocking findings:
+- **Inbound env leakage.** The plan's hazard note covered only the outbound direction (tests must not `export`). `GATE_REQUIRED_TOOLS=shellcheck bash scripts/gate.sh` failed 8 of 15 new tests — the inherited value reached every fixture, whose restricted `PATH` lacks shellcheck, aborting each fixture gate before it could do its job. A green gate flipping red on an unrelated env var is the trust erosion this unit exists to fix.
+- **A vacuous test.** `preflight aborts before stack checks` passed even with the abort removed: the fixture had no runnable tool, so no implementation could emit a `▶` line and the assertion could not fail. Violates the 2026-08-27 mutation decision directly.
+
+Fixed in `960bcd9` (`unset` at the top of the gate block; fake `node`/`npm` added to the fixture).
+
+**Round 3** — both APPROVE. Claude ran 9 mutations in a sandbox and 12 parser shapes; every new assertion is falsifiable, inbound and outbound hermeticity both hold, `fail_message` masks nothing.
+
+Open non-blocking findings, carried to `/5-retro` rather than fixed here — a fourth dispatch would exceed the 3-round limit, and the 2026-08-27 cost lesson says a flagged-inert fix tends to spend its savings back as review churn:
+1. **Dead code:** the awk comment-skip rule at `gate.sh:29` is unreachable — deleting it leaves the suite at 105/0. CLAUDE.md says delete dead code. The commented-out test is still discriminating; only its guard is inert.
+2. **Positional, not structural:** `unset GATE_REQUIRED_TOOLS` sits ~180 lines into `tests/test-scripts.sh` with no comment, so a future real-gate check added above it silently loses the protection. Moving it beside `cd "$ROOT"` would make the property structural.
+3. Requested inbound regression test absent — reviewer recommends closing as "verified manually, cost of automation exceeds value" (a faithful test means a nested full-suite run, ~doubling gate wall-clock). Finding 2 is the better durable substitute.
+4. Space-separated tool lists become one bogus name — fails loudly, documented shape is colon-separated. Diagnosability nit.
+
+Gate: `GATE: PASS`, 105 checks (90 before this unit), verified by the orchestrator and both round-3 reviewers independently.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
