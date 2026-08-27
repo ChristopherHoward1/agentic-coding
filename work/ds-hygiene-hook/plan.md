@@ -1,6 +1,6 @@
 # DS hygiene gate hook
 
-**Slug:** ds-hygiene-hook · **Date:** 2026-08-27 · **Status:** draft
+**Slug:** ds-hygiene-hook · **Date:** 2026-08-27 · **Status:** implemented
 
 ## Goal
 
@@ -211,3 +211,46 @@ retro lesson that a reviewer's "drop this marginal fix" is a cost signal.
   inline `bash -c` rather than the standard helpers.
 
 Plan verdict: APPROVE
+
+## Code review
+
+Three rounds, dual-vendor (fresh Claude `code-reviewer` per round + `scripts/codex-review.sh`).
+
+**Round 1** — Claude REQUEST CHANGES, Codex APPROVE. Two blocking:
+1. `file_size_bytes`'s platform probe was inverted. GNU `stat -f %z` does not fail — `-f` means
+   `--file-system`, an unknown directive prints `?` and exits 0 — so on Linux `size` became `?`,
+   `stat -c %s` was never reached, and `[[ "?" -gt N ]]` aborted. The artifact check would have
+   never fired on ubuntu-latest CI or in any Linux DS repo, while the hook reported clean.
+   Fixed by ordering `stat -c %s … 2>/dev/null || stat -f %z …`.
+2. The test for criterion 7 was vacuous: its fixture violated both checks, so exit 1 arrived
+   from the path scan whether or not the artifact guard existed. Proven by deleting the guard —
+   suite stayed 87/87. Fixed with artifact-only fixtures.
+
+**Round 2** — Claude APPROVE, Codex REQUEST CHANGES. Two convergent test-coverage gaps:
+3. The empty-prefix skip (`[[ -z "$prefix" ]] && continue`) was load-bearing but untested —
+   deleting it killed nothing, yet without it `DS_DATA_ALLOW_DIRS=":data/samples"` exempts every
+   path, the exact allow-everything inversion this plan was written to prevent.
+4. Criterion 8's test asserted empty stderr but discarded the exit status (the form this plan
+   itself prescribed at lines 125-126 — the plan was imprecise, not the implementation).
+
+**Round 3** — both APPROVE. The Claude reviewer ran 13 mutations across the hook; every guard,
+both regex alternatives it tested, the `-gt` boundary, and the stderr redirect are each killed
+by at least one test. Gate 90/90, ARCHI count matches an actual run, footprint exactly the six
+declared paths.
+
+### Non-blocking findings carried to the follow-up unit
+
+Not fixed here: both reviewers approved, and fixing them in this stage would make the
+Orchestrator a writer and force a fourth review round for cosmetic-to-moderate gain.
+
+- **Non-numeric `DS_DATA_MAX_BYTES` disables the check while the gate stays green.**
+  `DS_DATA_MAX_BYTES=10MB` prints `value too great for base` to stderr and exits 0 — plausible
+  edit, bad failure mode. One-line `=~ ^[0-9]+$` validation closes it.
+- **`/home/` in the path regex is uncovered.** Removing that alternative kills no test: the
+  fixture containing `/home/someone/data` is only asserted with `DS_PATH_SCAN=''` expecting
+  exit 0, so it passes either way. `/home/` is the branch that matters on the CI platform.
+- **`is_data_artifact` is case-sensitive** — `data/BIG.CSV` passes while `data/big.csv` fails.
+  Uppercase extensions are common from Windows/Excel/SAS exports, i.e. this hook's population.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
