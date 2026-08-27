@@ -18,8 +18,21 @@ CMD=$(awk "/^implementer:/{f=1;next} f&&/command:/{sub(/^[[:space:]]*command:[[:
 [[ -n "$CMD" ]] || { echo "Error: implementer.command not set in config.yaml" >&2; exit 1; }
 
 HANDOFF_ABS=$(cd "$(dirname "$HANDOFF")" && pwd -P)/$(basename "$HANDOFF")
+HEAD_BEFORE=$(git -C "$WORKTREE" rev-parse HEAD)
 
 echo "Dispatching implementer in $WORKTREE" >&2
 echo "  $CMD < $HANDOFF_ABS" >&2
 cd "$WORKTREE"
+set +e
 eval "$CMD" < "$HANDOFF_ABS"
+status=$?
+set -e
+if [[ "$status" -ne 0 ]]; then
+  exit "$status"
+fi
+
+HEAD_AFTER=$(git rev-parse HEAD)
+if [[ "$HEAD_AFTER" == "$HEAD_BEFORE" && -z "$(git status --porcelain)" ]]; then
+  echo "Error: implementer produced no new commit and left no worktree changes" >&2
+  exit 1
+fi

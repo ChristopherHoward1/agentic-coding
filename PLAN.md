@@ -9,7 +9,7 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 ## Now
 
 - **Shipped 2026-08-26:** v2026.8.6 `work/codex-reviewer` (dual-vendor review, release-enforced) and v2026.8.7 `work/retro-stage` (`/5-retro`; marker arms next release). Reviewers on opus.
-- Next candidate: `loop-hardening` — named in `work/retro-stage/retro.md` (marker guard/validation, /5-retro resume+cleanup, dispatch disconnect detection).
+- In progress: `loop-hardening` — named in `work/retro-stage/retro.md` (marker byte-identity, main-bound codex reviewer command, /5-retro resume+cleanup, null dispatch detection).
 - **Full TRIP autonomy reached** (2026-08-25): 4/4 `none` releases (2026.8.1–2026.8.4); `/4-release` push confirmation removed from CLAUDE.md.
 - Remaining candidate: `/2-implement` batching — deferred until real use demands it.
 
@@ -25,9 +25,9 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 - 2026-08-25 — One universal PR-merge release topology under protected `main`; `self` direct-push + `review.human_pr_review` knob removed; tagging moves post-merge to `release.sh tag-after-merge` (verify-then-tag, no push) — `work/pr-merge-topology`
 - 2026-08-26 — /5-retro stage; release.sh refuses unit N until unit N−1's retro exists non-empty — work/retro-stage
 - 2026-08-26 — README loop/skills sections are release-note-owned: checked at /4-release step 3, fixed via the small-fix path — `work/retro-stage/retro.md`
+- 2026-08-26 — codex reviewer command is main-bound (branch config cannot choose the reviewer binary); marker byte-identity vs origin/main — work/loop-hardening
 
 ## Risks
 
 - Correlated validators: mitigated 2026-08-26 by the codex second reviewer (`work/codex-reviewer`); residual — orchestrator and Claude reviewer still share a vendor.
-- `reviewer.command` is executable branch content: an implementer could edit its own branch's `reviewer:` block to self-approve the codex gate. Mitigation today: the Claude reviewer sees `config.yaml` in the diff. Candidate hardening: `codex-review.sh` refuses when the branch's `reviewer:` block differs from `main`'s.
 - The PR-merge flow's `tag-after-merge` verify assumes the PR lands as a fast-forward/rebase so `origin/main`'s tip stays the `Release v<version>` commit; a merge-commit or squash strategy would (correctly) fail the guard and block tagging.

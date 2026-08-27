@@ -181,53 +181,8 @@ setup_codex_review_fixture() {
     chmod +x scripts/codex-review.sh
     printf 'base\n' >base.txt
     printf '# Primary plan\n' >work/demo/plan.md
-    git add -A
-    git commit -qm main
-    git branch wt/demo
-    git worktree add -q "$COD_WORKTREE" wt/demo
-    git -C "$COD_WORKTREE" config user.email tester@example.com
-    git -C "$COD_WORKTREE" config user.name Tester
-  )
-
-  cat >"$COD_REVIEWER" <<'EOF'
-#!/usr/bin/env bash
-set -uo pipefail
-if [[ -n "${COD_REVIEWER_MARKER:-}" ]]; then
-  printf 'invoked\n' >>"$COD_REVIEWER_MARKER"
-fi
-cat >/dev/null
-case "${1:-approve}" in
-  approve)
-    printf 'looks fine\n'
-    printf 'Codex verdict: APPROVE\n'
-    ;;
-  indented-approve)
-    printf 'looks fine\n'
-    printf '  Codex verdict: APPROVE\n'
-    ;;
-  request)
-    printf 'needs work\n'
-    printf 'Codex verdict: REQUEST CHANGES\n'
-    ;;
-  missing)
-    printf 'no machine verdict here\n'
-    ;;
-  approve-then-fail)
-    printf 'looks fine\n'
-    printf 'Codex verdict: APPROVE\n'
-    exit 42
-    ;;
-esac
-EOF
-  chmod +x "$COD_REVIEWER"
-
-  (
-    cd "$COD_WORKTREE" || exit 1
-    mkdir -p work/demo
-    printf '# Demo\n\n## Goal\n\nReview me.\n' >work/demo/plan.md
-    printf 'feature\n' >feature.txt
     case "$command_mode" in
-      normal)
+      normal|branch-override)
         cat >config.yaml <<EOF
 reviewer:
   command: '$COD_REVIEWER approve'
@@ -274,7 +229,6 @@ EOF
 reviewer:
   command: 'COD_REVIEWER_MARKER=$COD_MARKER $COD_REVIEWER approve'
 EOF
-        git rm -q -f work/demo/plan.md
         ;;
       reviewer-fails)
         cat >config.yaml <<EOF
@@ -284,8 +238,118 @@ EOF
         ;;
     esac
     git add -A
+    git commit -qm main
+    git branch wt/demo
+    git worktree add -q "$COD_WORKTREE" wt/demo
+    git -C "$COD_WORKTREE" config user.email tester@example.com
+    git -C "$COD_WORKTREE" config user.name Tester
+  )
+
+  cat >"$COD_REVIEWER" <<'EOF'
+#!/usr/bin/env bash
+set -uo pipefail
+if [[ -n "${COD_REVIEWER_MARKER:-}" ]]; then
+  printf 'invoked\n' >>"$COD_REVIEWER_MARKER"
+fi
+cat >/dev/null
+case "${1:-approve}" in
+  approve)
+    printf 'looks fine\n'
+    printf 'Codex verdict: APPROVE\n'
+    ;;
+  indented-approve)
+    printf 'looks fine\n'
+    printf '  Codex verdict: APPROVE\n'
+    ;;
+  request)
+    printf 'needs work\n'
+    printf 'Codex verdict: REQUEST CHANGES\n'
+    ;;
+  missing)
+    printf 'no machine verdict here\n'
+    ;;
+  approve-then-fail)
+    printf 'looks fine\n'
+    printf 'Codex verdict: APPROVE\n'
+    exit 42
+    ;;
+esac
+EOF
+  chmod +x "$COD_REVIEWER"
+
+  (
+    cd "$COD_WORKTREE" || exit 1
+    mkdir -p work/demo
+    printf '# Demo\n\n## Goal\n\nReview me.\n' >work/demo/plan.md
+    printf 'feature\n' >feature.txt
+    case "$command_mode" in
+      branch-override)
+        cat >config.yaml <<EOF
+reviewer:
+  command: '$COD_REVIEWER request'
+EOF
+        ;;
+      missing-plan)
+        git rm -q -f work/demo/plan.md
+        ;;
+    esac
+    git add -A
     git commit -qm "fixture $command_mode"
   )
+}
+
+setup_agent_exec_fixture() {
+  local name="$1"
+  local mode="$2"
+  local tmp_root="$TMP/$name"
+
+  AGENT_PRIMARY="$tmp_root/primary"
+  AGENT_WORKTREE="$tmp_root/demo-wt"
+  AGENT_IMPL="$tmp_root/canned-implementer.sh"
+  AGENT_HANDOFF="$tmp_root/handoff.md"
+
+  mkdir -p "$tmp_root"
+  git init -q -b main "$AGENT_PRIMARY"
+  (
+    cd "$AGENT_PRIMARY" || exit 1
+    git config user.email tester@example.com
+    git config user.name Tester
+    mkdir -p scripts
+    cp "$ROOT/scripts/agent-exec.sh" scripts/agent-exec.sh
+    chmod +x scripts/agent-exec.sh
+    cat >"$AGENT_IMPL" <<'EOF'
+#!/usr/bin/env bash
+set -uo pipefail
+cat >/dev/null
+git config user.email tester@example.com
+git config user.name Tester
+case "${AGENT_MODE:-nothing}" in
+  commit)
+    printf 'committed\n' >agent-result.txt
+    git add agent-result.txt
+    git commit -qm 'agent result'
+    ;;
+  dirty)
+    printf 'dirty\n' >agent-result.txt
+    ;;
+  nothing)
+    ;;
+esac
+EOF
+    chmod +x "$AGENT_IMPL"
+    cat >config.yaml <<EOF
+implementer:
+  command: 'AGENT_MODE=$mode $AGENT_IMPL'
+EOF
+    printf 'base\n' >base.txt
+    git add -A
+    git commit -qm init
+    git branch wt/demo
+    git worktree add -q "$AGENT_WORKTREE" wt/demo
+    git -C "$AGENT_WORKTREE" config user.email tester@example.com
+    git -C "$AGENT_WORKTREE" config user.name Tester
+  )
+  printf 'handoff\n' >"$AGENT_HANDOFF"
 }
 
 setup_fan_fixture() {
@@ -378,7 +442,7 @@ trap 'rm -rf "$TMP"' EXIT
 
 # --- codex-review.sh pure-reader contract with a canned reviewer
 check "codex-review reads plan body from branch" grep -F "git show \"\$branch:\$plan_path\"" scripts/codex-review.sh
-check "codex-review reads config from branch" grep -F "git show \"\$branch:config.yaml\"" scripts/codex-review.sh
+check "codex-review reads config from main" grep -F "git show \"main:config.yaml\"" scripts/codex-review.sh
 check "codex-review prompt names exact verdict format" grep -F 'Codex verdict: REQUEST CHANGES' scripts/codex-review.sh
 check "codex-review emits verdict instruction after diff" awk '/--- DIFF/ {d=1} d && /Your final line must/ {found=1} END {exit !found}' scripts/codex-review.sh
 
@@ -391,6 +455,9 @@ check_exit "codex-review accepts indented approve verdict" 0 "" bash -c "cd '$CO
 
 setup_codex_review_fixture codex-request request
 check_exit "codex-review request-changes exits 1" 1 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+
+setup_codex_review_fixture codex-branch-override branch-override
+check_exit "codex-review ignores branch reviewer.command override" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
 
 setup_codex_review_fixture codex-missing-verdict missing-verdict
 check_exit "codex-review missing verdict exits 2" 2 "no verdict" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
@@ -553,6 +620,15 @@ check "worktree add resume path does not duplicate plan commit" bash -c "
 
 # --- agent-exec.sh argument validation
 check_fails "agent-exec rejects missing handoff" bash scripts/agent-exec.sh /tmp nonexistent-handoff.md
+
+setup_agent_exec_fixture agent-commit commit
+check_exit "agent-exec exits 0 when implementer commits" 0 "" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF'"
+
+setup_agent_exec_fixture agent-dirty dirty
+check_exit "agent-exec exits 0 when implementer leaves uncommitted changes" 0 "" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF'"
+
+setup_agent_exec_fixture agent-nothing nothing
+check_exit "agent-exec exits non-zero when implementer produces nothing" 1 "no new commit" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF'"
 
 # --- opt-in notebook cleanliness hook
 NB_REPO="$TMP/notebook-clean"
@@ -764,6 +840,59 @@ check "release proceeds when previous retro is non-empty" bash -c "
   PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo &&
   [ \"\$(cat work/.last-released)\" = demo ]
 "
+
+setup_release_fixture release-marker-deleted 2026.8.9 "Code-review verdict: APPROVE" pass fresh "Codex-review verdict: APPROVE" previous "learned"
+(
+  cd "$REL_WORKTREE" || exit 1
+  git rm -q work/.last-released
+  GIT_AUTHOR_DATE="2026-08-16T10:00:30Z" GIT_COMMITTER_DATE="2026-08-16T10:00:30Z" git commit -qm "delete marker"
+)
+check_exit "release refuses deleted last-released marker" 1 "marker deleted" bash -c "cd '$REL_WORKTREE' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo"
+
+setup_release_fixture release-marker-mutated 2026.8.9 "Code-review verdict: APPROVE" pass fresh "Codex-review verdict: APPROVE" previous "learned"
+(
+  cd "$REL_WORKTREE" || exit 1
+  mkdir -p work/other
+  printf 'other\n' >work/.last-released
+  printf 'learned\n' >work/other/retro.md
+  git add work/.last-released work/other/retro.md
+  GIT_AUTHOR_DATE="2026-08-16T10:00:30Z" GIT_COMMITTER_DATE="2026-08-16T10:00:30Z" git commit -qm "mutate marker"
+)
+check_exit "release refuses mutated last-released marker" 1 "marker differs" bash -c "cd '$REL_WORKTREE' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo"
+
+setup_release_fixture release-marker-extra-newline 2026.8.9 "Code-review verdict: APPROVE" pass fresh "Codex-review verdict: APPROVE" previous "learned"
+(
+  cd "$REL_WORKTREE" || exit 1
+  printf 'previous\n\n' >work/.last-released
+  git add work/.last-released
+  GIT_AUTHOR_DATE="2026-08-16T10:00:30Z" GIT_COMMITTER_DATE="2026-08-16T10:00:30Z" git commit -qm "add marker newline"
+)
+check_exit "release refuses last-released marker with extra trailing newline" 1 "marker differs" bash -c "cd '$REL_WORKTREE' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo"
+
+setup_release_fixture release-rerun-release-commit 2026.8.9 "Code-review verdict: APPROVE" pass fresh "Codex-review verdict: APPROVE" previous "learned"
+check_exit "release re-run on release branch names merge guidance" 1 "merge its PR instead of re-running release" bash -c "
+  cd '$REL_WORKTREE' &&
+  PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo &&
+  PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo
+"
+
+setup_release_fixture release-bootstrap-empty-marker 2026.8.9 "Code-review verdict: APPROVE" pass fresh
+(
+  cd "$REL_WORKTREE" || exit 1
+  : >work/.last-released
+  git add work/.last-released
+  GIT_AUTHOR_DATE="2026-08-16T10:00:30Z" GIT_COMMITTER_DATE="2026-08-16T10:00:30Z" git commit -qm "empty bootstrap marker"
+)
+check_exit "release refuses empty bootstrap last-released marker" 1 "malformed" bash -c "cd '$REL_WORKTREE' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo"
+
+setup_release_fixture release-bootstrap-multiline-marker 2026.8.9 "Code-review verdict: APPROVE" pass fresh
+(
+  cd "$REL_WORKTREE" || exit 1
+  printf 'previous\nother\n' >work/.last-released
+  git add work/.last-released
+  GIT_AUTHOR_DATE="2026-08-16T10:00:30Z" GIT_COMMITTER_DATE="2026-08-16T10:00:30Z" git commit -qm "multiline bootstrap marker"
+)
+check_exit "release refuses multi-line bootstrap last-released marker" 1 "malformed" bash -c "cd '$REL_WORKTREE' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo"
 
 setup_release_fixture release-no-marker 2026.8.9 "Code-review verdict: APPROVE" pass fresh
 check "release proceeds without last-released marker" bash -c "

@@ -181,6 +181,18 @@ check_previous_retro() {
   local previous_slug
   local previous_retro
 
+  if git show origin/main:"$marker" >/dev/null 2>&1; then
+    [[ -f "$marker" ]] || die "previous release marker deleted; restore $marker from origin/main"
+    git show origin/main:"$marker" | cmp -s - "$marker" \
+      || die "previous release marker differs from origin/main; if this branch already carries its release commit, merge its PR instead of re-running release"
+  else
+    if [[ -f "$marker" ]]; then
+      [[ -s "$marker" ]] || die "previous release marker malformed"
+      [[ "$(awk 'END { print NR }' "$marker")" -eq 1 ]] \
+        || die "previous release marker malformed"
+    fi
+  fi
+
   [[ -f "$marker" ]] || return 0
 
   previous_slug=$(<"$marker")
