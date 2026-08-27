@@ -460,7 +460,7 @@ setup_gate_fixture() {
     git add -A
     git commit -qm init
   )
-  ln -sf /bin/bash "$GATE_BIN/bash"
+  ln -sf "$(command -v bash)" "$GATE_BIN/bash"
   ln -sf "$(command -v git)" "$GATE_BIN/git"
   ln -sf "$(command -v awk)" "$GATE_BIN/awk"
 }
@@ -663,6 +663,8 @@ check "worktree add resume path does not duplicate plan commit" bash -c "
 "
 
 # --- gate.sh tool visibility and required-tool preflight
+unset GATE_REQUIRED_TOOLS
+
 setup_gate_fixture gate-node-missing
 (
   cd "$GATE_REPO" || exit 1
@@ -727,6 +729,8 @@ setup_gate_fixture gate-required-two-missing
 check "gate required tool preflight reports every missing executable" bash -c "cd '$GATE_REPO' && out=\$(GATE_REQUIRED_TOOLS=one:two PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); status=\$?; [[ \"\$status\" -ne 0 ]] && grep -Fq 'one' <<<\"\$out\" && grep -Fq 'two' <<<\"\$out\""
 
 setup_gate_fixture gate-required-no-run-lines
+write_fake_tool "$GATE_BIN/node"
+write_fake_tool "$GATE_BIN/npm"
 (
   cd "$GATE_REPO" || exit 1
   printf '{"scripts":{"lint":"true"}}\n' >package.json

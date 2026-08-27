@@ -9,6 +9,10 @@ set -uo pipefail
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
 fail=0
+fail_message() {
+  echo "GATE: FAIL — fix everything marked ✗ above."
+}
+
 run() {
   echo "▶ $*"
   if ! "$@"; then
@@ -56,7 +60,7 @@ if [[ ${#missing_required[@]} -gt 0 ]]; then
   for tool in "${missing_required[@]}"; do
     echo "✗ missing required tool: $tool"
   done
-  echo "GATE: FAIL — fix everything marked ✗ above."
+  fail_message
   exit 1
 fi
 
@@ -131,6 +135,6 @@ done
 if [[ $fail -eq 0 ]]; then
   echo "GATE: PASS"
 else
-  echo "GATE: FAIL — fix everything marked ✗ above."
+  fail_message
 fi
 exit $fail
