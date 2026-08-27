@@ -803,7 +803,7 @@ git init -q -b main "$DS_DELETED_REPO"
   git commit -qm ds-hygiene-deleted
   rm data/deleted.parquet
 )
-check "ds hygiene hook skips deleted tracked artifact without stderr" bash -c "cd '$DS_DELETED_REPO' && [ -z \"\$(DS_DATA_MAX_BYTES=10 bash scripts/gate.d/ds-hygiene.sh 2>&1 >/dev/null)\" ]"
+check "ds hygiene hook skips deleted tracked artifact without stderr" bash -c "cd '$DS_DELETED_REPO' && out=\$(DS_DATA_MAX_BYTES=10 bash scripts/gate.d/ds-hygiene.sh 2>&1 >/dev/null); status=\$?; [[ \"\$status\" -eq 0 ]] && [[ -z \"\$out\" ]]"
 
 DS_ALLOW_LIST_REPO="$TMP/ds-hygiene-allow-list"
 git init -q -b main "$DS_ALLOW_LIST_REPO"
@@ -819,6 +819,21 @@ git init -q -b main "$DS_ALLOW_LIST_REPO"
   git commit -qm ds-hygiene-allow-list
 )
 check "ds hygiene hook honours colon-separated allow dirs" bash -c "cd '$DS_ALLOW_LIST_REPO' && DS_DATA_MAX_BYTES=10 DS_DATA_ALLOW_DIRS=tests/fixtures:data/samples bash scripts/gate.d/ds-hygiene.sh"
+
+DS_EMPTY_PREFIX_REPO="$TMP/ds-hygiene-empty-prefix"
+git init -q -b main "$DS_EMPTY_PREFIX_REPO"
+(
+  cd "$DS_EMPTY_PREFIX_REPO" || exit 1
+  git config user.email tester@example.com
+  git config user.name Tester
+  mkdir -p scripts/gate.d data/samples data/raw
+  cp "$ROOT/scripts/gate.d/examples/ds-hygiene.sh" scripts/gate.d/ds-hygiene.sh
+  printf 'small\n' >data/samples/allowed.csv
+  printf '01234567890123456789\n' >data/raw/outside.csv
+  git add -A
+  git commit -qm ds-hygiene-empty-prefix
+)
+check_exit "ds hygiene hook ignores empty allow-dir prefix" 1 "data/raw/outside.csv" bash -c "cd '$DS_EMPTY_PREFIX_REPO' && DS_DATA_MAX_BYTES=10 DS_DATA_ALLOW_DIRS=':data/samples' bash scripts/gate.d/ds-hygiene.sh"
 
 # --- fan-exec.sh dispatch/adopt in a hermetic repo with a canned implementer
 setup_fan_fixture fan-basic

@@ -41,4 +41,4 @@ Bash (`set -uo pipefail`, macOS/Linux) and Markdown. No compiled language, no pa
 
 ## Verification
 
-`bash scripts/gate.sh` — shellcheck over all tracked `*.sh` plus the `gate.d/` hook running `tests/test-scripts.sh` (89 checks, incl. the PR-merge release flow + `tag-after-merge`, the marker-integrity matrix, the dual-sentinel refusals, the hermetic fan-exec, agent-exec, and codex-review suites, the `worktree.sh add` base/seed cases, and the `nb-clean.sh` / `ds-hygiene.sh` example-hook cases). CI runs the gate on push. Currently green.
+`bash scripts/gate.sh` — shellcheck over all tracked `*.sh` plus the `gate.d/` hook running `tests/test-scripts.sh` (90 checks, incl. the PR-merge release flow + `tag-after-merge`, the marker-integrity matrix, the dual-sentinel refusals, the hermetic fan-exec, agent-exec, and codex-review suites, the `worktree.sh add` base/seed cases, and the `nb-clean.sh` / `ds-hygiene.sh` example-hook cases). CI runs the gate on push. Currently green.
