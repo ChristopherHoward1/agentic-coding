@@ -730,6 +730,36 @@ check_exit "ds hygiene hook flags Windows local path in Python" 1 "src/windows_p
 check_exit "ds hygiene hook still flags artifact when path scan is disabled" 1 "data/too-big.parquet" bash -c "cd '$DS_REPO' && DS_DATA_MAX_BYTES=10 DS_PATH_SCAN='' bash scripts/gate.d/ds-hygiene.sh"
 check_exit "ds hygiene hook still flags local path when artifact scan is disabled" 1 "src/user_path.py" bash -c "cd '$DS_REPO' && DS_DATA_MAX_BYTES='' bash scripts/gate.d/ds-hygiene.sh"
 
+DS_ARTIFACT_ONLY_REPO="$TMP/ds-hygiene-artifact-only"
+git init -q -b main "$DS_ARTIFACT_ONLY_REPO"
+(
+  cd "$DS_ARTIFACT_ONLY_REPO" || exit 1
+  git config user.email tester@example.com
+  git config user.name Tester
+  mkdir -p scripts/gate.d data src
+  cp "$ROOT/scripts/gate.d/examples/ds-hygiene.sh" scripts/gate.d/ds-hygiene.sh
+  printf '01234567890123456789\n' >data/too-big.parquet
+  printf 'DATA_ROOT = "relative/data"\n' >src/clean.py
+  git add -A
+  git commit -qm ds-hygiene-artifact-only
+)
+check "ds hygiene hook disables artifact scan independently" bash -c "cd '$DS_ARTIFACT_ONLY_REPO' && out=\$(DS_DATA_MAX_BYTES='' bash scripts/gate.d/ds-hygiene.sh 2>&1); status=\$?; [[ \"\$status\" -eq 0 ]] && [[ -z \"\$out\" ]]"
+
+DS_BOTH_FAIL_REPO="$TMP/ds-hygiene-both-fail"
+git init -q -b main "$DS_BOTH_FAIL_REPO"
+(
+  cd "$DS_BOTH_FAIL_REPO" || exit 1
+  git config user.email tester@example.com
+  git config user.name Tester
+  mkdir -p scripts/gate.d data src
+  cp "$ROOT/scripts/gate.d/examples/ds-hygiene.sh" scripts/gate.d/ds-hygiene.sh
+  printf '01234567890123456789\n' >data/both.parquet
+  printf 'DATA_ROOT = "/Users/someone/data"\n' >src/both_path.py
+  git add -A
+  git commit -qm ds-hygiene-both-fail
+)
+check "ds hygiene hook reports artifact and local path together" bash -c "cd '$DS_BOTH_FAIL_REPO' && out=\$(DS_DATA_MAX_BYTES=10 bash scripts/gate.d/ds-hygiene.sh 2>&1 >/dev/null); status=\$?; [[ \"\$status\" -eq 1 ]] && grep -Fq data/both.parquet <<<\"\$out\" && grep -Fq src/both_path.py <<<\"\$out\""
+
 DS_CLEAN_REPO="$TMP/ds-hygiene-clean"
 git init -q -b main "$DS_CLEAN_REPO"
 (
