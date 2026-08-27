@@ -10,7 +10,6 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 
 - **Shipped:** v2026.8.10 `work/gate-tool-preflight` (gate reports skipped checks; `gate.required_tools` hard-fail) · v2026.8.6 `work/codex-reviewer` (dual-vendor review) · v2026.8.7 `work/retro-stage` (`/5-retro`; marker arms next release) · v2026.8.8 `work/loop-hardening` (marker byte-identity, main-bound codex reviewer, /5-retro resume+cleanup, null-dispatch detection) · v2026.8.9 `work/ds-hygiene-hook` (opt-in DS hygiene gate hook; ML + work profiles wired). Reviewers on opus.
 - Candidate: `agent-exec-noop-scope` — soften the null-dispatch guard so a clean-tree no-op re-dispatch doesn't hard-fail (`work/loop-hardening/retro.md`; small, may be a small-fix).
-- Candidate: `gate-preflight-cleanup` — delete the unreachable awk comment-skip rule in `gate.sh`; make the suite's `unset GATE_REQUIRED_TOOLS` structural, not positional (`work/gate-tool-preflight/retro.md`; two one-liners, likely small-fix).
 - Candidate: `work-artifact-capture` — record `handoff.md`/`notes.md`/`followup-*.md`/`codex-review.md` onto the branch as `worktree.sh` already does for `plan.md`; artifacts were left untracked two units running (`work/gate-tool-preflight/retro.md`).
 - **Full TRIP autonomy reached** (2026-08-25): 4/4 `none` releases (2026.8.1–2026.8.4); `/4-release` push confirmation removed from CLAUDE.md.
 - Remaining candidate: `/2-implement` batching — deferred until real use demands it.
