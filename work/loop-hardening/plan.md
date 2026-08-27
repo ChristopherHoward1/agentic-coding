@@ -1,6 +1,6 @@
 # Loop hardening
 
-**Slug:** loop-hardening · **Date:** 2026-08-26 · **Status:** approved
+**Slug:** loop-hardening · **Date:** 2026-08-26 · **Status:** implemented
 
 ## Goal
 
@@ -193,3 +193,16 @@ Owner arbitration (2026-08-26): all four fixes ship; the knowledge-doc addendum
 stays dropped.
 
 Plan verdict: APPROVE (rounds 1–3 applied; Owner arbitrated both open items)
+
+### Implementation review (2026-08-26/27)
+
+Four dual-vendor rounds (Owner authorized round 4 after the 3-round budget):
+- R1: Claude APPROVE / codex REQUEST CHANGES → fixed symlink marker bypass; agent-exec post-dispatch `git -C`.
+- R2: Claude APPROVE / codex REQUEST CHANGES → normalized worktree path to absolute; bootstrap symlink refusal; ARCHI.md regenerated on-branch via /compact.
+- R3: Claude APPROVE / codex REQUEST CHANGES → null-dispatch guard scoped to clean-before-dispatch (Owner authorized fix + round 4).
+- R4: both APPROVE. Gate green (76 checks).
+
+Recorded deviations: symlink refusals are review-added scope (closes cmp-follows-symlinks bypass); the guard also fires on a clean-tree no-op re-dispatch (loud, orchestrator-recoverable — retro item); codex reviewer binds to local `main`, so a stale primary `main` runs an older reviewer (as designed; retro item).
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
