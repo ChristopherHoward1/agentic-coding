@@ -17,6 +17,10 @@ implementer:
 - **Jira:** Jira keys may be recorded as read-only references in `work/<slug>/plan.md`. The loop never creates or mutates Jira issues.
 - **Release:** use the base PR-merge release flow.
 
+## Machine-learning hygiene
+
+If a work repo is also an ML/data-science repo, copy the relevant `NOTEBOOK_STRATEGY` and `REPO_HYGIENE` declarations from `profiles/machine-learning.md` during /init. `config.yaml` selects exactly one `profile:` with no merging, and `scripts/gate.d/*.sh` hooks run on every gate regardless of `profile:`. The DS hygiene hook is a pre-commit guard over working-tree size; it prevents new tracked blobs before commit but does not recover already-committed artifact history.
+
 ## S3 write discipline
 
 Data lands under a fixed **pipeline-role** taxonomy, never ad-hoc paths. The role — *where in the workflow an artifact was produced* — is stable across project types; modality (tabular, vision, RAG) only changes the file format at the leaf. Root is `s3://<bucket>/<user>/{project}/` (declare the real bucket and user at /init; it lives in the work-side copy of this profile, never in the public template):

@@ -706,6 +706,90 @@ check_fails "notebook hook flags dirty tracked notebook" bash -c "cd '$NB_REPO' 
 cp "$NB_REPO/notebooks/cb/clean.ipynb" "$NB_REPO/notebooks/cb/dirty.ipynb"
 check "notebook hook passes cleaned tracked notebook" bash -c "cd '$NB_REPO' && bash scripts/gate.d/nb-clean.sh"
 
+# --- opt-in data-science hygiene hook
+DS_REPO="$TMP/ds-hygiene"
+git init -q -b main "$DS_REPO"
+(
+  cd "$DS_REPO" || exit 1
+  git config user.email tester@example.com
+  git config user.name Tester
+  mkdir -p scripts/gate.d data src tests/fixtures
+  cp "$ROOT/scripts/gate.d/examples/ds-hygiene.sh" scripts/gate.d/ds-hygiene.sh
+  printf '01234567890123456789\n' >data/too-big.parquet
+  printf '01234567890123456789\n' >tests/fixtures/allowed.csv
+  printf 'DATA_ROOT = "/Users/someone/data"\n' >src/user_path.py
+  printf "DATA_ROOT = 'C:\\\\data'\n" >src/windows_path.py
+  git add -A
+  git commit -qm ds-hygiene
+)
+check_exit "ds hygiene hook flags oversized tracked artifact" 1 "data/too-big.parquet" bash -c "cd '$DS_REPO' && DS_DATA_MAX_BYTES=10 bash scripts/gate.d/ds-hygiene.sh"
+check "ds hygiene hook exempts default allowed directory" bash -c "cd '$DS_REPO' && out=\$(DS_DATA_MAX_BYTES=10 bash scripts/gate.d/ds-hygiene.sh 2>&1); ! grep -q allowed.csv <<<\"\$out\""
+check_exit "ds hygiene hook treats empty allow dirs as no allowed dirs" 1 "tests/fixtures/allowed.csv" bash -c "cd '$DS_REPO' && DS_DATA_MAX_BYTES=10 DS_DATA_ALLOW_DIRS='' bash scripts/gate.d/ds-hygiene.sh"
+check_exit "ds hygiene hook flags Unix local path in Python" 1 "src/user_path.py" bash -c "cd '$DS_REPO' && DS_DATA_MAX_BYTES=1000 bash scripts/gate.d/ds-hygiene.sh"
+check_exit "ds hygiene hook flags Windows local path in Python" 1 "src/windows_path.py" bash -c "cd '$DS_REPO' && DS_DATA_MAX_BYTES=1000 bash scripts/gate.d/ds-hygiene.sh"
+check_exit "ds hygiene hook still flags artifact when path scan is disabled" 1 "data/too-big.parquet" bash -c "cd '$DS_REPO' && DS_DATA_MAX_BYTES=10 DS_PATH_SCAN='' bash scripts/gate.d/ds-hygiene.sh"
+check_exit "ds hygiene hook still flags local path when artifact scan is disabled" 1 "src/user_path.py" bash -c "cd '$DS_REPO' && DS_DATA_MAX_BYTES='' bash scripts/gate.d/ds-hygiene.sh"
+
+DS_CLEAN_REPO="$TMP/ds-hygiene-clean"
+git init -q -b main "$DS_CLEAN_REPO"
+(
+  cd "$DS_CLEAN_REPO" || exit 1
+  git config user.email tester@example.com
+  git config user.name Tester
+  mkdir -p scripts/gate.d data src tests/fixtures
+  cp "$ROOT/scripts/gate.d/examples/ds-hygiene.sh" scripts/gate.d/ds-hygiene.sh
+  printf 'small\n' >tests/fixtures/small.csv
+  printf '0123456789' >data/exact.npy
+  printf 'DATA_ROOT = "relative/data"\n' >src/clean.py
+  git add -A
+  git commit -qm ds-hygiene-clean
+)
+check "ds hygiene hook passes clean fixture" bash -c "cd '$DS_CLEAN_REPO' && DS_DATA_MAX_BYTES=10 bash scripts/gate.d/ds-hygiene.sh"
+
+DS_PATH_ONLY_REPO="$TMP/ds-hygiene-path-only"
+git init -q -b main "$DS_PATH_ONLY_REPO"
+(
+  cd "$DS_PATH_ONLY_REPO" || exit 1
+  git config user.email tester@example.com
+  git config user.name Tester
+  mkdir -p scripts/gate.d src
+  cp "$ROOT/scripts/gate.d/examples/ds-hygiene.sh" scripts/gate.d/ds-hygiene.sh
+  printf 'DATA_ROOT = "/home/someone/data"\n' >src/path.py
+  git add -A
+  git commit -qm ds-hygiene-path-only
+)
+check "ds hygiene hook disables path scan independently" bash -c "cd '$DS_PATH_ONLY_REPO' && DS_PATH_SCAN='' bash scripts/gate.d/ds-hygiene.sh"
+
+DS_DELETED_REPO="$TMP/ds-hygiene-deleted"
+git init -q -b main "$DS_DELETED_REPO"
+(
+  cd "$DS_DELETED_REPO" || exit 1
+  git config user.email tester@example.com
+  git config user.name Tester
+  mkdir -p scripts/gate.d data
+  cp "$ROOT/scripts/gate.d/examples/ds-hygiene.sh" scripts/gate.d/ds-hygiene.sh
+  printf '01234567890123456789\n' >data/deleted.parquet
+  git add -A
+  git commit -qm ds-hygiene-deleted
+  rm data/deleted.parquet
+)
+check "ds hygiene hook skips deleted tracked artifact without stderr" bash -c "cd '$DS_DELETED_REPO' && [ -z \"\$(DS_DATA_MAX_BYTES=10 bash scripts/gate.d/ds-hygiene.sh 2>&1 >/dev/null)\" ]"
+
+DS_ALLOW_LIST_REPO="$TMP/ds-hygiene-allow-list"
+git init -q -b main "$DS_ALLOW_LIST_REPO"
+(
+  cd "$DS_ALLOW_LIST_REPO" || exit 1
+  git config user.email tester@example.com
+  git config user.name Tester
+  mkdir -p scripts/gate.d tests/fixtures data/samples
+  cp "$ROOT/scripts/gate.d/examples/ds-hygiene.sh" scripts/gate.d/ds-hygiene.sh
+  printf '01234567890123456789\n' >tests/fixtures/allowed.csv
+  printf '01234567890123456789\n' >data/samples/allowed.csv
+  git add -A
+  git commit -qm ds-hygiene-allow-list
+)
+check "ds hygiene hook honours colon-separated allow dirs" bash -c "cd '$DS_ALLOW_LIST_REPO' && DS_DATA_MAX_BYTES=10 DS_DATA_ALLOW_DIRS=tests/fixtures:data/samples bash scripts/gate.d/ds-hygiene.sh"
+
 # --- fan-exec.sh dispatch/adopt in a hermetic repo with a canned implementer
 setup_fan_fixture fan-basic
 fan_manifest="$TMP/fan-manifest.out"
