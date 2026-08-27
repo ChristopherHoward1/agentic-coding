@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.8.9] - 2026-08-27
+
+- Added an opt-in `ds-hygiene.sh` gate hook flagging committed data/model
+- Confirm-delta: none
+
 ## [2026.8.8] - 2026-08-27
 
 - Enforcement hardening — retro marker must match origin/main byte-for-
