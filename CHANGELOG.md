@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.8.10] - 2026-08-27
+
+- Gate reports skipped checks and hard-fails on declared missing tools (`gate.required_tools`), so a green gate no longer hides checks that never ran.
+- Confirm-delta: none
+
 ## [2026.8.9] - 2026-08-27
 
 - Added an opt-in `ds-hygiene.sh` gate hook flagging committed data/model
