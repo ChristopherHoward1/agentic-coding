@@ -187,6 +187,7 @@ check_previous_retro() {
     git show origin/main:"$marker" | cmp -s - "$marker" \
       || die "previous release marker differs from origin/main; if this branch already carries its release commit, merge its PR instead of re-running release"
   else
+    [[ ! -L "$marker" ]] || die "previous release marker is a symlink"
     if [[ -f "$marker" ]]; then
       [[ -s "$marker" ]] || die "previous release marker malformed"
       [[ "$(awk 'END { print NR }' "$marker")" -eq 1 ]] \
