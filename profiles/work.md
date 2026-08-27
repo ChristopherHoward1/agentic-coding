@@ -19,7 +19,7 @@ implementer:
 
 ## Machine-learning hygiene
 
-If a work repo is also an ML/data-science repo, copy the relevant `NOTEBOOK_STRATEGY` and `REPO_HYGIENE` declarations from `profiles/machine-learning.md` during /init. `config.yaml` selects exactly one `profile:` with no merging, and `scripts/gate.d/*.sh` hooks run on every gate regardless of `profile:`. The DS hygiene hook is a pre-commit guard over working-tree size; it prevents new tracked blobs before commit but does not recover already-committed artifact history. Its allowed directories are literal path prefixes, so choose prefixes with separator boundaries where that distinction matters.
+If a work repo is also an ML/data-science repo, copy the relevant `NOTEBOOK_STRATEGY` and `REPO_HYGIENE` declarations from `profiles/machine-learning.md` during /init. `config.yaml` selects exactly one `profile:` with no merging, and `scripts/gate.d/*.sh` hooks run on every gate regardless of `profile:`. The DS hygiene hook is a gate-time guard over working-tree size, run before the commit lands; it prevents new tracked blobs before commit but does not recover already-committed artifact history. Its allowed directories are literal path prefixes, so choose prefixes with separator boundaries where that distinction matters.
 
 ## S3 write discipline
 
