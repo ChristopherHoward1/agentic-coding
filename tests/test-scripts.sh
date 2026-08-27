@@ -338,6 +338,9 @@ case "${AGENT_MODE:-nothing}" in
   dirty)
     printf 'dirty\n' >agent-result.txt
     ;;
+  predirty-clean)
+    rm -f preexisting-dirty.txt
+    ;;
   nothing)
     ;;
 esac
@@ -355,6 +358,9 @@ EOF
     git worktree add -q "$AGENT_WORKTREE" wt/demo
     git -C "$AGENT_WORKTREE" config user.email tester@example.com
     git -C "$AGENT_WORKTREE" config user.name Tester
+    if [[ "$mode" == predirty-clean ]]; then
+      printf 'preexisting dirty state\n' >"$AGENT_WORKTREE/preexisting-dirty.txt"
+    fi
   )
   printf 'handoff\n' >"$AGENT_HANDOFF"
 }
@@ -639,6 +645,9 @@ check_exit "agent-exec exits 0 when implementer cd's elsewhere then commits" 0 "
 
 setup_agent_exec_fixture agent-dirty dirty
 check_exit "agent-exec exits 0 when implementer leaves uncommitted changes" 0 "" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF'"
+
+setup_agent_exec_fixture agent-predirty-clean predirty-clean
+check_exit "agent-exec exits 0 when dirty redispatch cleans tree without commit" 0 "" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF'"
 
 setup_agent_exec_fixture agent-nothing nothing
 check_exit "agent-exec exits non-zero when implementer produces nothing" 1 "no new commit" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF'"
