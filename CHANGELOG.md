@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.8.8] - 2026-08-27
+
+- Enforcement hardening — retro marker must match origin/main byte-for-
+- Confirm-delta: none
+
 ## [2026.8.7] - 2026-08-26
 
 - New `/5-retro` stage — release.sh now refuses to release a unit until the previous unit's retro exists and is non-empty; lessons route into gate hooks, knowledge/ docs, or PLAN.md decisions.
