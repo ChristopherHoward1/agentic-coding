@@ -19,7 +19,7 @@ implementer:
 
 ## S3 write discipline
 
-Data lands under a fixed **pipeline-role** taxonomy, never ad-hoc paths. The role — *where in the workflow an artifact was produced* — is stable across project types; modality (tabular, vision, RAG) only changes the file format at the leaf. Root is `s3://sagemaker-edh-snow-prod2/choward/{project}/`:
+Data lands under a fixed **pipeline-role** taxonomy, never ad-hoc paths. The role — *where in the workflow an artifact was produced* — is stable across project types; modality (tabular, vision, RAG) only changes the file format at the leaf. Root is `s3://<bucket>/<user>/{project}/` (declare the real bucket and user at /init; it lives in the work-side copy of this profile, never in the public template):
 
 ```
 {project}/
