@@ -47,6 +47,12 @@ check_exit() {
 ROOT=$(git rev-parse --show-toplevel)
 cd "$ROOT" || exit 1
 
+# This suite runs nested inside scripts/gate.sh (via the gate.d/ hook), so an inherited
+# value would reach every fixture gate and abort it. Keep this here, not beside the gate
+# cases — a guard that works only because of where it sits is lost by the next case
+# added above it. See knowledge/test-helper-contract.md.
+unset GATE_REQUIRED_TOOLS
+
 commit_fixture() {
   local repo="$1"
   local stamp="$2"
@@ -663,8 +669,6 @@ check "worktree add resume path does not duplicate plan commit" bash -c "
 "
 
 # --- gate.sh tool visibility and required-tool preflight
-unset GATE_REQUIRED_TOOLS
-
 setup_gate_fixture gate-node-missing
 (
   cd "$GATE_REPO" || exit 1
