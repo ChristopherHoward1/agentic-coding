@@ -329,6 +329,12 @@ case "${AGENT_MODE:-nothing}" in
     git add agent-result.txt
     git commit -qm 'agent result'
     ;;
+  cd-elsewhere-commit)
+    cd /tmp || exit 1
+    printf 'committed after cd\n' >"$AGENT_WORKTREE_PATH/agent-result.txt"
+    git -C "$AGENT_WORKTREE_PATH" add agent-result.txt
+    git -C "$AGENT_WORKTREE_PATH" commit -qm 'agent result after cd'
+    ;;
   dirty)
     printf 'dirty\n' >agent-result.txt
     ;;
@@ -339,7 +345,7 @@ EOF
     chmod +x "$AGENT_IMPL"
     cat >config.yaml <<EOF
 implementer:
-  command: 'AGENT_MODE=$mode $AGENT_IMPL'
+  command: 'AGENT_MODE=$mode AGENT_WORKTREE_PATH=$AGENT_WORKTREE $AGENT_IMPL'
 EOF
     printf 'base\n' >base.txt
     git add -A
@@ -624,6 +630,9 @@ check_fails "agent-exec rejects missing handoff" bash scripts/agent-exec.sh /tmp
 setup_agent_exec_fixture agent-commit commit
 check_exit "agent-exec exits 0 when implementer commits" 0 "" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF'"
 
+setup_agent_exec_fixture agent-cd-elsewhere-commit cd-elsewhere-commit
+check_exit "agent-exec exits 0 when implementer cd's elsewhere then commits" 0 "" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF'"
+
 setup_agent_exec_fixture agent-dirty dirty
 check_exit "agent-exec exits 0 when implementer leaves uncommitted changes" 0 "" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF'"
 
@@ -859,6 +868,16 @@ setup_release_fixture release-marker-mutated 2026.8.9 "Code-review verdict: APPR
   GIT_AUTHOR_DATE="2026-08-16T10:00:30Z" GIT_COMMITTER_DATE="2026-08-16T10:00:30Z" git commit -qm "mutate marker"
 )
 check_exit "release refuses mutated last-released marker" 1 "marker differs" bash -c "cd '$REL_WORKTREE' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo"
+
+setup_release_fixture release-marker-symlink 2026.8.9 "Code-review verdict: APPROVE" pass fresh "Codex-review verdict: APPROVE" previous "learned"
+(
+  cd "$REL_WORKTREE" || exit 1
+  git show origin/main:work/.last-released >"$TMP/release-marker-symlink-target"
+  ln -sf "$TMP/release-marker-symlink-target" work/.last-released
+  git add work/.last-released
+  GIT_AUTHOR_DATE="2026-08-16T10:00:30Z" GIT_COMMITTER_DATE="2026-08-16T10:00:30Z" git commit -qm "symlink marker"
+)
+check_exit "release refuses symlinked last-released marker" 1 "marker is a symlink" bash -c "cd '$REL_WORKTREE' && PATH='$REL_FAKEBIN':\$PATH bash scripts/release.sh demo"
 
 setup_release_fixture release-marker-extra-newline 2026.8.9 "Code-review verdict: APPROVE" pass fresh "Codex-review verdict: APPROVE" previous "learned"
 (
