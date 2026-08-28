@@ -1,6 +1,6 @@
 # Work artifact capture — a released unit's artifacts should reach main with it
 
-**Slug:** work-artifact-capture · **Date:** 2026-08-27 · **Status:** approved
+**Slug:** work-artifact-capture · **Date:** 2026-08-27 · **Status:** implemented
 
 ## Goal
 
@@ -59,9 +59,9 @@ Files NOT to touch:
 - [ ] A gitignored stray (`.DS_Store`) in `work/<slug>/` does not abort the subcommand — it exits 0 and the file is not committed.
 - [ ] Refuses with a non-zero exit and a clear message when no worktree exists for `<slug>`.
 - [ ] Refuses when the primary checkout has no `work/<slug>/` directory.
-- [ ] Leaves the worktree clean — `git status --porcelain` in the worktree is empty afterwards, so `release.sh`'s `check_clean_worktree` still passes.
+- [ ] Leaves the worktree clean **given a clean input** — `git status --porcelain` in the worktree is empty afterwards, so `release.sh`'s `check_clean_worktree` still passes. Deliberate exception: a pre-existing uncommitted `plan.md` edit stays pending, because sync must never fold review sentinels into an artifact commit. *(Wording amended 2026-08-28: codex flagged twice that the original absolute phrasing contradicted the tested plan-dirt behavior.)*
 - [ ] `scripts/release.sh` is byte-identical: `git diff main...HEAD -- scripts/release.sh` is empty.
-- [ ] ARCHI's Verification check count matches `tests/test-scripts.sh` output (currently 132).
+- [ ] ARCHI's Verification check count matches `tests/test-scripts.sh` output (currently 137).
 - [ ] Each new test has been shown to fail with its guard removed (2026-08-27 decision in `PLAN.md`; see `knowledge/test-helper-contract.md` for how vacuity arises here and what each helper actually asserts).
 - [ ] `bash scripts/gate.sh` passes.
 
@@ -93,3 +93,32 @@ Applied:
 6. **Adopted the reviewer's simpler shape:** exclude `plan.md`, `cp` the rest with no per-file comparison, `git add` the directory so git skips ignored strays itself, commit only if `git diff --cached --quiet` fails. ~8 lines, and it deletes the "which copy wins" question from the implementation.
 
 Plan verdict: APPROVE (revised draft; Owner-approved 2026-08-27 after the reviewer's six REVISE findings were applied in full).
+
+### Code review — six rounds, dual vendor
+
+Fresh reviewer threads on both vendors every round; an approving reviewer is anchored and was never reused. The Owner authorized rounds 4, 5, and 6 past the 3-round cap, each time on an explicit escalation.
+
+**Round 1** — both requested changes. `[[ -f ]]` follows symlinks, so a link's *target contents* were copied and committed (demonstrated live against a file outside the repo). The `/2-implement` call site covered only the initial dispatch, so a unit escalated at the retry cap still lost its followups.
+
+**Round 2** — codex APPROVE, Claude REVISE. The `.DS_Store` test was **vacuous**: it placed the file in the *worktree*, where gitignore excludes it under every implementation, so the plan's directory-staging decision had no test behind it. Swapping in per-file staging left the suite green. Also: the target worktree was resolved by path, not branch, so a worktree switched to another branch would silently receive the commit.
+
+**Round 3** — both requested changes. `sync-artifacts` invoked *from inside the worktree* — exactly where the round-1 call site put it, since `/2-implement` step 4 `cd`s there and cwd persists — resolved `ROOT` to the worktree and silently copied nothing, exit 0. `git commit` without a pathspec committed the **entire index**, sweeping an unrelated staged file into a "Record artifacts" commit.
+
+**Round 4** — codex APPROVE, Claude REVISE. Escalated to the Owner, who chose to scope the reviewer diff and authorized round 5. Two blockers: the exclusion pathspec `.` was **cwd-relative**, so a subdirectory invocation silently truncated the reviewer's diff — a mechanically recorded APPROVE over a diff never shown; and a non-ASCII artifact filename made sync exit 1 with a staged-dirty worktree, blocking the release.
+
+**Round 5** — codex REQUEST CHANGES (Fan Mode had no sync call, correcting a round-1 judgment this plan had adopted), Claude REVISE: the `,top` anchor added in round 5 had **no test** — dropping it leaked eight artifact files back into the reviewer diff with the suite still at 136/136.
+
+**Round 6** — both APPROVE. Claude ran ten mutations, asserting each landed, and found no vacuous test; codex found no substantive defect.
+
+**The through-line worth keeping:** five of six rounds found either a vacuous test or an unpinned guard, and three separate defects were the same failure mode — *cwd- or checkout-dependence producing a silent no-op rather than a loud error*. A fourth instance hit the orchestrator's own dispatch during round 6.
+
+Open non-blocking notes, carried to `/5-retro`:
+1. **Staging scope unpinned:** replacing `git add -- "work/$slug"` with `git add -A` leaves the suite green. Bounded by the pinned commit pathspec, but drift would silently stage unrelated worktree edits.
+2. **The `|| true` prohibition is unpinned:** collapsing the commit guard to `git commit … || true` keeps the suite green. Shipped code is correct; only drift detection is missing.
+3. **New pre-release stop condition:** `/4-release` step 1 now runs sync before `release.sh`, so a removed `wt/<slug>` worktree stops an orchestrator following the prose literally. `release.sh` itself is untouched; recovery is `worktree.sh add`.
+4. Gitignored primary strays are physically copied into the worktree working directory (never staged, status stays clean).
+
+Gate: `GATE: PASS`, 137 checks (105 before this unit). Verified by the orchestrator and both round-6 reviewers independently; `scripts/release.sh` byte-identical throughout.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
