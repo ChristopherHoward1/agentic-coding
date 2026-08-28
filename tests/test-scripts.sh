@@ -804,6 +804,26 @@ check "worktree sync-artifacts commit excludes unrelated staged file" bash -c "
   git -C '$SYNC_WORKTREE' status --porcelain | grep -Fx 'A  AGENTS.md'
 "
 
+# Pins the scoped `git add -- work/<slug>`: `git add -A` would stage this edit as a
+# side effect of a bookkeeping command, changing what a later worktree commit picks up.
+setup_worktree_sync_fixture sync-unrelated-unstaged
+printf '# unstaged unrelated edit\n' >>"$SYNC_WORKTREE/config.yaml"
+check_exit "worktree sync-artifacts leaves unrelated unstaged edit alone" 0 "" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts demo"
+check "worktree sync-artifacts does not stage unrelated worktree edit" bash -c "
+  git -C '$SYNC_WORKTREE' status --porcelain | grep -Fx ' M config.yaml'
+"
+
+# Pins the commit guard against `|| true`: a real commit failure must propagate, not be
+# swallowed. Hooks live in the common dir, so this fires for the linked worktree too.
+setup_worktree_sync_fixture sync-commit-failure
+cat >"$SYNC_PRIMARY/.git/hooks/pre-commit" <<'EOF'
+#!/bin/sh
+exit 1
+EOF
+chmod +x "$SYNC_PRIMARY/.git/hooks/pre-commit"
+check_fails "worktree sync-artifacts propagates a failed artifact commit" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts demo"
+rm -f "$SYNC_PRIMARY/.git/hooks/pre-commit"
+
 setup_worktree_sync_fixture sync-primary-non-main
 git -C "$SYNC_PRIMARY" checkout -q -b owner-fix
 check_exit "worktree sync-artifacts accepts primary checkout on non-main branch" 0 "" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts demo"
