@@ -12,11 +12,13 @@ Done = every unit that reaches release has its artifacts committed on `wt/<slug>
 
 ## Approach
 
-Add `scripts/worktree.sh sync-artifacts <slug>`: copy `work/<slug>/`'s top-level regular non-dot files from the primary checkout into the same path in the unit's worktree, **excluding `plan.md`**, then `git add -- work/<slug>` and commit only if something is staged.
+Add `scripts/worktree.sh sync-artifacts <slug>`: refuse unless run from the primary checkout, copy `work/<slug>/`'s top-level regular non-dot files from the primary checkout into the same path in the unit's worktree, **excluding `plan.md`**, then `git add -- work/<slug>`, explicitly unstage `work/<slug>/plan.md` if directory staging picked it up, and commit only if something else is staged.
 
 **`plan.md` is excluded outright**, not merely protected. It reaches the branch via `add`, and `/3-review` step 5 writes the verdict sentinels into the *worktree* copy and explicitly warns against `cp`-ing over it from the primary checkout (`skills/3-review/SKILL.md:18`). Excluding it removes the "which copy wins" question from the implementation entirely; every other file is copied unconditionally, so a second sync correctly refreshes a `notes.md` that a followup round rewrote.
 
-**Top-level regular non-dot files only.** Dotfiles must not sync: `codex-review.sh:92` creates `mktemp "$root/work/$slug/.codex-review.XXXXXX"` in that very directory, cleaned by an EXIT trap that a SIGKILL defeats — syncing dotfiles would commit reviewer garbage. Separately, `.DS_Store` is gitignored, and `git add` of an explicitly-named ignored file fails, which under `set -euo pipefail` would abort the subcommand. Staging the **directory** (`git add -- work/<slug>`) rather than each file lets git skip ignored strays silently instead of erroring.
+**Top-level regular non-dot files only for the copy.** Dotfiles must not sync: `codex-review.sh:92` creates `mktemp "$root/work/$slug/.codex-review.XXXXXX"` in that very directory, cleaned by an EXIT trap that a SIGKILL defeats — syncing dotfiles would commit reviewer garbage. Separately, `.DS_Store` is gitignored, and `git add` of an explicitly-named ignored file fails, which under `set -euo pipefail` would abort the subcommand. Staging the **directory** (`git add -- work/<slug>`) rather than each copied file lets git skip ignored strays silently instead of erroring.
+
+**Whole unit directory for staging, minus `plan.md`.** Per-file staging is intentionally avoided because explicitly adding gitignored strays aborts under `set -e`. After the directory add, `sync-artifacts` unstages `work/<slug>/plan.md` when needed, so review sentinels can never be folded into a `Record artifacts` commit regardless of command ordering. Other files already present under the worktree's `work/<slug>/` are accepted as in scope for the unit and may be committed by the artifact sync; the copy scope is narrow, while the staging scope is the whole unit directory minus `plan.md`.
 
 **Why `worktree.sh`.** `fan-exec.sh:38` already does `cp -R "$ROOT/work/$slug" "$wt/work/"`, so the copy idiom belongs to the worktree layer, not the producers. Having each writer commit its own output would spread the same logic across scripts and still leave `notes.md` homeless, since the orchestrator writes it and no script owns it.
 
@@ -49,13 +51,16 @@ Files NOT to touch:
 - [ ] **A second sync refreshes changed files:** modify `notes.md` in the primary checkout, re-run, and the worktree copy matches the new content.
 - [ ] Idempotent: two consecutive syncs with no intervening change produce exactly one commit; the second exits 0 having committed nothing.
 - [ ] Dotfiles are not synced: a fixture containing `.codex-review.tmpAB` leaves it absent from `git ls-tree -r wt/<slug> -- work/<slug>/`.
-- [ ] Subdirectories are not synced: a fixture containing `work/<slug>/sub/x.md` leaves it absent from the same listing.
+- [ ] Primary-checkout subdirectories are not synced: a fixture containing `work/<slug>/sub/x.md` in the primary checkout leaves it absent from the same listing.
+- [ ] Existing worktree-side files under `work/<slug>/`, including subdirectory files, are deliberately staged and committed by the artifact sync.
+- [ ] A dirty worktree `plan.md` sentinel edit is left pending after sync and is not included in the artifact commit.
+- [ ] Refuses with a non-zero exit and a clear message when invoked from inside the unit worktree instead of the primary checkout.
 - [ ] A gitignored stray (`.DS_Store`) in `work/<slug>/` does not abort the subcommand — it exits 0 and the file is not committed.
 - [ ] Refuses with a non-zero exit and a clear message when no worktree exists for `<slug>`.
 - [ ] Refuses when the primary checkout has no `work/<slug>/` directory.
 - [ ] Leaves the worktree clean — `git status --porcelain` in the worktree is empty afterwards, so `release.sh`'s `check_clean_worktree` still passes.
 - [ ] `scripts/release.sh` is byte-identical: `git diff main...HEAD -- scripts/release.sh` is empty.
-- [ ] ARCHI's Verification check count matches `tests/test-scripts.sh` output (currently 105).
+- [ ] ARCHI's Verification check count matches `tests/test-scripts.sh` output (currently 126).
 - [ ] Each new test has been shown to fail with its guard removed (2026-08-27 decision in `PLAN.md`; see `knowledge/test-helper-contract.md` for how vacuity arises here and what each helper actually asserts).
 - [ ] `bash scripts/gate.sh` passes.
 
