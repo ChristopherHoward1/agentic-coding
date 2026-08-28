@@ -388,7 +388,7 @@ setup_worktree_sync_fixture() {
     cp "$ROOT/scripts/worktree.sh" scripts/worktree.sh
     chmod +x scripts/worktree.sh
     printf 'worktrees:\n  dir: ../wts\n' >config.yaml
-    printf '.DS_Store\n' >.gitignore
+    printf '.DS_Store\nwork/*/scratch.bin\n' >.gitignore
     printf '# Primary plan\n' >work/demo/plan.md
     git add -A
     git commit -qm init
@@ -403,7 +403,10 @@ setup_worktree_sync_fixture() {
     printf 'notes v1\n' >work/demo/notes.md
     printf 'followup\n' >work/demo/followup-1.md
     printf 'codex\n' >work/demo/codex-review.md
+    printf 'ignored primary stray\n' >work/demo/scratch.bin
     printf 'temp\n' >work/demo/.codex-review.tmpAB
+    printf 'external secret\n' >"$tmp_root/external-secret.txt"
+    ln -s "$tmp_root/external-secret.txt" work/demo/leak.md
     mkdir -p work/demo/sub
     printf 'nested\n' >work/demo/sub/x.md
     printf 'finder\n' >"$SYNC_WORKTREE/work/demo/.DS_Store"
@@ -733,6 +736,13 @@ check "worktree sync-artifacts excludes dotfiles and subdirectories" bash -c "
   ! grep -Fx work/demo/sub/x.md '$sync_tree' &&
   ! grep -Fx work/demo/.DS_Store '$sync_tree'
 "
+check "worktree sync-artifacts stages directory so ignored primary strays do not abort" bash -c "
+  ! grep -Fx work/demo/scratch.bin '$sync_tree'
+"
+check "worktree sync-artifacts does not materialize symlink targets" bash -c "
+  ! grep -Fx work/demo/leak.md '$sync_tree' &&
+  ! git -C '$SYNC_PRIMARY' grep -q 'external secret' wt/demo -- work/demo
+"
 check "worktree sync-artifacts leaves worktree clean" bash -c "[ \"\$(git -C '$SYNC_WORKTREE' status --porcelain)\" = '' ]"
 sync_commits_before=$(git -C "$SYNC_PRIMARY" log --format=%s wt/demo | grep -c '^Record artifacts for demo$')
 check_exit "worktree sync-artifacts idempotent no-op exits zero" 0 "" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts demo"
@@ -741,6 +751,21 @@ check "worktree sync-artifacts no-op makes no extra commit" bash -c "[ '$sync_co
 printf 'notes v2\n' >"$SYNC_PRIMARY/work/demo/notes.md"
 check_exit "worktree sync-artifacts refreshes changed artifact" 0 "" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts demo"
 check "worktree sync-artifacts copied refreshed notes" bash -c "[ \"\$(cat '$SYNC_WORKTREE/work/demo/notes.md')\" = 'notes v2' ]"
+
+setup_worktree_sync_fixture sync-wrong-branch
+(
+  cd "$SYNC_PRIMARY" || exit 1
+  git worktree remove "$SYNC_WORKTREE" >/dev/null
+  git branch wt/other
+  git worktree add -q "$SYNC_WORKTREE" wt/other
+  git -C "$SYNC_WORKTREE" config user.email tester@example.com
+  git -C "$SYNC_WORKTREE" config user.name Tester
+) || { echo "FAIL: sync wrong-branch setup"; exit 1; }
+check_exit "worktree sync-artifacts refuses expected path on wrong branch" 1 "no worktree for demo" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts demo"
+check "worktree sync-artifacts wrong branch receives no artifact commit" bash -c "
+  [ -z \"\$(git -C '$SYNC_PRIMARY' log --format=%s wt/other | grep '^Record artifacts for demo$')\" ] &&
+  ! git -C '$SYNC_PRIMARY' ls-tree -r --name-only wt/other -- work/demo/handoff.md | grep -q .
+"
 
 # --- gate.sh tool visibility and required-tool preflight
 setup_gate_fixture gate-node-missing
