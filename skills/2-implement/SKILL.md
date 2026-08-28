@@ -16,9 +16,9 @@ Read `implementer.fan` from `config.yaml`.
 
 1. **Create the worktree:** `WT=$(scripts/worktree.sh add <slug>)`.
 2. **Render the handoff** from `prompts/handoff.tpl` into `work/<slug>/handoff.md`. It must be self-contained — the implementer starts cold.
-3. **Dispatch:** `scripts/agent-exec.sh "$WT" work/<slug>/handoff.md`. Capture the implementer's final summary into `work/<slug>/notes.md`, then run `scripts/worktree.sh sync-artifacts <slug>`.
+3. **Dispatch:** `scripts/agent-exec.sh "$WT" work/<slug>/handoff.md`. Capture the implementer's final summary into `work/<slug>/notes.md`, then from the repo root run `scripts/worktree.sh sync-artifacts <slug>`.
 4. **Run the gate in the worktree:** `cd "$WT" && scripts/gate.sh`. Trust the exit code, not the implementer's claim.
-5. **On failure:** render `prompts/followup.tpl` with the gate output and re-dispatch, then run `scripts/worktree.sh sync-artifacts <slug>` after each dispatch, up to `gate.max_retries` from `config.yaml`. After that, stop and escalate to the Owner with the failing output — do not fix it yourself in this stage, and do not lower the bar.
+5. **On failure:** render `prompts/followup.tpl` with the gate output and re-dispatch, then from the repo root run `scripts/worktree.sh sync-artifacts <slug>` after each dispatch, up to `gate.max_retries` from `config.yaml`. After that, stop and escalate to the Owner with the failing output — do not fix it yourself in this stage, and do not lower the bar.
 6. **On pass:** commit in the worktree if the implementer didn't, then proceed to `/3-review`.
 
 ## Rules

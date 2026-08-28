@@ -720,7 +720,10 @@ check_exit "worktree sync-artifacts refuses missing worktree" 1 "no worktree for
   git worktree add -q ../wts/no-primary wt/no-primary
 )
 check_exit "worktree sync-artifacts refuses missing primary work dir" 1 "primary checkout has no work/no-primary directory" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts no-primary"
+check_exit "worktree sync-artifacts refuses invocation from unit worktree" 1 "sync-artifacts must run from the primary checkout" bash -c "cd '$SYNC_WORKTREE' && bash scripts/worktree.sh sync-artifacts demo"
 
+mkdir -p "$SYNC_WORKTREE/work/demo/sub"
+printf 'worktree-side\n' >"$SYNC_WORKTREE/work/demo/sub/worktree-side.md"
 check_exit "worktree sync-artifacts copies primary artifacts" 0 "" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts demo"
 sync_tree="$TMP/sync-artifacts-tree.out"
 git -C "$SYNC_PRIMARY" ls-tree -r --name-only wt/demo -- work/demo >"$sync_tree"
@@ -736,9 +739,10 @@ check "worktree sync-artifacts excludes dotfiles and subdirectories" bash -c "
   ! grep -Fx work/demo/sub/x.md '$sync_tree' &&
   ! grep -Fx work/demo/.DS_Store '$sync_tree'
 "
-check "worktree sync-artifacts stages directory so ignored primary strays do not abort" bash -c "
+check "worktree sync-artifacts keeps ignored primary stray absent after successful sync" bash -c "
   ! grep -Fx work/demo/scratch.bin '$sync_tree'
 "
+check "worktree sync-artifacts deliberately commits existing worktree-side unit files" grep -Fx work/demo/sub/worktree-side.md "$sync_tree"
 check "worktree sync-artifacts does not materialize symlink targets" bash -c "
   ! grep -Fx work/demo/leak.md '$sync_tree' &&
   ! git -C '$SYNC_PRIMARY' grep -q 'external secret' wt/demo -- work/demo
@@ -751,6 +755,15 @@ check "worktree sync-artifacts no-op makes no extra commit" bash -c "[ '$sync_co
 printf 'notes v2\n' >"$SYNC_PRIMARY/work/demo/notes.md"
 check_exit "worktree sync-artifacts refreshes changed artifact" 0 "" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts demo"
 check "worktree sync-artifacts copied refreshed notes" bash -c "[ \"\$(cat '$SYNC_WORKTREE/work/demo/notes.md')\" = 'notes v2' ]"
+
+setup_worktree_sync_fixture sync-plan-pending
+printf 'Codex-review verdict: APPROVE\n' >>"$SYNC_WORKTREE/work/demo/plan.md"
+check_exit "worktree sync-artifacts leaves pending worktree plan edit uncommitted" 0 "" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts demo"
+check "worktree sync-artifacts keeps pending plan edit in worktree" grep -Fx "Codex-review verdict: APPROVE" "$SYNC_WORKTREE/work/demo/plan.md"
+check "worktree sync-artifacts artifact commit excludes pending plan edit" bash -c "
+  ! git -C '$SYNC_PRIMARY' show wt/demo:work/demo/plan.md | grep -Fx 'Codex-review verdict: APPROVE' &&
+  git -C '$SYNC_WORKTREE' status --porcelain | grep -Fx ' M work/demo/plan.md'
+"
 
 setup_worktree_sync_fixture sync-wrong-branch
 (

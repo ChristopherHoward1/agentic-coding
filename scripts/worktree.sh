@@ -69,6 +69,8 @@ case "$cmd" in
     ;;
   sync-artifacts)
     [[ -n "$slug" ]] || { echo "usage: worktree.sh sync-artifacts <slug>" >&2; exit 1; }
+    primary_root=$(worktree_for_branch main) || { echo "Error: main must be checked out in the primary worktree" >&2; exit 1; }
+    [[ "$(cd "$primary_root" && pwd -P)" == "$(pwd -P)" ]] || { echo "Error: sync-artifacts must run from the primary checkout" >&2; exit 1; }
     wt_root=$(worktree_for_branch "wt/$slug") || { echo "Error: no worktree for $slug" >&2; exit 1; }
     [[ -d "$ROOT/work/$slug" ]] || { echo "Error: primary checkout has no work/$slug directory" >&2; exit 1; }
     mkdir -p "$wt_root/work/$slug"
@@ -77,6 +79,9 @@ case "$cmd" in
       cp "$src" "$wt_root/work/$slug/"
     done
     git -C "$wt_root" add -- "work/$slug"
+    if ! git -C "$wt_root" diff --cached --quiet -- "work/$slug/plan.md"; then
+      git -C "$wt_root" restore --staged -- "work/$slug/plan.md"
+    fi
     git -C "$wt_root" diff --cached --quiet || git -C "$wt_root" commit -q -m "Record artifacts for $slug"
     ;;
   list)
