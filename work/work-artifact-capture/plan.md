@@ -32,6 +32,7 @@ Add `scripts/worktree.sh sync-artifacts <slug>`: refuse unless run from the prim
 
 Files to modify:
 - `scripts/worktree.sh` — new `sync-artifacts <slug>` subcommand + usage header
+- `scripts/codex-review.sh` — Owner-authorized round-4 footprint expansion to exclude `work/<slug>` artifacts from reviewer diffs
 - `skills/2-implement/SKILL.md` — call it after dispatch
 - `skills/3-review/SKILL.md` — call it at step 5
 - `skills/4-release/SKILL.md` — call it before `release.sh`
@@ -40,7 +41,7 @@ Files to modify:
 
 Files NOT to touch:
 - `scripts/release.sh` — see Approach; no new precondition, no warning, no change to the release commit
-- `scripts/codex-review.sh`, `scripts/agent-exec.sh` — producers keep writing where they write today
+- `scripts/agent-exec.sh` — producers keep writing where they write today
 - `worktree.sh`'s `add` path — the `plan.md` seed and its resume behavior are unchanged
 - `skills/5-retro/SKILL.md` — retro artifacts already commit on their own branch
 
@@ -60,7 +61,7 @@ Files NOT to touch:
 - [ ] Refuses when the primary checkout has no `work/<slug>/` directory.
 - [ ] Leaves the worktree clean — `git status --porcelain` in the worktree is empty afterwards, so `release.sh`'s `check_clean_worktree` still passes.
 - [ ] `scripts/release.sh` is byte-identical: `git diff main...HEAD -- scripts/release.sh` is empty.
-- [ ] ARCHI's Verification check count matches `tests/test-scripts.sh` output (currently 126).
+- [ ] ARCHI's Verification check count matches `tests/test-scripts.sh` output (currently 132).
 - [ ] Each new test has been shown to fail with its guard removed (2026-08-27 decision in `PLAN.md`; see `knowledge/test-helper-contract.md` for how vacuity arises here and what each helper actually asserts).
 - [ ] `bash scripts/gate.sh` passes.
 

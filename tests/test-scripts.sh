@@ -242,6 +242,12 @@ reviewer:
   command: '$COD_REVIEWER approve-then-fail'
 EOF
         ;;
+      capture-prompt)
+        cat >config.yaml <<EOF
+reviewer:
+  command: '$COD_REVIEWER capture-prompt $tmp_root/prompt.txt'
+EOF
+        ;;
     esac
     git add -A
     git commit -qm main
@@ -256,6 +262,12 @@ EOF
 set -uo pipefail
 if [[ -n "${COD_REVIEWER_MARKER:-}" ]]; then
   printf 'invoked\n' >>"$COD_REVIEWER_MARKER"
+fi
+if [[ "${1:-approve}" == capture-prompt ]]; then
+  cat >"$2"
+  printf 'looks fine\n'
+  printf 'Codex verdict: APPROVE\n'
+  exit 0
 fi
 cat >/dev/null
 case "${1:-approve}" in
@@ -585,6 +597,15 @@ check "codex-review only dirties primary artifact" bash -c "
 "
 check "codex-review leaves worktree branch clean" bash -c "[ \"\$(git -C '$COD_WORKTREE' status --porcelain)\" = '' ]"
 
+setup_codex_review_fixture codex-excludes-work-artifacts capture-prompt
+printf 'do-not-leak-review-artifact\n' >"$COD_WORKTREE/work/demo/notes.md"
+git -C "$COD_WORKTREE" add work/demo/notes.md
+git -C "$COD_WORKTREE" commit -qm "record synced artifact"
+check_exit "codex-review with branch artifacts exits 0" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+check "codex-review excludes work unit artifacts from reviewer diff" bash -c "
+  ! grep -Fq 'do-not-leak-review-artifact' '$TMP/codex-excludes-work-artifacts/prompt.txt'
+"
+
 (
   cd "$TMP"
   git init -q -b main sandbox && cd sandbox
@@ -763,6 +784,22 @@ check "worktree sync-artifacts keeps pending plan edit in worktree" grep -Fx "Co
 check "worktree sync-artifacts artifact commit excludes pending plan edit" bash -c "
   ! git -C '$SYNC_PRIMARY' show wt/demo:work/demo/plan.md | grep -Fx 'Codex-review verdict: APPROVE' &&
   git -C '$SYNC_WORKTREE' status --porcelain | grep -Fx ' M work/demo/plan.md'
+"
+
+setup_worktree_sync_fixture sync-unrelated-staged
+printf 'staged unrelated\n' >"$SYNC_WORKTREE/AGENTS.md"
+git -C "$SYNC_WORKTREE" add AGENTS.md
+check_exit "worktree sync-artifacts ignores unrelated staged files" 0 "" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts demo"
+check "worktree sync-artifacts commit excludes unrelated staged file" bash -c "
+  ! git -C '$SYNC_PRIMARY' ls-tree -r --name-only wt/demo -- AGENTS.md | grep -q . &&
+  git -C '$SYNC_WORKTREE' status --porcelain | grep -Fx 'A  AGENTS.md'
+"
+
+setup_worktree_sync_fixture sync-primary-non-main
+git -C "$SYNC_PRIMARY" checkout -q -b owner-fix
+check_exit "worktree sync-artifacts accepts primary checkout on non-main branch" 0 "" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts demo"
+check "worktree sync-artifacts synced from non-main primary checkout" bash -c "
+  git -C '$SYNC_PRIMARY' ls-tree -r --name-only wt/demo -- work/demo/handoff.md | grep -Fx work/demo/handoff.md
 "
 
 setup_worktree_sync_fixture sync-wrong-branch
