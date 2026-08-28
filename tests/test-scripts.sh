@@ -415,6 +415,7 @@ setup_worktree_sync_fixture() {
     printf 'notes v1\n' >work/demo/notes.md
     printf 'followup\n' >work/demo/followup-1.md
     printf 'codex\n' >work/demo/codex-review.md
+    printf 'accented\n' >work/demo/résumé.md
     printf 'ignored primary stray\n' >work/demo/scratch.bin
     printf 'temp\n' >work/demo/.codex-review.tmpAB
     printf 'external secret\n' >"$tmp_root/external-secret.txt"
@@ -549,6 +550,7 @@ check "codex-review reads plan body from branch" grep -F "git show \"\$branch:\$
 check "codex-review reads config from main" grep -F "git show \"main:config.yaml\"" scripts/codex-review.sh
 check "codex-review prompt names exact verdict format" grep -F 'Codex verdict: REQUEST CHANGES' scripts/codex-review.sh
 check "codex-review emits verdict instruction after diff" awk '/--- DIFF/ {d=1} d && /Your final line must/ {found=1} END {exit !found}' scripts/codex-review.sh
+check "3-review skill keeps codex-review work artifacts out of diff" grep -F "git diff main...wt/<slug> -- ':/' \":(exclude,top)work/<slug>\"" skills/3-review/SKILL.md
 
 setup_codex_review_fixture codex-approve normal
 check_exit "codex-review approve exits 0" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
@@ -605,6 +607,9 @@ check_exit "codex-review with branch artifacts exits 0" 0 "" bash -c "cd '$COD_P
 check "codex-review excludes work unit artifacts from reviewer diff" bash -c "
   ! grep -Fq 'do-not-leak-review-artifact' '$TMP/codex-excludes-work-artifacts/prompt.txt'
 "
+mkdir -p "$COD_PRIMARY/subdir"
+check_exit "codex-review from subdirectory exits 0" 0 "" bash -c "cd '$COD_PRIMARY/subdir' && bash ../scripts/codex-review.sh demo"
+check "codex-review from subdirectory includes top-level branch diff" grep -F '+feature' "$TMP/codex-excludes-work-artifacts/prompt.txt"
 
 (
   cd "$TMP"
@@ -747,13 +752,14 @@ mkdir -p "$SYNC_WORKTREE/work/demo/sub"
 printf 'worktree-side\n' >"$SYNC_WORKTREE/work/demo/sub/worktree-side.md"
 check_exit "worktree sync-artifacts copies primary artifacts" 0 "" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts demo"
 sync_tree="$TMP/sync-artifacts-tree.out"
-git -C "$SYNC_PRIMARY" ls-tree -r --name-only wt/demo -- work/demo >"$sync_tree"
+git -C "$SYNC_PRIMARY" -c core.quotePath=false ls-tree -r --name-only wt/demo -- work/demo >"$sync_tree"
 check "worktree sync-artifacts records handoff notes followup and codex review" bash -c "
   grep -Fx work/demo/handoff.md '$sync_tree' &&
   grep -Fx work/demo/notes.md '$sync_tree' &&
   grep -Fx work/demo/followup-1.md '$sync_tree' &&
   grep -Fx work/demo/codex-review.md '$sync_tree'
 "
+check "worktree sync-artifacts commits non-ASCII artifact filename" grep -Fx "work/demo/résumé.md" "$sync_tree"
 check "worktree sync-artifacts preserves worktree plan sentinels" grep -Fx "Code-review verdict: APPROVE" "$SYNC_WORKTREE/work/demo/plan.md"
 check "worktree sync-artifacts excludes dotfiles and subdirectories" bash -c "
   ! grep -Fx work/demo/.codex-review.tmpAB '$sync_tree' &&

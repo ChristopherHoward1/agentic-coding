@@ -81,12 +81,8 @@ case "$cmd" in
     if ! git -C "$wt_root" diff --cached --quiet -- "work/$slug/plan.md"; then
       git -C "$wt_root" reset -q -- "work/$slug/plan.md"
     fi
-    staged_paths=()
-    while IFS= read -r path; do
-      [[ -n "$path" ]] && staged_paths+=("$path")
-    done < <(git -C "$wt_root" diff --cached --name-only -- "work/$slug" ":(exclude)work/$slug/plan.md")
-    if [[ "${#staged_paths[@]}" -gt 0 ]]; then
-      git -C "$wt_root" commit -q -m "Record artifacts for $slug" -- "${staged_paths[@]}"
+    if ! git -C "$wt_root" diff --cached --quiet -- "work/$slug" ":(exclude)work/$slug/plan.md"; then
+      git -C "$wt_root" commit -q -m "Record artifacts for $slug" -- "work/$slug" ":(exclude)work/$slug/plan.md"
     fi
     ;;
   list)

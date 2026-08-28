@@ -9,7 +9,7 @@ Input: a work unit whose worktree branch `wt/<slug>` passed the gate.
 
 ## Steps
 
-1. **Assemble artifacts, not transcripts:** the diff (`git diff main...wt/<slug> -- . ":(exclude)work/<slug>"`), the plan path, and nothing else, so synced handoffs, followups, and other reviewer artifacts cannot leak into the review. Reviewers must never see the implementation conversation or your own commentary on the diff.
+1. **Assemble artifacts, not transcripts:** the diff (`git diff main...wt/<slug> -- ':/' ":(exclude,top)work/<slug>"`), the plan path, and nothing else, so synced handoffs, followups, and other reviewer artifacts cannot leak into the review. Reviewers must never see the implementation conversation or your own commentary on the diff.
 2. **Spawn both reviewers.** Launch the `code-reviewer` agent (fresh thread) with the diff, the plan path, and the worktree path, instructed to review per its own definition. From the primary checkout, run `scripts/codex-review.sh <slug>` so Codex reviews the branch plan and diff from cold, read-only context and writes `work/<slug>/codex-review.md`. Its exit-code contract is: 0 = APPROVE, so record the sentinel; 1 = REQUEST CHANGES, so route the artifact's findings to the followup flow; >=2 = tooling error, not a verdict. Never record a sentinel from prose in the artifact after a non-zero exit; fix the tooling and re-run.
 3. **Route findings:**
    - Substantive findings from either reviewer → back to the implementer via `/2-implement`'s followup flow (same worktree).
