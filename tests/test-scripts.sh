@@ -610,6 +610,9 @@ check "codex-review excludes work unit artifacts from reviewer diff" bash -c "
 mkdir -p "$COD_PRIMARY/subdir"
 check_exit "codex-review from subdirectory exits 0" 0 "" bash -c "cd '$COD_PRIMARY/subdir' && bash ../scripts/codex-review.sh demo"
 check "codex-review from subdirectory includes top-level branch diff" grep -F '+feature' "$TMP/codex-excludes-work-artifacts/prompt.txt"
+check "codex-review from subdirectory excludes work unit artifacts" bash -c "
+  ! grep -Fq 'do-not-leak-review-artifact' '$TMP/codex-excludes-work-artifacts/prompt.txt'
+"
 
 (
   cd "$TMP"
