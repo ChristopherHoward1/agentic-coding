@@ -79,7 +79,7 @@ git show "$branch:$plan_path" >>"$prompt" \
   || die2 "cannot read plan from $branch:$plan_path"
 
 printf '\n%s\n' "--- DIFF (main...$branch excluding work/$slug) ---" >>"$prompt"
-git diff "main...$branch" -- . ":(exclude)work/$slug" >>"$prompt" \
+git diff "main...$branch" -- ':/' ":(exclude,top)work/$slug" >>"$prompt" \
   || die2 "cannot diff main...$branch"
 
 {
