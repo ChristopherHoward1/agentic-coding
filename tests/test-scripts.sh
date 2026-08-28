@@ -371,6 +371,45 @@ EOF
   printf 'handoff\n' >"$AGENT_HANDOFF"
 }
 
+setup_worktree_sync_fixture() {
+  local name="$1"
+  local tmp_root="$TMP/$name"
+
+  SYNC_PRIMARY="$tmp_root/primary"
+  SYNC_WORKTREE="$tmp_root/wts/demo"
+
+  mkdir -p "$tmp_root"
+  git init -q -b main "$SYNC_PRIMARY"
+  (
+    cd "$SYNC_PRIMARY" || exit 1
+    git config user.email tester@example.com
+    git config user.name Tester
+    mkdir -p scripts work/demo
+    cp "$ROOT/scripts/worktree.sh" scripts/worktree.sh
+    chmod +x scripts/worktree.sh
+    printf 'worktrees:\n  dir: ../wts\n' >config.yaml
+    printf '.DS_Store\n' >.gitignore
+    printf '# Primary plan\n' >work/demo/plan.md
+    git add -A
+    git commit -qm init
+    git branch wt/demo
+    git worktree add -q "$SYNC_WORKTREE" wt/demo
+    git -C "$SYNC_WORKTREE" config user.email tester@example.com
+    git -C "$SYNC_WORKTREE" config user.name Tester
+    printf '# Worktree plan\nCode-review verdict: APPROVE\n' >"$SYNC_WORKTREE/work/demo/plan.md"
+    git -C "$SYNC_WORKTREE" add work/demo/plan.md
+    git -C "$SYNC_WORKTREE" commit -qm "record review sentinel"
+    printf 'handoff\n' >work/demo/handoff.md
+    printf 'notes v1\n' >work/demo/notes.md
+    printf 'followup\n' >work/demo/followup-1.md
+    printf 'codex\n' >work/demo/codex-review.md
+    printf 'temp\n' >work/demo/.codex-review.tmpAB
+    mkdir -p work/demo/sub
+    printf 'nested\n' >work/demo/sub/x.md
+    printf 'finder\n' >"$SYNC_WORKTREE/work/demo/.DS_Store"
+  )
+}
+
 setup_fan_fixture() {
   local name="$1"
   local pass_mode="${2:-some}"
@@ -667,6 +706,41 @@ check "worktree add resume path does not duplicate plan commit" bash -c "
   [ '$SEED_PLAN_COMMITS_BEFORE' = 1 ] &&
   [ '$SEED_PLAN_COMMITS_AFTER' = 1 ]
 "
+
+setup_worktree_sync_fixture sync-artifacts
+check_exit "worktree sync-artifacts without slug fails" 1 "usage: worktree.sh sync-artifacts <slug>" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts"
+mkdir -p "$SYNC_PRIMARY/work/no-wt"
+check_exit "worktree sync-artifacts refuses missing worktree" 1 "no worktree for no-wt" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts no-wt"
+(
+  cd "$SYNC_PRIMARY" || exit 1
+  git branch wt/no-primary
+  git worktree add -q ../wts/no-primary wt/no-primary
+)
+check_exit "worktree sync-artifacts refuses missing primary work dir" 1 "primary checkout has no work/no-primary directory" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts no-primary"
+
+check_exit "worktree sync-artifacts copies primary artifacts" 0 "" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts demo"
+sync_tree="$TMP/sync-artifacts-tree.out"
+git -C "$SYNC_PRIMARY" ls-tree -r --name-only wt/demo -- work/demo >"$sync_tree"
+check "worktree sync-artifacts records handoff notes followup and codex review" bash -c "
+  grep -Fx work/demo/handoff.md '$sync_tree' &&
+  grep -Fx work/demo/notes.md '$sync_tree' &&
+  grep -Fx work/demo/followup-1.md '$sync_tree' &&
+  grep -Fx work/demo/codex-review.md '$sync_tree'
+"
+check "worktree sync-artifacts preserves worktree plan sentinels" grep -Fx "Code-review verdict: APPROVE" "$SYNC_WORKTREE/work/demo/plan.md"
+check "worktree sync-artifacts excludes dotfiles and subdirectories" bash -c "
+  ! grep -Fx work/demo/.codex-review.tmpAB '$sync_tree' &&
+  ! grep -Fx work/demo/sub/x.md '$sync_tree' &&
+  ! grep -Fx work/demo/.DS_Store '$sync_tree'
+"
+check "worktree sync-artifacts leaves worktree clean" bash -c "[ \"\$(git -C '$SYNC_WORKTREE' status --porcelain)\" = '' ]"
+sync_commits_before=$(git -C "$SYNC_PRIMARY" log --format=%s wt/demo | grep -c '^Record artifacts for demo$')
+check_exit "worktree sync-artifacts idempotent no-op exits zero" 0 "" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts demo"
+sync_commits_after=$(git -C "$SYNC_PRIMARY" log --format=%s wt/demo | grep -c '^Record artifacts for demo$')
+check "worktree sync-artifacts no-op makes no extra commit" bash -c "[ '$sync_commits_before' = 1 ] && [ '$sync_commits_after' = 1 ]"
+printf 'notes v2\n' >"$SYNC_PRIMARY/work/demo/notes.md"
+check_exit "worktree sync-artifacts refreshes changed artifact" 0 "" bash -c "cd '$SYNC_PRIMARY' && bash scripts/worktree.sh sync-artifacts demo"
+check "worktree sync-artifacts copied refreshed notes" bash -c "[ \"\$(cat '$SYNC_WORKTREE/work/demo/notes.md')\" = 'notes v2' ]"
 
 # --- gate.sh tool visibility and required-tool preflight
 setup_gate_fixture gate-node-missing

@@ -3,6 +3,7 @@
 # Usage:
 #   scripts/worktree.sh add <slug>      # create worktree + branch wt/<slug>, print its path
 #   scripts/worktree.sh remove <slug>   # remove worktree, keep the branch
+#   scripts/worktree.sh sync-artifacts <slug>  # copy primary work artifacts into worktree + commit
 #   scripts/worktree.sh list
 set -euo pipefail
 
@@ -47,11 +48,24 @@ case "$cmd" in
     git worktree remove "$WT_DIR/$slug"
     echo "Removed worktree. Branch wt/$slug kept; delete with: git branch -D wt/$slug" >&2
     ;;
+  sync-artifacts)
+    [[ -n "$slug" ]] || { echo "usage: worktree.sh sync-artifacts <slug>" >&2; exit 1; }
+    path="$WT_DIR/$slug"
+    wt_root=$(git -C "$path" rev-parse --show-toplevel 2>/dev/null) || { echo "Error: no worktree for $slug" >&2; exit 1; }
+    [[ -d "$ROOT/work/$slug" ]] || { echo "Error: primary checkout has no work/$slug directory" >&2; exit 1; }
+    mkdir -p "$wt_root/work/$slug"
+    for src in "$ROOT/work/$slug"/*; do
+      [[ -f "$src" && "$(basename "$src")" != plan.md ]] || continue
+      cp "$src" "$wt_root/work/$slug/"
+    done
+    git -C "$wt_root" add -- "work/$slug"
+    git -C "$wt_root" diff --cached --quiet || git -C "$wt_root" commit -q -m "Record artifacts for $slug"
+    ;;
   list)
     git worktree list
     ;;
   *)
-    echo "usage: worktree.sh {add|remove|list} [slug]" >&2
+    echo "usage: worktree.sh {add|remove|sync-artifacts|list} [slug]" >&2
     exit 1
     ;;
 esac
