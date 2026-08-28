@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.8.11] - 2026-08-28
+
+- `worktree.sh sync-artifacts <slug>` records a unit's handoff, notes, followups, and codex review onto its branch, so a released unit's artifacts reach main with it instead of needing a manual catch-up commit.
+- Confirm-delta: none
+
 ## [2026.8.10] - 2026-08-27
 
 - Gate reports skipped checks and hard-fails on declared missing tools (`gate.required_tools`), so a green gate no longer hides checks that never ran.
