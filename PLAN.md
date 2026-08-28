@@ -10,7 +10,6 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 
 - **Shipped:** v2026.8.11 `work/work-artifact-capture` (`sync-artifacts`; reviewer diff excludes unit artifacts) · v2026.8.10 `work/gate-tool-preflight` (gate reports skipped checks; `gate.required_tools` hard-fail) · v2026.8.6 `work/codex-reviewer` (dual-vendor review) · v2026.8.7 `work/retro-stage` (`/5-retro`; marker arms next release) · v2026.8.8 `work/loop-hardening` (marker byte-identity, main-bound codex reviewer, /5-retro resume+cleanup, null-dispatch detection) · v2026.8.9 `work/ds-hygiene-hook` (opt-in DS hygiene gate hook; ML + work profiles wired). Reviewers on opus.
 - Candidate: `agent-exec-noop-scope` — soften the null-dispatch guard so a clean-tree no-op re-dispatch doesn't hard-fail (`work/loop-hardening/retro.md`; small, may be a small-fix).
-- Candidate: `pin-sync-guards` — pin two correct-but-unpinned guards in `sync-artifacts`: `git add -A` in place of the scoped add, and `|| true` in place of the commit guard, both currently leave the suite green (`work/work-artifact-capture/retro.md`; two tests, likely small-fix).
 - **Full TRIP autonomy reached** (2026-08-25): 4/4 `none` releases (2026.8.1–2026.8.4); `/4-release` push confirmation removed from CLAUDE.md.
 - Remaining candidate: `/2-implement` batching — deferred until real use demands it.
 
