@@ -17,6 +17,25 @@ WT_DIR=${WT_DIR:-../$(basename "$ROOT")-worktrees}
 cmd=${1:-}
 slug=${2:-}
 
+worktree_for_branch() {
+  local branch="$1"
+
+  git worktree list --porcelain | awk -v branch="refs/heads/$branch" '
+    $1 == "worktree" {
+      path = substr($0, 10)
+      next
+    }
+    $1 == "branch" && $2 == branch {
+      print path
+      found = 1
+      exit
+    }
+    END {
+      if (!found) exit 1
+    }
+  '
+}
+
 case "$cmd" in
   add)
     [[ -n "$slug" ]] || { echo "usage: worktree.sh add <slug>" >&2; exit 1; }
@@ -50,12 +69,11 @@ case "$cmd" in
     ;;
   sync-artifacts)
     [[ -n "$slug" ]] || { echo "usage: worktree.sh sync-artifacts <slug>" >&2; exit 1; }
-    path="$WT_DIR/$slug"
-    wt_root=$(git -C "$path" rev-parse --show-toplevel 2>/dev/null) || { echo "Error: no worktree for $slug" >&2; exit 1; }
+    wt_root=$(worktree_for_branch "wt/$slug") || { echo "Error: no worktree for $slug" >&2; exit 1; }
     [[ -d "$ROOT/work/$slug" ]] || { echo "Error: primary checkout has no work/$slug directory" >&2; exit 1; }
     mkdir -p "$wt_root/work/$slug"
     for src in "$ROOT/work/$slug"/*; do
-      [[ -f "$src" && "$(basename "$src")" != plan.md ]] || continue
+      [[ -f "$src" && ! -L "$src" && "$(basename "$src")" != plan.md ]] || continue
       cp "$src" "$wt_root/work/$slug/"
     done
     git -C "$wt_root" add -- "work/$slug"
