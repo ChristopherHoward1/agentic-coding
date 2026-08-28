@@ -35,4 +35,4 @@ Read `implementer.fan` from `config.yaml`.
    - 1 survivor: run `scripts/fan-exec.sh adopt <slug> <survivor>`.
    - 2+ survivors: spawn a fresh `fan-selector` thread to rank the surviving diffs against the plan, then run `scripts/fan-exec.sh adopt <slug> <winner>`.
 4. The `fan-selector` is only a selector: it is distinct from `/3-review`'s `code-reviewer`, has a different output contract, and must not anchor or replace the later approver.
-5. After adoption, all paths converge on populated `wt/<slug>`; continue to `/3-review` as in step 6.
+5. After adoption, all paths converge on populated `wt/<slug>`; from the repo root run `scripts/worktree.sh sync-artifacts <slug>`, then continue to `/3-review` as in step 6.
