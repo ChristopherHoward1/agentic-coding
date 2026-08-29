@@ -550,6 +550,10 @@ check "codex-review reads plan body from branch" grep -F "git show \"\$branch:\$
 check "codex-review reads config from main" grep -F "git show \"main:config.yaml\"" scripts/codex-review.sh
 check "codex-review prompt names exact verdict format" grep -F 'Codex verdict: REQUEST CHANGES' scripts/codex-review.sh
 check "codex-review emits verdict instruction after diff" awk '/--- DIFF/ {d=1} d && /Your final line must/ {found=1} END {exit !found}' scripts/codex-review.sh
+check "codex-review reads deferrals from branch" grep -F "git show \"\$branch:\$deferrals_path\"" scripts/codex-review.sh
+check "codex-review emits deferrals before the diff" awk '/--- ACCEPTED DEFERRALS/ {f=1} /--- DIFF/ {exit !f}' scripts/codex-review.sh
+check "3-review skill routes deferrals to the ledger" grep -F 'work/<slug>/deferrals.md' skills/3-review/SKILL.md
+check "code-reviewer agent is told deferrals are settled scope" grep -F 'work/<slug>/deferrals.md' .claude/agents/code-reviewer.md
 check "3-review skill keeps codex-review work artifacts out of diff" grep -F "git diff main...wt/<slug> -- ':/' \":(exclude,top)work/<slug>\"" skills/3-review/SKILL.md
 
 setup_codex_review_fixture codex-approve normal
@@ -612,6 +616,22 @@ check_exit "codex-review from subdirectory exits 0" 0 "" bash -c "cd '$COD_PRIMA
 check "codex-review from subdirectory includes top-level branch diff" grep -F '+feature' "$TMP/codex-excludes-work-artifacts/prompt.txt"
 check "codex-review from subdirectory excludes work unit artifacts" bash -c "
   ! grep -Fq 'do-not-leak-review-artifact' '$TMP/codex-excludes-work-artifacts/prompt.txt'
+"
+check "codex-review marks an absent deferral ledger explicitly" bash -c "
+  grep -Fq '(none recorded)' '$TMP/codex-excludes-work-artifacts/prompt.txt'
+"
+
+setup_codex_review_fixture codex-deferrals capture-prompt
+printf '# Deferrals\n\n- version bump on NEEDS_REFINEMENT -> deferred to work/version-bump\n' \
+  >"$COD_WORKTREE/work/demo/deferrals.md"
+git -C "$COD_WORKTREE" add work/demo/deferrals.md
+git -C "$COD_WORKTREE" commit -qm "record accepted deferral"
+check_exit "codex-review with a deferral ledger exits 0" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+check "codex-review injects the deferral ledger into the prompt" bash -c "
+  grep -Fq 'version bump on NEEDS_REFINEMENT' '$TMP/codex-deferrals/prompt.txt'
+"
+check "codex-review deferral ledger is not treated as absent" bash -c "
+  ! grep -Fq '(none recorded)' '$TMP/codex-deferrals/prompt.txt'
 "
 
 (

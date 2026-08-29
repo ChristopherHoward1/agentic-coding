@@ -20,6 +20,7 @@ fi
 slug="$1"
 branch="wt/$slug"
 plan_path="work/$slug/plan.md"
+deferrals_path="work/$slug/deferrals.md"
 root=$(git rev-parse --show-toplevel) || die2 "not inside a git checkout"
 artifact="$root/work/$slug/codex-review.md"
 current_branch=$(git symbolic-ref --quiet --short HEAD || true)
@@ -77,6 +78,21 @@ trap 'rm -f "$prompt" "$artifact_tmp"' EXIT
 
 git show "$branch:$plan_path" >>"$prompt" \
   || die2 "cannot read plan from $branch:$plan_path"
+
+{
+  printf '\n%s\n' "--- ACCEPTED DEFERRALS ($branch:$deferrals_path) ---"
+  printf 'These findings were reviewed in an earlier round and deliberately deferred to a\n'
+  printf 'later work unit. They are settled scope: do not raise them as findings here.\n'
+  printf 'If one has become blocking, say so under a heading "Deferral challenge" and name\n'
+  printf 'what changed since it was accepted.\n\n'
+} >>"$prompt"
+
+if git cat-file -e "$branch:$deferrals_path" 2>/dev/null; then
+  git show "$branch:$deferrals_path" >>"$prompt" \
+    || die2 "cannot read deferrals from $branch:$deferrals_path"
+else
+  printf '(none recorded)\n' >>"$prompt"
+fi
 
 printf '\n%s\n' "--- DIFF (main...$branch excluding work/$slug) ---" >>"$prompt"
 git diff "main...$branch" -- ':/' ":(exclude,top)work/$slug" >>"$prompt" \
