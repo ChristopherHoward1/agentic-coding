@@ -554,6 +554,15 @@ check "codex-review reads deferrals from branch" grep -F "git show \"\$branch:\$
 check "codex-review emits deferrals before the diff" awk '/--- ACCEPTED DEFERRALS/ {f=1} /--- DIFF/ {exit !f}' scripts/codex-review.sh
 check "3-review skill routes deferrals to the ledger" grep -F 'work/<slug>/deferrals.md' skills/3-review/SKILL.md
 check "code-reviewer agent is told deferrals are settled scope" grep -F 'work/<slug>/deferrals.md' .claude/agents/code-reviewer.md
+check "code-reviewer agent defines severity taxonomy" grep -F "CRITICAL" .claude/agents/code-reviewer.md
+check "code-reviewer agent has calibration section" grep -F "Calibration" .claude/agents/code-reviewer.md
+check "code-reviewer agent requires concrete failure for blocking" grep -F "finding without a concrete failure scenario is LOW" .claude/agents/code-reviewer.md
+check "codex-review prompt includes severity taxonomy" grep -F "CRITICAL" scripts/codex-review.sh
+check "codex-review prompt includes calibration guidance" grep -F "Calibration" scripts/codex-review.sh
+check "codex-review prompt passes round number" grep -F "REVIEW_ROUND" scripts/codex-review.sh
+check "3-review skill tracks round counter" grep -F "work/<slug>/review-round" skills/3-review/SKILL.md
+check "3-review skill routes by severity" grep -F "CRITICAL/HIGH" skills/3-review/SKILL.md
+check "3-review skill caps at round 3 mechanically" grep -F "counter reaches 3" skills/3-review/SKILL.md
 check "3-review skill keeps codex-review work artifacts out of diff" grep -F "git diff main...wt/<slug> -- ':/' \":(exclude,top)work/<slug>\"" skills/3-review/SKILL.md
 
 setup_codex_review_fixture codex-approve normal
@@ -632,6 +641,16 @@ check "codex-review injects the deferral ledger into the prompt" bash -c "
 "
 check "codex-review deferral ledger is not treated as absent" bash -c "
   ! grep -Fq '(none recorded)' '$TMP/codex-deferrals/prompt.txt'
+"
+
+check "codex-review prompt includes round number from REVIEW_ROUND" bash -c "
+  grep -Fq 'review round' '$TMP/codex-deferrals/prompt.txt'
+"
+
+setup_codex_review_fixture codex-round-env capture-prompt
+check_exit "codex-review passes custom round number" 0 "" bash -c "cd '$COD_PRIMARY' && REVIEW_ROUND=3 bash scripts/codex-review.sh demo"
+check "codex-review prompt contains round 3" bash -c "
+  grep -Fq 'round 3' '$TMP/codex-round-env/prompt.txt'
 "
 
 (

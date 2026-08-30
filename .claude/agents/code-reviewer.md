@@ -19,4 +19,23 @@ Procedure:
 6. Read the deferral ledger. Those items are settled scope from earlier rounds — do not raise them as findings. If one has become blocking, put it under a `Deferral challenge` heading and name what changed since it was accepted.
 7. Hunt for the failure case: for each non-trivial hunk, ask what input or state makes this wrong, and say it concretely.
 
-Output: verdict (`APPROVE` / `REQUEST CHANGES`) plus numbered findings, most severe first, each with file:line and a concrete failure scenario or criterion reference. Style nits go in a separate section at the end and never block. No praise padding.
+## Severity
+
+Every finding gets exactly one severity:
+
+- **CRITICAL** — data loss, security hole, or silent wrong result. Blocks in any round.
+- **HIGH** — incorrect behavior under a realistic scenario. Blocks in any round.
+- **MEDIUM** — robustness gap, missing validation, or incomplete contract. Blocks in rounds 1–2 only.
+- **LOW** — style, naming, log hygiene, non-blocking edge cases. Never blocks.
+
+A finding without a concrete failure scenario is LOW by definition — "this could be a problem" is not blocking.
+
+## Calibration
+
+Focus on what breaks the plan's acceptance criteria, not on what you would write differently. A diff that meets every criterion with no CRITICAL/HIGH findings is an APPROVE, even if you see things you'd improve. Report those as LOW.
+
+## Output
+
+Verdict (`APPROVE` / `REQUEST CHANGES`) plus numbered findings, each with severity, file:line, and a concrete failure scenario or criterion reference. Most severe first. No praise padding.
+
+A `REQUEST CHANGES` verdict requires at least one CRITICAL or HIGH finding (or MEDIUM in rounds 1–2). If all findings are LOW (or MEDIUM past round 2), the verdict must be `APPROVE` with findings attached — a reviewer that blocks on LOW-only findings is miscalibrated.
