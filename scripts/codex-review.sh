@@ -71,6 +71,7 @@ trap 'rm -f "$prompt" "$artifact_tmp"' EXIT
 
 {
   printf "You are an independent code reviewer for work unit \`%s\`.\n\n" "$slug"
+  printf 'This is review round %s.\n\n' "${REVIEW_ROUND:-1}"
   printf 'Review the plan body and diff below. Report substantive findings first.\n'
   printf '\n'
   printf '%s\n' "--- PLAN ($branch:$plan_path) ---"
@@ -100,6 +101,19 @@ git diff "main...$branch" -- ':/' ":(exclude,top)work/$slug" >>"$prompt" \
 
 {
   printf '\n'
+  printf '## Severity\n\n'
+  printf 'Every finding gets exactly one severity:\n'
+  printf '- CRITICAL: data loss, security hole, or silent wrong result. Blocks in any round.\n'
+  printf '- HIGH: incorrect behavior under a realistic scenario. Blocks in any round.\n'
+  printf '- MEDIUM: robustness gap, missing validation, or incomplete contract. Blocks rounds 1-2 only.\n'
+  printf '- LOW: style, naming, log hygiene, non-blocking edge cases. Never blocks.\n\n'
+  printf 'A finding without a concrete failure scenario is LOW by definition.\n\n'
+  printf '## Calibration\n\n'
+  printf 'Focus on what breaks the acceptance criteria, not on what you would write differently.\n'
+  printf 'A diff that meets every criterion with no CRITICAL/HIGH findings is an APPROVE,\n'
+  printf 'even if you see things you would improve. Report those as LOW.\n'
+  printf 'REQUEST CHANGES requires at least one CRITICAL or HIGH finding.\n'
+  printf 'If all findings are LOW, the verdict must be APPROVE with findings attached.\n\n'
   printf 'Your final line must be exactly one of:\n'
   printf 'Codex verdict: APPROVE\n'
   printf 'Codex verdict: REQUEST CHANGES\n'
