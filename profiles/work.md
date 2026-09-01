@@ -23,7 +23,12 @@ If a work repo is also an ML/data-science repo, copy the relevant `NOTEBOOK_STRA
 
 ## S3 write discipline
 
-Data lands under a fixed **pipeline-role** taxonomy, never ad-hoc paths. The role — *where in the workflow an artifact was produced* — is stable across project types; modality (tabular, vision, RAG) only changes the file format at the leaf. Root is `s3://<bucket>/<user>/{project}/` (declare the real bucket and user at /init; it lives in the work-side copy of this profile, never in the public template):
+Data lands under a fixed **pipeline-role** taxonomy, never ad-hoc paths. The role — *where in the workflow an artifact was produced* — is stable across project types; modality (tabular, vision, RAG) only changes the file format at the leaf. Root is `s3://<bucket>/<owner-scope>/{project}/`. The `<owner-scope>` segment names *who owns the write* within the bucket, so multiple people can share one bucket — and one framework checkout — without colliding. It takes one of two kinds of value:
+
+- **A person** — resolve per-write from the environment (`$USER`, or the configured identity) rather than baking in one name: `ch/`, `sh/`.
+- **A shared namespace** — `shared/` (or `team/`) for collaborative artifacts no single person owns.
+
+Declare the real bucket at /init (it lives in the work-side copy of this profile, never in the public template). `<bucket>` is the ownership/access boundary and `<owner-scope>` is the writer within it, so the same scopes carry over unchanged when a personal bucket is later swapped for a real team bucket:
 
 ```
 {project}/
@@ -43,6 +48,7 @@ Data lands under a fixed **pipeline-role** taxonomy, never ad-hoc paths. The rol
 1. **`raw/` is immutable.** Never overwrite or mutate it — it's the reproducibility anchor; everything else regenerates from it.
 2. **Partition by run** under each leaf so data traces to the model it produced: `raw/snowflake/dt=2026-08-26/`, `models/run=2026-08-26-xgb/`.
 3. **Scratch stays out.** Local RAG tests and throwaway experiments stay local; if they must hit S3, use a disposable `scratch/` (or `experiments/{name}/`) sibling — never the five real buckets.
+4. **`shared/` traces to a writer.** A shared owner-scope has no single owner, so partition every write under it by writer or run — `shared/{project}/models/run=2026-08-26-sh-xgb/` — never anonymous drops.
 
 The plan for a work unit that writes data names its `{project}` root; writes never happen outside it.
 
