@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.9.0] - 2026-09-01
+
+- `scripts/state.sh <slug>` derives per-work-unit execution state (stage, review, next legal action) from observable repo facts — a cold session can learn where a unit stands and what comes next without the prior conversation.
+- Confirm-delta: none
+
 ## [2026.8.11] - 2026-08-28
 
 - `worktree.sh sync-artifacts <slug>` records a unit's handoff, notes, followups, and codex review onto its branch, so a released unit's artifacts reach main with it instead of needing a manual catch-up commit.
