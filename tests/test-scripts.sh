@@ -526,6 +526,106 @@ setup_gate_fixture() {
   ln -sf "$(command -v awk)" "$GATE_BIN/awk"
 }
 
+setup_state_fixture() {
+  local name="$1"
+  local mode="$2"
+  local tmp_root="$TMP/$name"
+
+  STATE_REPO="$tmp_root/repo"
+  mkdir -p "$STATE_REPO/scripts" "$STATE_REPO/work/demo"
+  git init -q -b main "$STATE_REPO"
+  (
+    cd "$STATE_REPO" || exit 1
+    git config user.email tester@example.com
+    git config user.name Tester
+    cp "$ROOT/scripts/state.sh" scripts/state.sh
+    chmod +x scripts/state.sh
+
+    case "$mode" in
+      missing-plan)
+        ;;
+      plan)
+        printf '# Demo\n\n' >work/demo/plan.md
+        ;;
+      implement)
+        printf '# Demo\n\nPlan verdict: APPROVE\n' >work/demo/plan.md
+        ;;
+      review-gate)
+        printf '# Demo\n\nPlan verdict: APPROVE\n' >work/demo/plan.md
+        printf 'handoff\n' >work/demo/handoff.md
+        ;;
+      review-single-sentinel)
+        {
+          printf '# Demo\n\n'
+          printf 'Plan verdict: APPROVE\n'
+          printf 'Code-review verdict: APPROVE\n'
+        } >work/demo/plan.md
+        printf 'handoff\n' >work/demo/handoff.md
+        printf 'codex review\n' >work/demo/codex-review.md
+        ;;
+      release)
+        {
+          printf '# Demo\n\n'
+          printf 'Plan verdict: APPROVE\n'
+          printf 'Code-review verdict: APPROVE\n'
+          printf 'Codex-review verdict: APPROVE\n'
+        } >work/demo/plan.md
+        printf 'handoff\n' >work/demo/handoff.md
+        printf 'codex review\n' >work/demo/codex-review.md
+        ;;
+      retro)
+        {
+          printf '# Demo\n\n'
+          printf 'Plan verdict: APPROVE\n'
+          printf 'Code-review verdict: APPROVE\n'
+          printf 'Codex-review verdict: APPROVE\n'
+        } >work/demo/plan.md
+        printf 'handoff\n' >work/demo/handoff.md
+        printf 'codex review\n' >work/demo/codex-review.md
+        printf ' demo \n' >work/.last-released
+        ;;
+      done)
+        {
+          printf '# Demo\n\n'
+          printf 'Plan verdict: APPROVE\n'
+          printf 'Code-review verdict: APPROVE\n'
+          printf 'Codex-review verdict: APPROVE\n'
+        } >work/demo/plan.md
+        printf 'handoff\n' >work/demo/handoff.md
+        printf 'codex review\n' >work/demo/codex-review.md
+        printf 'demo\n' >work/.last-released
+        printf 'learned\n' >work/demo/retro.md
+        ;;
+      branch-approve)
+        {
+          printf '# Demo\n\n'
+          printf 'Plan verdict: APPROVE\n'
+          printf 'Code-review verdict: APPROVE\n'
+          printf 'Codex-review verdict: APPROVE\n'
+        } >work/demo/plan.md
+        printf 'handoff\n' >work/demo/handoff.md
+        printf 'codex review\n' >work/demo/codex-review.md
+        git add -A
+        git commit -qm branch-plan
+        git branch wt/demo
+        printf '# Demo\n\nPlan verdict: APPROVE\n' >work/demo/plan.md
+        ;;
+      *)
+        echo "unknown state fixture mode: $mode" >&2
+        exit 1
+        ;;
+    esac
+
+    if [[ "$mode" != branch-approve ]]; then
+      git add -A
+      git commit -qm "$mode"
+    else
+      git add work/demo/plan.md
+      git commit -qm primary-plan
+    fi
+  )
+}
+
 write_fake_tool() {
   local path="$1"
   mkdir -p "$(dirname "$path")"
@@ -544,6 +644,90 @@ fi
 # --- worktree.sh lifecycle in a throwaway repo
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
+
+# --- state.sh derives cold-session work-unit state without writes
+setup_state_fixture state-missing missing-plan
+check_exit "state missing plan exits non-zero" 1 "not a work unit" bash -c "cd '$STATE_REPO' && bash scripts/state.sh demo"
+
+setup_state_fixture state-plan plan
+check "state derives plan stage" bash -c "
+  cd '$STATE_REPO' &&
+  out=\$(bash scripts/state.sh demo) &&
+  grep -qx 'stage: plan' <<<\"\$out\" &&
+  grep -qx 'next_action: finish /1-plan' <<<\"\$out\"
+"
+
+setup_state_fixture state-implement implement
+check "state derives implement stage" bash -c "
+  cd '$STATE_REPO' &&
+  out=\$(bash scripts/state.sh demo) &&
+  grep -qx 'stage: implement' <<<\"\$out\" &&
+  grep -qx 'next_action: /2-implement' <<<\"\$out\"
+"
+
+setup_state_fixture state-review-gate review-gate
+check "state derives review stage before codex review" bash -c "
+  cd '$STATE_REPO' &&
+  out=\$(bash scripts/state.sh demo) &&
+  grep -qx 'stage: review' <<<\"\$out\" &&
+  grep -qx 'review: pending' <<<\"\$out\" &&
+  grep -qx 'next_action: run scripts/gate.sh' <<<\"\$out\"
+"
+
+setup_state_fixture state-release release
+check "state derives release stage before marker" bash -c "
+  cd '$STATE_REPO' &&
+  out=\$(bash scripts/state.sh demo) &&
+  grep -qx 'stage: release' <<<\"\$out\" &&
+  grep -qx 'review: approve' <<<\"\$out\" &&
+  grep -qx 'next_action: /4-release' <<<\"\$out\"
+"
+
+setup_state_fixture state-retro retro
+check "state derives release stage for retro" bash -c "
+  cd '$STATE_REPO' &&
+  out=\$(bash scripts/state.sh demo) &&
+  grep -qx 'stage: release' <<<\"\$out\" &&
+  grep -qx 'next_action: /5-retro' <<<\"\$out\"
+"
+
+setup_state_fixture state-done "done"
+check "state derives done stage" bash -c "
+  cd '$STATE_REPO' &&
+  out=\$(bash scripts/state.sh demo) &&
+  grep -qx 'stage: done' <<<\"\$out\" &&
+  grep -qx 'next_action: none' <<<\"\$out\"
+"
+
+setup_state_fixture state-branch-approve branch-approve
+check "state reads review sentinels from wt branch when it exists" bash -c "
+  cd '$STATE_REPO' &&
+  out=\$(bash scripts/state.sh demo) &&
+  grep -qx 'review: approve' <<<\"\$out\" &&
+  ! grep -qx 'Code-review verdict: APPROVE' work/demo/plan.md
+"
+
+setup_state_fixture state-read-only release
+check "state run is read-only" bash -c "
+  cd '$STATE_REPO' &&
+  before=\$(find . -path ./.git -prune -o -type f -print | sort) &&
+  out=\$(bash scripts/state.sh demo) &&
+  after=\$(find . -path ./.git -prune -o -type f -print | sort) &&
+  grep -qx 'slug: demo' <<<\"\$out\" &&
+  [ \"\$before\" = \"\$after\" ] &&
+  [ \"\$(git status --porcelain)\" = '' ]
+"
+
+# Mutation pin: if state.sh treats either review sentinel as approval, this fixture
+# moves from review/pending to release/approve and the check fails.
+setup_state_fixture state-review-and-pin review-single-sentinel
+check "state requires both review approval sentinels" bash -c "
+  cd '$STATE_REPO' &&
+  out=\$(bash scripts/state.sh demo) &&
+  grep -qx 'stage: review' <<<\"\$out\" &&
+  grep -qx 'review: pending' <<<\"\$out\" &&
+  grep -qx 'next_action: /3-review' <<<\"\$out\"
+"
 
 # --- codex-review.sh pure-reader contract with a canned reviewer
 check "codex-review reads plan body from branch" grep -F "git show \"\$branch:\$plan_path\"" scripts/codex-review.sh
