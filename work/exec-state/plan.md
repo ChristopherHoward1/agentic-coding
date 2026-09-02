@@ -1,6 +1,6 @@
 # Explicit Per-Work-Unit Execution State
 
-**Slug:** exec-state · **Date:** 2026-09-01 · **Status:** draft
+**Slug:** exec-state · **Date:** 2026-09-01 · **Status:** implemented
 
 ## Goal
 
@@ -79,3 +79,7 @@ Reviewer: fresh `plan-reviewer` subagent (opus, cold, read-only), 2026-09-01. Ve
 No disagreements — the reviewer's cuts are right and shrink the unit to its core.
 
 Plan verdict: APPROVE
+
+Code review (round 1, 2026-09-01): both reviewers APPROVE. Claude `code-reviewer` (opus) verified the mutation-pin by hand and confirmed all 7 acceptance criteria; Codex reviewer exit 0. Only LOW findings, none blocking: read-only test uses a branchless fixture (the `git show` path's read-only-ness is covered implicitly by `branch-approve`); bad-arg exits 2 while other errors exit 1 (both non-zero, per spec); `review: approve` can co-print with `stage: implement` pre-handoff (per-contract, `review` is a pure sentinel projection).
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
