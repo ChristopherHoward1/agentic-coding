@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.9.1] - 2026-09-03
+
+- Review verdict now converges — MEDIUM findings are reported and orchestrator-routed but never gate the reviewer verdict or force extra rounds; only CRITICAL/HIGH block. Fixes both reviewers and resolves the codex-review.sh self-contradiction.
+- Confirm-delta: none
+
 ## [2026.9.0] - 2026-09-01
 
 - `scripts/state.sh <slug>` derives per-work-unit execution state (stage, review, next legal action) from observable repo facts — a cold session can learn where a unit stands and what comes next without the prior conversation.
