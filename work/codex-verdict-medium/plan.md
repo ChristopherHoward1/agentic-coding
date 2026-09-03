@@ -1,6 +1,6 @@
 # MEDIUM findings never gate the review verdict
 
-**Slug:** codex-verdict-medium · **Date:** 2026-09-02 · **Status:** draft
+**Slug:** codex-verdict-medium · **Date:** 2026-09-02 · **Status:** implemented
 
 ## Goal
 
@@ -53,3 +53,10 @@ Release note: Review verdict now converges — MEDIUM findings are reported and 
 plan-reviewer (opus, fresh): APPROVE. Verified the three edit sites are the only places MEDIUM-blocking is encoded (grepped the whole tree). Two minor clarity findings, both applied: (1) added `SKILL.md` to the verification grep and named line 21's second `auto-triage remaining MEDIUM` occurrence in Approach step 3; (2) stated the ARCHI remedy is a freshness bump, not a content edit. Confirmed gate stays green — no test asserts the changed prompt text; the round counter is retained (removing it would balloon the footprint into tests 746/747/749/830–837).
 
 Plan verdict: APPROVE
+
+**Round 1 (both APPROVE, no blocking findings):**
+- code-reviewer (opus, fresh): APPROVE. Ran the gate itself (170/170). All 5 acceptance criteria met; footprint exactly the three declared files. Two LOW findings, non-blocking: (1) `codex-review.sh:116` closing calibration says "all findings are LOW" where the Claude agent says "LOW or MEDIUM" — cosmetic asymmetry, governed unambiguously by lines 108/115; (2) the round cap can still burn rounds on CRITICAL/HIGH churn — intended safety-net behavior.
+- codex (gpt-5.5, read-only, main-bound): APPROVE, no substantive findings. First run exited 2 (tooling non-verdict: reviewer emitted the plan's `Codex-review verdict:` sentinel form instead of the required `Codex verdict:` line, plausibly contaminated by this unit's verdict-sentinel subject matter); re-run with a fresh reviewer returned the correct sentinel and exit 0. No sentinel was recorded from the exit-2 prose.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
