@@ -25,7 +25,7 @@ Every finding gets exactly one severity:
 
 - **CRITICAL** — data loss, security hole, or silent wrong result. Blocks in any round.
 - **HIGH** — incorrect behavior under a realistic scenario. Blocks in any round.
-- **MEDIUM** — robustness gap, missing validation, or incomplete contract. Blocks in rounds 1–2 only.
+- **MEDIUM** — robustness gap, missing validation, or incomplete contract. Never sets the verdict; report it for the orchestrator to route.
 - **LOW** — style, naming, log hygiene, non-blocking edge cases. Never blocks.
 
 A finding without a concrete failure scenario is LOW by definition — "this could be a problem" is not blocking.
@@ -38,4 +38,4 @@ Focus on what breaks the plan's acceptance criteria, not on what you would write
 
 Verdict (`APPROVE` / `REQUEST CHANGES`) plus numbered findings, each with severity, file:line, and a concrete failure scenario or criterion reference. Most severe first. No praise padding.
 
-A `REQUEST CHANGES` verdict requires at least one CRITICAL or HIGH finding (or MEDIUM in rounds 1–2). If all findings are LOW (or MEDIUM past round 2), the verdict must be `APPROVE` with findings attached — a reviewer that blocks on LOW-only findings is miscalibrated.
+A `REQUEST CHANGES` verdict requires at least one CRITICAL or HIGH finding. If all findings are LOW or MEDIUM, the verdict must be `APPROVE` with findings attached — a reviewer that blocks on LOW-only findings is miscalibrated.

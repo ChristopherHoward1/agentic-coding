@@ -105,7 +105,7 @@ git diff "main...$branch" -- ':/' ":(exclude,top)work/$slug" >>"$prompt" \
   printf 'Every finding gets exactly one severity:\n'
   printf '- CRITICAL: data loss, security hole, or silent wrong result. Blocks in any round.\n'
   printf '- HIGH: incorrect behavior under a realistic scenario. Blocks in any round.\n'
-  printf '- MEDIUM: robustness gap, missing validation, or incomplete contract. Blocks rounds 1-2 only.\n'
+  printf '- MEDIUM: robustness gap, missing validation, or incomplete contract. Never sets the verdict; report it for the orchestrator to route.\n'
   printf '- LOW: style, naming, log hygiene, non-blocking edge cases. Never blocks.\n\n'
   printf 'A finding without a concrete failure scenario is LOW by definition.\n\n'
   printf '## Calibration\n\n'
