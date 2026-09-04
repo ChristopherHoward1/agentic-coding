@@ -1,6 +1,6 @@
 # Implementer ladder: lazy/YAGNI build discipline in the contract
 
-**Slug:** implementer-ladder · **Date:** 2026-09-04 · **Status:** approved
+**Slug:** implementer-ladder · **Date:** 2026-09-04 · **Status:** implemented
 
 ## Goal
 
@@ -55,3 +55,12 @@ Plan-reviewer (fresh thread) verified all codebase claims and returned APPROVE w
 3. This is a contract *nudge* with zero enforcement — over-engineering stays undetectable downstream, only less likely. No revision needed; the plan does not overclaim (Done = "codex reaches for the leaner rung by default"). Recorded for the Owner's awareness.
 
 Plan verdict: APPROVE
+
+### Implementation review (/3-review)
+
+Round 1: code-reviewer APPROVE (all 7 criteria met; one LOW — the nudge has no downstream enforcement, already noted). Codex REQUEST CHANGES on a single HIGH claiming `handoff.tpl` was outside the footprint — a false positive: `.claude/skills` is a symlink to `skills/` (`-ef` confirms same file), so the file was in-footprint; the plan had merely named the symlink path. Resolved by normalizing the plan footprint to the canonical tracked path (no scope change).
+
+Round 2 (after normalization): both APPROVE. code-reviewer one LOW (rung-1 "say so in one line" phrasing, harmless); codex clean.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
