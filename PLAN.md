@@ -33,6 +33,7 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 - 2026-08-27 — A plan-reviewer's "drop this marginal fix" is a cost signal: keeping a flagged-inert fix tends to spend its savings back as review-round churn (fix 3 drew 3 of 4 rounds) — `work/loop-hardening/retro.md`
 - 2026-09-01 — A unit that adds/renames a `scripts/` or `skills/` file must refresh `ARCHI.md` **on the release branch** with a targeted edit: `release.sh` checks ARCHI freshness on the branch, and `/compact` from a `main` checkout cannot describe branch-only code, so "run /compact" is not the remedy here — `work/exec-state/retro.md`
 - 2026-08-28 — A guard is not pinned until a mutation to it has been shown to fail the suite **and** that mutation was verified to have landed; writing the doc then citing the doc did not stop a third consecutive unit shipping unpinned guards, while reviewer-run mutation testing caught every one — `knowledge/silent-no-op-hazards.md`, `work/work-artifact-capture/retro.md`
+- 2026-09-04 — Plan footprints name the **canonical tracked path** (`skills/…`, `agents/…`), never the `.claude/` symlink alias: a cold reviewer sees the plan's path string vs the diff's and cannot be relied on to resolve the symlink, so the alias reads as a phantom footprint violation (noted benignly in `codex-verdict-medium`, then a blocking HIGH costing a round in `implementer-ladder`) — `work/codex-verdict-medium/retro.md`
 
 ## Risks
 
