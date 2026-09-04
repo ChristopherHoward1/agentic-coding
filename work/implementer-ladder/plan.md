@@ -23,7 +23,7 @@ Alternative considered: a warm-tier profile addition instead of `AGENTS.md` — 
 
 Files to modify:
 - `AGENTS.md` — add the build-discipline section (ladder + root-cause + boundaries + marker)
-- `.claude/skills/2-implement/prompts/handoff.tpl` — one reinforcing line
+- `skills/2-implement/prompts/handoff.tpl` — one reinforcing line (`.claude/skills` is a symlink to `skills/`; the canonical tracked path is named here)
 
 Files NOT to touch:
 - `.claude/agents/code-reviewer.md` and `scripts/codex-review.sh` — the review-side complexity lens is recommendation #2, a separate unit; keep this diff to the build side.
