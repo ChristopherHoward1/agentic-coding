@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.9.2] - 2026-09-04
+
+- Implementer contract now carries a lazy/YAGNI build ladder (borrowed from ponytail) so codex writes the leanest working diff within scope, with explicit boundaries protecting validation/security/error-handling.
+- Confirm-delta: none
+
 ## [2026.9.1] - 2026-09-03
 
 - Review verdict now converges — MEDIUM findings are reported and orchestrator-routed but never gate the reviewer verdict or force extra rounds; only CRITICAL/HIGH block. Fixes both reviewers and resolves the codex-review.sh self-contradiction.
