@@ -70,11 +70,21 @@ skip() {
 # --- Node ---------------------------------------------------------------
 if [[ -f package.json ]]; then
   if command -v node >/dev/null; then
+    typecheck_script=0
     for s in lint typecheck test; do
       if node -e "process.exit(require('./package.json').scripts?.['$s'] ? 0 : 1)" 2>/dev/null; then
         run npm run --silent "$s"
+        [[ "$s" == typecheck ]] && typecheck_script=1
       fi
     done
+    # No typecheck script but a TypeScript project: let the compiler judge.
+    if [[ $typecheck_script -eq 0 && -f tsconfig.json ]]; then
+      if npx --no-install tsc --version >/dev/null 2>&1; then
+        run npx --no-install tsc --noEmit
+      else
+        skip tsc
+      fi
+    fi
   else
     skip node
   fi
