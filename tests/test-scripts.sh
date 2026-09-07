@@ -635,6 +635,25 @@ exit 0
 EOF
   chmod +x "$path"
 }
+# A node stand-in that honors the gate's `node -e "... scripts?.['x'] ..."`
+# probe by checking package.json, so the typecheck-fallback path is testable
+# without a real node toolchain. Any other invocation exits 0.
+write_fake_node() {
+  local path="$1"
+  mkdir -p "$(dirname "$path")"
+  # Pure-bash: the restricted test PATH has no grep/tr/cat.
+  cat >"$path" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "-e" ]]; then
+  key=${2#*\[\'}     # strip up to the opening ['
+  key=${key%%\'\]*}  # strip from '] onward -> the script name
+  pkg=$(<package.json)
+  [[ "$pkg" == *"\"$key\""* ]] && exit 0 || exit 1
+fi
+exit 0
+EOF
+  chmod +x "$path"
+}
 
 # --- shellcheck the scripts themselves (gate.sh covers this too; belt+braces)
 if command -v shellcheck >/dev/null; then
@@ -1122,6 +1141,44 @@ write_fake_tool "$GATE_BIN/npm"
   git commit -qm node-runs
 )
 check "gate does not report skipped node when node check runs" bash -c "cd '$GATE_REPO' && out=\$(PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); grep -Fq '▶ npm run --silent lint' <<<\"\$out\" && ! grep -Fq 'skipped: node' <<<\"\$out\""
+
+setup_gate_fixture gate-tsc-fallback
+write_fake_node "$GATE_BIN/node"
+write_fake_tool "$GATE_BIN/npm"
+write_fake_tool "$GATE_BIN/npx"
+(
+  cd "$GATE_REPO" || exit 1
+  printf '{"scripts":{"lint":"true"}}\n' >package.json
+  printf '{}\n' >tsconfig.json
+  git add package.json tsconfig.json
+  git commit -qm tsc-fallback
+)
+check "gate runs tsc --noEmit when TS project has no typecheck script" bash -c "cd '$GATE_REPO' && out=\$(PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); grep -Fq '▶ npx --no-install tsc --noEmit' <<<\"\$out\" && ! grep -Fq 'skipped: tsc' <<<\"\$out\""
+
+setup_gate_fixture gate-tsc-has-script
+write_fake_node "$GATE_BIN/node"
+write_fake_tool "$GATE_BIN/npm"
+write_fake_tool "$GATE_BIN/npx"
+(
+  cd "$GATE_REPO" || exit 1
+  printf '{"scripts":{"typecheck":"tsc --noEmit"}}\n' >package.json
+  printf '{}\n' >tsconfig.json
+  git add package.json tsconfig.json
+  git commit -qm tsc-has-script
+)
+check "gate does not add tsc fallback when a typecheck script exists" bash -c "cd '$GATE_REPO' && out=\$(PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); grep -Fq '▶ npm run --silent typecheck' <<<\"\$out\" && ! grep -Fq 'tsc --noEmit' <<<\"\$out\" && ! grep -Fq 'skipped: tsc' <<<\"\$out\""
+
+setup_gate_fixture gate-tsc-missing
+write_fake_node "$GATE_BIN/node"
+write_fake_tool "$GATE_BIN/npm"
+(
+  cd "$GATE_REPO" || exit 1
+  printf '{"scripts":{"lint":"true"}}\n' >package.json
+  printf '{}\n' >tsconfig.json
+  git add package.json tsconfig.json
+  git commit -qm tsc-missing
+)
+check "gate reports skipped tsc when TS project has no typecheck script and tsc is absent" bash -c "cd '$GATE_REPO' && out=\$(PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); grep -Fq '⊘ skipped: tsc (not installed)' <<<\"\$out\""
 
 setup_gate_fixture gate-required-present
 write_fake_tool "$GATE_BIN/fixturetool"
