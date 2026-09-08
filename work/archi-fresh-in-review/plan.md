@@ -1,6 +1,6 @@
 # Catch ARCHI staleness in /3-review, not first at /4-release
 
-**Slug:** archi-fresh-in-review · **Date:** 2026-09-08 · **Status:** draft
+**Slug:** archi-fresh-in-review · **Date:** 2026-09-08 · **Status:** implemented
 
 ## Goal
 
@@ -62,3 +62,14 @@ plan-reviewer verdict: REVISE (fresh opus subagent, cold context). Core design c
 Disagreement (Owner arbitrates): reviewer offered a "simpler version" dropping the `release.sh` refactor to avoid touching the release path. Declined and recorded in Approach — two definitions of "stale" is the drift this unit prevents; the edit is a one-wrapper delegation guarded by the existing refusal test. Kept as the unit's acknowledged main risk.
 
 Plan verdict: REVISE → addressed; ready for Owner approval.
+
+### Code review (round 1)
+
+Both reviewers APPROVE on the clean `origin/main`-based diff (local `main` was stale; FF'd before review). All findings LOW, none blocking:
+- Claude code-reviewer: (a) release.sh wrapper collapses exit 1/2 into the "stale" die message (plan-accepted); (b) a nonexistent `<ref>` reports as "no git history" rather than ref-not-found (fails closed); (c) the missing-*source* exit-2 branch is untested (symmetric to the tested missing-archi side).
+- Codex reviewer: step-7 text cites "step 4 / step-19" for the re-review exemption; the mandatory-re-review rule is actually step 5. Cosmetic; intent clear.
+
+None routed to a fix round (all LOW). (a)–(c) and the step-ref wording noted for /5-retro.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
