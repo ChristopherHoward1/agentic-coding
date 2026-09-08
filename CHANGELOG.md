@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.9.4] - 2026-09-08
+
+- `/3-review` and `codex-review.sh` now base the review diff on a freshly-fetched `origin/main`, so a stale local `main` can no longer pollute what reviewers see.
+- Confirm-delta: none
+
 ## [2026.9.3] - 2026-09-08
 
 - `/3-review` now validates ARCHI.md freshness and heals it on the branch, so `/4-release` no longer surprises with a stale-ARCHI block; freshness check extracted to `scripts/archi-fresh.sh`.
