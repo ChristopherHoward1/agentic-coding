@@ -109,6 +109,7 @@ setup_release_fixture() {
 
     mkdir -p scripts skills/3-review skills/1-plan/prompts work/demo
     cp "$ROOT/scripts/release.sh" scripts/release.sh
+    cp "$ROOT/scripts/archi-fresh.sh" scripts/archi-fresh.sh
     cat >scripts/gate.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -124,7 +125,7 @@ if compgen -G "scripts/gate.d/*.sh" >/dev/null; then
 fi
 echo "GATE: PASS"
 EOF
-    chmod +x scripts/release.sh scripts/gate.sh
+    chmod +x scripts/release.sh scripts/archi-fresh.sh scripts/gate.sh
     printf 'name: fixture\n' >config.yaml
     printf 'merge rules\n' >CLAUDE.md
     printf '%s\n' "$version" >VERSION
@@ -164,6 +165,58 @@ EOF
     git -C "$REL_WORKTREE" config user.name Tester
   )
   write_release_fixture_date "$REL_FAKEBIN" "2026.8" "2026-08-16"
+}
+
+setup_archi_fresh_fixture() {
+  local name="$1"
+  local mode="$2"
+  local tmp_root="$TMP/$name"
+
+  ARCHI_REPO="$tmp_root/repo"
+
+  mkdir -p "$ARCHI_REPO"
+  git init -q -b main "$ARCHI_REPO"
+  (
+    cd "$ARCHI_REPO" || exit 1
+    git config user.email tester@example.com
+    git config user.name Tester
+    mkdir -p scripts skills profiles
+    cp "$ROOT/scripts/archi-fresh.sh" scripts/archi-fresh.sh
+    chmod +x scripts/archi-fresh.sh
+    printf 'name: fixture\n' >config.yaml
+    printf 'merge rules\n' >CLAUDE.md
+    printf 'profile\n' >profiles/default.md
+    printf 'skill\n' >skills/fixture.md
+    git add -A
+    GIT_AUTHOR_DATE="2026-08-16T10:00:00Z" GIT_COMMITTER_DATE="2026-08-16T10:00:00Z" git commit -qm source
+
+    if [[ "$mode" == missing-archi ]]; then
+      return 0
+    fi
+
+    printf 'architecture\n' >ARCHI.md
+    if [[ "$mode" == equal ]]; then
+      printf 'merge rules updated\n' >>CLAUDE.md
+    fi
+    git add -A
+    GIT_AUTHOR_DATE="2026-08-16T10:01:00Z" GIT_COMMITTER_DATE="2026-08-16T10:01:00Z" git commit -qm archi
+
+    case "$mode" in
+      stale)
+        printf 'skill updated\n' >>skills/fixture.md
+        git add skills/fixture.md
+        GIT_AUTHOR_DATE="2026-08-16T10:02:00Z" GIT_COMMITTER_DATE="2026-08-16T10:02:00Z" git commit -qm stale-source
+        ;;
+      branch-ref)
+        git branch wt/demo
+        printf 'branch-only skill update\n' >>skills/fixture.md
+        git add skills/fixture.md
+        GIT_AUTHOR_DATE="2026-08-16T10:02:00Z" GIT_COMMITTER_DATE="2026-08-16T10:02:00Z" git commit -qm branch-source
+        git branch -f wt/demo HEAD
+        git reset -q --hard HEAD~1
+        ;;
+    esac
+  )
 }
 
 setup_codex_review_fixture() {
@@ -663,6 +716,30 @@ fi
 # --- worktree.sh lifecycle in a throwaway repo
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
+
+# --- archi-fresh.sh freshness checks in hermetic git repos
+setup_archi_fresh_fixture archi-fresh fresh
+check_exit "archi-fresh passes when ARCHI is newer than source paths" 0 "" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
+
+setup_archi_fresh_fixture archi-stale stale
+check_exit "archi-fresh reports stale source paths" 1 "skills/" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
+check_exit "archi-fresh stale message says to refresh branch ARCHI" 1 "refresh ARCHI on the branch" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
+
+setup_archi_fresh_fixture archi-equal equal
+check_exit "archi-fresh treats equal epochs as fresh" 0 "" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
+
+setup_archi_fresh_fixture archi-ref branch-ref
+check_exit "archi-fresh default ref checks current branch history" 0 "" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
+check_exit "archi-fresh explicit ref selects branch history" 1 "skills/" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh wt/demo"
+
+setup_archi_fresh_fixture archi-missing missing-archi
+check_exit "archi-fresh exits 2 when one side has no history" 2 "ARCHI.md has no git history" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
+
+check "archi-fresh help documents optional ref" bash -c "
+  out=\$(bash scripts/archi-fresh.sh --help) &&
+  grep -Fq 'Usage: scripts/archi-fresh.sh [<ref>]' <<<\"\$out\" &&
+  grep -Fq 'Defaults to HEAD' <<<\"\$out\"
+"
 
 # --- state.sh derives cold-session work-unit state without writes
 setup_state_fixture state-missing missing-plan

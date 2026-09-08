@@ -116,17 +116,7 @@ check_gate() {
 }
 
 check_archi_fresh() {
-  local archi_epoch source_epoch
-
-  archi_epoch=$(git log -1 --format=%ct -- ARCHI.md)
-  source_epoch=$(git log -1 --format=%ct -- scripts/ skills/ profiles/ config.yaml CLAUDE.md)
-
-  [[ -n "$archi_epoch" ]] || die "ARCHI.md has no git history"
-  [[ -n "$source_epoch" ]] || die "source paths have no git history"
-
-  if (( archi_epoch < source_epoch )); then
-    die "ARCHI.md is stale; run /compact first"
-  fi
+  scripts/archi-fresh.sh || die "ARCHI.md is stale; refresh it on the branch"
 }
 
 check_version_exceeds() {
