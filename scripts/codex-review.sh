@@ -95,9 +95,16 @@ else
   printf '(none recorded)\n' >>"$prompt"
 fi
 
-printf '\n%s\n' "--- DIFF (main...$branch excluding work/$slug) ---" >>"$prompt"
-git diff "main...$branch" -- ':/' ":(exclude,top)work/$slug" >>"$prompt" \
-  || die2 "cannot diff main...$branch"
+git fetch origin --quiet 2>/dev/null || true
+if git show-ref --verify --quiet refs/remotes/origin/main; then
+  base=origin/main
+else
+  base=main
+fi
+
+printf '\n%s\n' "--- DIFF ($base...$branch excluding work/$slug) ---" >>"$prompt"
+git diff "$base...$branch" -- ':/' ":(exclude,top)work/$slug" >>"$prompt" \
+  || die2 "cannot diff $base...$branch"
 
 {
   printf '\n'
