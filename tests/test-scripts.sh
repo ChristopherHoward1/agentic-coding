@@ -295,7 +295,7 @@ reviewer:
   command: '$COD_REVIEWER approve-then-fail'
 EOF
         ;;
-      capture-prompt)
+      capture-prompt|origin-main-ahead)
         cat >config.yaml <<EOF
 reviewer:
   command: '$COD_REVIEWER capture-prompt $tmp_root/prompt.txt'
@@ -304,7 +304,24 @@ EOF
     esac
     git add -A
     git commit -qm main
-    git branch wt/demo
+    case "$command_mode" in
+      origin-main-ahead)
+        git init -q --bare "$tmp_root/origin.git"
+        git remote add origin "$tmp_root/origin.git"
+        git push -q -u origin main
+        local_main=$(git rev-parse HEAD)
+        printf 'remote-only\n' >remote-only.txt
+        git add remote-only.txt
+        git commit -qm remote-only
+        git push -q origin main
+        git reset -q --hard "$local_main"
+        git fetch origin --quiet
+        git branch wt/demo origin/main
+        ;;
+      *)
+        git branch wt/demo
+        ;;
+    esac
     git worktree add -q "$COD_WORKTREE" wt/demo
     git -C "$COD_WORKTREE" config user.email tester@example.com
     git -C "$COD_WORKTREE" config user.name Tester
@@ -843,7 +860,7 @@ check "codex-review prompt passes round number" grep -F "REVIEW_ROUND" scripts/c
 check "3-review skill tracks round counter" grep -F "work/<slug>/review-round" skills/3-review/SKILL.md
 check "3-review skill routes by severity" grep -F "CRITICAL/HIGH" skills/3-review/SKILL.md
 check "3-review skill caps at round 3 mechanically" grep -F "counter reaches 3" skills/3-review/SKILL.md
-check "3-review skill keeps codex-review work artifacts out of diff" grep -F "git diff main...wt/<slug> -- ':/' \":(exclude,top)work/<slug>\"" skills/3-review/SKILL.md
+check "3-review skill keeps codex-review work artifacts out of diff" grep -F "git diff origin/main...wt/<slug> -- ':/' \":(exclude,top)work/<slug>\"" skills/3-review/SKILL.md
 
 setup_codex_review_fixture codex-approve normal
 check_exit "codex-review approve exits 0" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
@@ -931,6 +948,21 @@ setup_codex_review_fixture codex-round-env capture-prompt
 check_exit "codex-review passes custom round number" 0 "" bash -c "cd '$COD_PRIMARY' && REVIEW_ROUND=3 bash scripts/codex-review.sh demo"
 check "codex-review prompt contains round 3" bash -c "
   grep -Fq 'round 3' '$TMP/codex-round-env/prompt.txt'
+"
+
+setup_codex_review_fixture codex-origin-main-ahead origin-main-ahead
+check_exit "codex-review excludes origin-main-only changes" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+check "codex-review bases diff on origin/main when local main is stale" bash -c "
+  grep -Fq -- '--- DIFF (origin/main...wt/demo excluding work/demo) ---' '$TMP/codex-origin-main-ahead/prompt.txt' &&
+  grep -Fq '+feature' '$TMP/codex-origin-main-ahead/prompt.txt' &&
+  ! grep -Fq 'remote-only' '$TMP/codex-origin-main-ahead/prompt.txt'
+"
+
+setup_codex_review_fixture codex-no-origin-fallback capture-prompt
+check_exit "codex-review falls back to local main without origin/main" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
+check "codex-review fallback prompt uses local main base" bash -c "
+  grep -Fq -- '--- DIFF (main...wt/demo excluding work/demo) ---' '$TMP/codex-no-origin-fallback/prompt.txt' &&
+  grep -Fq '+feature' '$TMP/codex-no-origin-fallback/prompt.txt'
 "
 
 (
