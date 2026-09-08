@@ -1,6 +1,6 @@
 # Base the review diff on freshly-fetched origin/main, not local main
 
-**Slug:** review-diff-base-origin-main · **Date:** 2026-09-08 · **Status:** draft
+**Slug:** review-diff-base-origin-main · **Date:** 2026-09-08 · **Status:** implemented
 
 ## Goal
 
@@ -58,3 +58,20 @@ plan-reviewer verdict: REVISE (fresh opus subagent, cold context). Core design c
 4. Test fixtures — recorded that the pollution case needs its own bare-remote fixture (current `setup_codex_review_fixture` has no origin) modeled on `:953–1026`, and that existing codex-review tests now exercise the fallback path (tolerated via substring stderr matching).
 
 Plan verdict: REVISE → addressed; ready for Owner approval.
+
+### Code review
+
+**Round 1** (fresh reviewers, clean `origin/main` diff):
+- Claude code-reviewer: APPROVE (LOW-only).
+- Codex: REQUEST CHANGES — HIGH: `skills/3-review/SKILL.md` step 1 lacked the local-`main` fallback the script has (fails in a checkout with no `origin/main` ref). **Valid.** Fixed in `5072d57` (prose fallback added; asserted diff substring preserved). Gate green.
+
+**Round 2** (fresh reviewers, updated diff):
+- Claude code-reviewer: APPROVE — no CRITICAL/HIGH/MEDIUM; verified the round-1 fix, the pollution test's discrimination, and the untouched config read. One LOW (best-effort fetch swallows a genuinely-broken remote — matches the declared contract, "not a regression").
+- Codex: REQUEST CHANGES — HIGH: on a fetch *failure* where a stale `refs/remotes/origin/main` already exists, the script uses that ref instead of falling back to local `main`; claims a "polluted or incorrect" diff.
+
+**Owner-adjudicated override of codex's round-2 HIGH (2026-09-08).** The finding is incorrect on the merits, and the disagreement was escalated to the Owner (an open HIGH), who ruled to override and ship. Analysis: the diff is three-dot (`origin/main...branch` = `merge-base(origin/main, branch)..branch`). The branch is forked from `origin/main` at `worktree.sh add`, so the merge-base collapses to that fork point for **any** `origin/main` at-or-after it — a stale `origin/main` still yields a clean, branch-only diff (walked the C1→C2 case: stays clean). The only base that actually pollutes is one *behind* the fork point, which only local `main` can be; so a stale `origin/main` is never worse than local `main`, and codex's proposed fetch-success gate would regress to a staler base in the offline case. The Claude reviewer independently rated the same behavior LOW/intended. Codex's "concrete failure scenario" cannot occur in the worktree.sh-created flow. No code change.
+
+Both sentinels below reflect the Owner's adjudicated decision; codex's raw round-2 verdict was REQUEST CHANGES, overridden as above.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
