@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.9.3] - 2026-09-08
+
+- `/3-review` now validates ARCHI.md freshness and heals it on the branch, so `/4-release` no longer surprises with a stale-ARCHI block; freshness check extracted to `scripts/archi-fresh.sh`.
+- Confirm-delta: none
+
 ## [2026.9.2] - 2026-09-04
 
 - Implementer contract now carries a lazy/YAGNI build ladder (borrowed from ponytail) so codex writes the leanest working diff within scope, with explicit boundaries protecting validation/security/error-handling.
