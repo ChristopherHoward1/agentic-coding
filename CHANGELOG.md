@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.10.3] - 2026-10-09
+
+- `scripts/sync-template.sh` keeps the GitHub template repo in step with the export. Each release opens a sync PR, which merges once its CI is green.
+- Confirm-delta: none
+
 ## [2026.10.2] - 2026-10-09
 
 - `scripts/export-template.sh <dest>` generates a clean, capabilities-only template from this repo. It has full TRIP, no work history, skeleton `PLAN.md`/`ARCHI.md`, and no framework smoke suite in the consumer gate. The generic `PLAN.md` decisions now live as rules in the skills and agents that apply them.
