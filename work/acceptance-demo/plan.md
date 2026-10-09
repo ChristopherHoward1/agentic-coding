@@ -1,6 +1,6 @@
 # Acceptance Demonstration
 
-**Slug:** acceptance-demo · **Date:** 2026-10-09 · **Status:** draft
+**Slug:** acceptance-demo · **Date:** 2026-10-09 · **Status:** implemented
 
 ## Goal
 
@@ -116,3 +116,14 @@ Finding 5 was a note: the dirty-tree check during review has a residual gap that
 There are no disagreements.
 
 Plan verdict: APPROVE
+
+### Code review (round 1, 2026-10-09)
+
+- Fresh `code-reviewer` (opus): **APPROVE**, all 8 acceptance criteria met.
+  - It ran the gate (200/200) and the demonstration; the output matched Expected exactly.
+  - It mutation-pinned all three guards in a throwaway clone. Each mutation failed the suite.
+  - It raised 5 LOW findings and none blocks. The main ones: the dirty-tree check misses writes inside an already-untracked folder (`--untracked-files=all` would close it, but it doesn't affect the commit-then-demo flow); a stray `None: ` line in the section text exits 0; heading and fence matching is exact.
+- `codex-review.sh`: **APPROVE**, with no substantive findings. Its read-only sandbox couldn't run the gate, the demo or the mutations, so the code-reviewer's runs are the only evidence for those.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
