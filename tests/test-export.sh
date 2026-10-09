@@ -90,6 +90,14 @@ empty_destination() {
   fixture empty && mkdir -p "$dest" && export_tree "$dest" &&
     [[ -f "$dest/CLAUDE.md" ]]
 }
+subdirectory_destination() {
+  fixture subdirectory || return 1
+  dest="$repo/scripts/out"
+  (cd "$repo/scripts" && bash ./export-template.sh out) &&
+    [[ -f "$dest/CLAUDE.md" ]] &&
+    [[ $(cat "$dest/VERSION") == 1970.1.0 ]] &&
+    [[ ! -e "$repo/out" ]]
+}
 check 'clean export and consumer gate/freshness' success
 check 'no arguments refuses with usage' arguments noargs
 check 'extra arguments refuses with usage and writes nothing' arguments extra "$TMP/extra/out" extra
@@ -97,6 +105,7 @@ check 'non-empty destination refuses without writes' nonempty
 check 'file destination refuses without writes' file_destination
 check 'base and overlay both reflect HEAD' head_content
 check 'existing empty destination succeeds' empty_destination
+check 'subdirectory export resolves relative destination against caller cwd' subdirectory_destination
 
 echo
 echo "passed: $pass, failed: $fail"
