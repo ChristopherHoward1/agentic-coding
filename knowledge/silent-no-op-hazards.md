@@ -71,3 +71,17 @@ Both are in `knowledge/test-helper-contract.md` too; repeated because this unit 
    asserted absent from the tree — but gitignore excludes it under every implementation, so the
    staging strategy it was meant to pin had no test behind it at all. The fix was a *non-dot*
    gitignored stray in the *primary* directory.
+
+## An empty "nothing differs" check
+
+Seen in `docs-stage` (v2026.10.0). To decide whether a squash-merged `wt/<slug>` branch had
+landed, the orchestrator ran `files=$(git diff --name-only <base> <branch>)` and then
+`git diff --stat origin/main <branch> -- $files`. The Bash tool's shell is **zsh**, which does not
+word-split an unquoted `$files`. The whole newline-joined list became one pathspec that matched
+nothing, the diff printed nothing, and "no output" was read as "fully landed". A worktree holding
+unlanded review fixes was then removed.
+
+- When empty output means "safe to delete", make the check able to print something: run
+  `git diff --stat origin/main <branch>` over the whole tree first, and only then narrow it.
+- Do not rely on unquoted word-splitting in tool-run shell snippets. Use `${=files}` in zsh, an
+  array, or pipe the list through `xargs`.
