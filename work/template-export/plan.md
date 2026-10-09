@@ -1,6 +1,6 @@
 # Template export — a clean, capabilities-only template generated from this repo
 
-**Slug:** template-export · **Date:** 2026-10-09 · **Status:** approved
+**Slug:** template-export · **Date:** 2026-10-09 · **Status:** implemented
 
 ## Goal
 
@@ -141,3 +141,21 @@ Disagreement on #8 (split step 7, the decision-folding, into its own unit): kept
 Owner (2026-10-09): keep step 7 here; approved to implement.
 
 Plan verdict: APPROVE
+
+### Code review
+
+**Round 1:**
+- Claude code-reviewer: REQUEST CHANGES. HIGH: the export was cwd-relative, so a run from a subdirectory exported a partial tree and exited 0. LOWs: rule lines split the bullet lists; a partial dest is left behind on a mid-run failure.
+- Codex: APPROVE. MEDIUM: the same cwd issue.
+- Fixed in `a90a089`: dest resolves against the caller's cwd, the script `cd`s to the repo root, and a subdirectory test case was added and mutation-verified. Gate green, demo green.
+
+**Round 2:**
+- Claude code-reviewer: APPROVE. MEDIUM: ARCHI stale after `a90a089`, healed per /3-review step 7. LOWs, open, not blocking:
+  - the repo is taken from the caller's cwd, not the script's location
+  - `""` dest exits 2, not 1
+  - the rule lines split the bullet lists
+  - the per-case working-tree copy cost grows with the repo
+- Codex: APPROVE. MEDIUM: the same ARCHI staleness.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
