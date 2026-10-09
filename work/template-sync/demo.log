@@ -1,0 +1,7 @@
+Switched to a new branch 'template-sync/v2026.10.2'
+exit=0
+54fe37c Sync from agentic-coding v2026.10.2 (96d003b)
+07161d3 Add CI workflow running lint and tests on pull requests (#111) (#113)
+parent=07161d35cb9bb203c06a24cd09c4c23ce72189b6 template_main=07161d35cb9bb203c06a24cd09c4c23ce72189b6
+synced=fe265e1202d021cfed801ed5ea3e5d3720d1495d export=fe265e1202d021cfed801ed5ea3e5d3720d1495d
+ 2 files changed, 33 deletions(-)
