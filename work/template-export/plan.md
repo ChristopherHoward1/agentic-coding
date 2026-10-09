@@ -109,7 +109,7 @@ grep -c "promoted 2026" CLAUDE.md || true
 grep -rn "agentic-coding-worktrees\|export-template" . --exclude-dir=.git || echo clean
 bash scripts/gate.sh >/dev/null && echo GATE-OK
 scripts/archi-fresh.sh && echo ARCHI-OK
-bash tests/test-scripts.sh >/tmp/x 2>&1; echo "suite exit $?"; tail -1 /tmp/x
+bash tests/test-scripts.sh >"$d.log" 2>&1; echo "suite exit $?"; tail -1 "$d.log"
 ```
 Expected:
 - the top-level listing has no `work/`, `template/` or `.gitattributes`
