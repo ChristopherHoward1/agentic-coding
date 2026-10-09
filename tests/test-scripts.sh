@@ -734,6 +734,86 @@ fi
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
+# --- demo.sh section scoping and exit contract in a hermetic git repo
+DEMO_REPO="$TMP/demo"
+mkdir -p "$DEMO_REPO/work/x"
+git init -q "$DEMO_REPO"
+cat >"$DEMO_REPO/work/x/plan.md" <<'EOF'
+## Earlier
+```sh
+echo earlier > earlier-ran
+```
+## Demonstration
+```sh
+pwd
+false
+## This is a shell comment, not a section boundary
+echo demo-complete
+```
+```sh
+echo second > second-ran
+```
+EOF
+check_exit "demo passes with plain bash despite an intermediate failure" 0 "" "$ROOT/scripts/demo.sh" x "$DEMO_REPO"
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check "demo runs the full first block in the requested cwd" bash -c '
+  out=$("$1/scripts/demo.sh" x "$2") &&
+  [[ "$out" == "$2"$'"'"'\n'"'"'demo-complete ]]
+' _ "$ROOT" "$DEMO_REPO"
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check "demo never runs earlier or second blocks" bash -c '[[ ! -e "$1/earlier-ran" && ! -e "$1/second-ran" ]]' _ "$DEMO_REPO"
+cat >"$DEMO_REPO/work/x/plan.md" <<'EOF'
+## Demonstration
+
+## Review
+```sh
+echo later > later-ran
+```
+EOF
+check_exit "demo refuses an empty section before a later shell block" 2 "no shell block" "$ROOT/scripts/demo.sh" x "$DEMO_REPO"
+check "demo never runs a later section block" test ! -e "$DEMO_REPO/later-ran"
+cat >"$DEMO_REPO/work/x/plan.md" <<'EOF'
+## Demonstration
+```bash
+echo bash-ran
+```
+EOF
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check "demo accepts bash fences and defaults cwd to dot" bash -c '
+  cd "$2" && [[ $("$1/scripts/demo.sh" x) == bash-ran ]]
+' _ "$ROOT" "$DEMO_REPO"
+cat >"$DEMO_REPO/work/x/plan.md" <<'EOF'
+## Demonstration
+```sh
+exit 7
+```
+EOF
+check_exit "demo maps a failing block to 1 and names its real code" 1 "code 7" "$ROOT/scripts/demo.sh" x "$DEMO_REPO"
+cat >"$DEMO_REPO/work/x/plan.md" <<'EOF'
+## Demonstration
+```sh
+touch untracked
+```
+EOF
+check_exit "demo refuses an untracked worktree write" 1 "demo dirtied the worktree" "$ROOT/scripts/demo.sh" x "$DEMO_REPO"
+printf '## Demonstration\n\nNone: documentation only\n' >"$DEMO_REPO/work/x/plan.md"
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check "demo None prints the reason and passes" bash -c '
+  out=$("$1/scripts/demo.sh" x "$2") && [[ "$out" == "demo: none — documentation only" ]]
+' _ "$ROOT" "$DEMO_REPO"
+check_exit "demo missing plan is a tooling error" 2 "no plan" "$ROOT/scripts/demo.sh" missing "$DEMO_REPO"
+printf '## Goal\nNo demo\n' >"$DEMO_REPO/work/x/plan.md"
+check_exit "demo missing section is a tooling error" 2 "no ## Demonstration" "$ROOT/scripts/demo.sh" x "$DEMO_REPO"
+printf '## Demonstration\n' >"$DEMO_REPO/work/x/plan.md"
+check_exit "demo empty section is a tooling error" 2 "no shell block" "$ROOT/scripts/demo.sh" x "$DEMO_REPO"
+mkdir -p "$TMP/demo-not-git"
+check_exit "demo non-git directory is a tooling error" 2 "not a git work tree" "$ROOT/scripts/demo.sh" x "$TMP/demo-not-git"
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check "demo help documents its arguments" bash -c '
+  out=$("$1/scripts/demo.sh" --help) && [[ "$out" == *"Usage: scripts/demo.sh <slug> [<dir>]"* ]]
+' _ "$ROOT"
+check_exit "demo refuses missing arguments" 2 "Usage:" "$ROOT/scripts/demo.sh"
+
 # --- archi-fresh.sh freshness checks in hermetic git repos
 setup_archi_fresh_fixture archi-fresh fresh
 check_exit "archi-fresh passes when ARCHI is newer than source paths" 0 "" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
