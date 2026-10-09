@@ -40,7 +40,7 @@ export_tree() { (cd "$repo" && bash scripts/export-template.sh "$@"); }
 success() {
   fixture success && export_tree "$dest" || return 1
   local path
-  for path in work template .gitattributes scripts/export-template.sh tests/test-export.sh scripts/gate.d/test-scripts.sh; do
+  for path in work template .gitattributes scripts/export-template.sh scripts/sync-template.sh tests/test-export.sh scripts/gate.d/test-scripts.sh; do
     [[ ! -e "$dest/$path" ]] || return 1
   done
   [[ -f "$dest/tests/test-scripts.sh" && -d "$dest/knowledge" ]] &&
@@ -98,6 +98,81 @@ subdirectory_destination() {
     [[ $(cat "$dest/VERSION") == 1970.1.0 ]] &&
     [[ ! -e "$repo/out" ]]
 }
+sync_fixture() {
+  fixture "$1" || return 1
+  version=$(cat "$repo/VERSION") || return 1
+  git -C "$repo" tag "v$version" || return 1
+  template="$TMP/$1/template.git"
+  local seed="$TMP/$1/seed"
+  mkdir -p "$seed/conventions" || return 1
+  printf 'stale\n' >"$seed/conventions/x"
+  printf 'old README\n' >"$seed/README.md"
+  git init -q -b main "$seed" && git -C "$seed" add -A &&
+    git -C "$seed" -c user.email=t@t -c user.name=t commit -qm old &&
+    git clone -q --bare "$seed" "$template" || return 1
+  original=$(git -C "$template" rev-parse main) || return 1
+  refs=$(git -C "$template" for-each-ref) || return 1
+  tempdir="$TMP/$1/temps"
+  mkdir -p "$tempdir"
+}
+sync_tree() {
+  (cd "$repo" && TMPDIR="$tempdir" TEMPLATE_REPO="$template" \
+    GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \
+    bash scripts/sync-template.sh "$@")
+}
+sync_first() {
+  sync_fixture sync-first || return 1
+  local out clone branch sha
+  out=$(sync_tree) || return 1
+  clone=$(head -1 <<<"$out")
+  branch=$(tail -1 <<<"$out")
+  sha=$(git -C "$repo" rev-parse --short HEAD) || return 1
+  [[ -d "$clone" && "$branch" == "template-sync/v$version" ]] &&
+    [[ $(git -C "$clone" branch --show-current) == "$branch" ]] &&
+    [[ $(git -C "$clone" log -1 --format=%s) == "Sync from agentic-coding v$version ($sha)" ]] &&
+    [[ $(git -C "$clone" rev-parse HEAD~1) == "$original" ]] &&
+    [[ $(git -C "$template" for-each-ref) == "$refs" ]] || return 1
+  export_tree "$dest" && git -C "$dest" init -q && git -C "$dest" add -Af &&
+    git -C "$dest" -c user.email=t@t -c user.name=t commit -qm export || return 1
+  [[ $(git -C "$clone" rev-parse 'HEAD^{tree}') == $(git -C "$dest" rev-parse 'HEAD^{tree}') ]]
+}
+sync_noop() {
+  sync_fixture sync-noop || return 1
+  local out clone
+  out=$(sync_tree) || return 1
+  clone=$(head -1 <<<"$out")
+  git -C "$clone" push -q origin HEAD:main || return 1
+  rm -rf "$clone" || return 1
+  refs=$(git -C "$template" for-each-ref) || return 1
+  [[ -z $(ls -A "$tempdir") ]] || return 1
+  out=$(sync_tree) || return 1
+  [[ "$out" == 'up to date' && -z $(ls -A "$tempdir") ]] &&
+    [[ $(git -C "$template" for-each-ref) == "$refs" ]]
+}
+sync_tags() {
+  sync_fixture sync-tags || return 1
+  git -C "$repo" tag -d "v$version" || return 1
+  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
+  local status=$?
+  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
+  git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+  local out
+  out=$(sync_tree) || return 1
+  [[ -d $(head -1 <<<"$out") && $(tail -1 <<<"$out") == "template-sync/v$version" ]]
+}
+sync_arguments() {
+  sync_fixture sync-arguments || return 1
+  sync_tree extra >"$TMP/stdout" 2>"$TMP/stderr"
+  local status=$?
+  [[ $status == 1 && ! -s "$TMP/stdout" && -z $(ls -A "$tempdir") ]] &&
+    grep -Fq 'Usage:' "$TMP/stderr"
+}
+check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
+check 'sync (d): arguments refuse without writes' sync_arguments
+
 check 'clean export and consumer gate/freshness' success
 check 'no arguments refuses with usage' arguments noargs
 check 'extra arguments refuses with usage and writes nothing' arguments extra "$TMP/extra/out" extra
