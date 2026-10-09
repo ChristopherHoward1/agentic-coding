@@ -9,7 +9,7 @@ Input: a work unit slug.
 
 ## Steps
 
-1. **Run the release script:** from the repo root, run `scripts/worktree.sh sync-artifacts <slug>`, then `bash scripts/release.sh <slug> --confirm-delta "none"` (full TRIP: no in-session confirmation; `Confirm-delta` is vestigial and logged as `none`).
+1. **Run the release script:** from the repo root, run `scripts/worktree.sh sync-artifacts <slug>`, then `bash scripts/release.sh <slug> --confirm-delta "none"` (full TRIP: no in-session confirmation; `Confirm-delta` is logged as `none`).
 2. **React to the exit code:**
    - Exit 0 → report the bump commit on the release branch, that no tag exists yet, and that `main` was untouched.
    - Non-zero → report the script output and stop.
@@ -18,6 +18,8 @@ Input: a work unit slug.
 5. **Invoke `/5-retro`** for the released unit.
 
 ## Rules
+
+- After the release PR merges, check each primary-checkout untracked `work/<slug>/` copy against `origin/main`, then delete matching copies before `git pull --ff-only`.
 
 - The release script is the source of truth for the release result.
 - Full TRIP: the Orchestrator runs the release, push, PR, and tag without an in-session Owner confirmation. (The harness may still independently gate the PR merge into protected `main`; that is a platform guard, not a framework confirmation.)

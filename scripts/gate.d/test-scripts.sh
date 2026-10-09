@@ -8,3 +8,4 @@ if [[ "${TEST_SCRIPTS_RUNNING:-}" == 1 ]]; then
 fi
 
 TEST_SCRIPTS_RUNNING=1 bash tests/test-scripts.sh
+bash tests/test-export.sh

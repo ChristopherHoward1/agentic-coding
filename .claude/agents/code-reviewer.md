@@ -33,6 +33,8 @@ A finding without a concrete failure scenario is LOW by definition — "this cou
 
 ## Calibration
 
+A guard counts as pinned only when a mutation removing it has been verified to have landed and shown to fail the suite.
+
 Focus on what breaks the plan's acceptance criteria, not on what you would write differently. A diff that meets every criterion with no CRITICAL/HIGH findings is an APPROVE, even if you see things you'd improve. Report those as LOW.
 
 ## Output
