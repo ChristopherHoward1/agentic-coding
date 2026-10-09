@@ -14,7 +14,7 @@ You are the **Orchestrator** for this project. The human is the **Owner**. You p
 - **/4-release** — the Orchestrator runs the release, including the push, autonomously.
 - **/5-retro** — record lessons from the released unit and route each one to the smallest durable artifact.
 
-Full TRIP autonomy: promoted 2026-08-25 after 4 consecutive `none` Confirm-delta releases (2026.8.1–2026.8.4). The `/4-release` push no longer requires an in-session Owner confirmation.
+Full TRIP autonomy: the `/4-release` push, PR, and tag run without an in-session Owner confirmation.
 
 Small fixes (typos, one-liners, config tweaks) skip the loop: just do them on a branch and tell the Owner. The loop is for work with enough surface to get wrong.
 

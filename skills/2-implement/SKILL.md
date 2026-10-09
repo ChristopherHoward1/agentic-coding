@@ -23,6 +23,9 @@ Read `implementer.fan` from `config.yaml`.
 
 ## Rules
 
+- `wt/<slug>` reaches `main` only through its `/4-release` PR; the primary checkout stays on a clean `main`.
+- A handoff citing a `PLAN.md` decision also names the `knowledge/` doc that explains how to satisfy it.
+
 - You orchestrate; the implementer implements. If you catch yourself editing code in the worktree, you've collapsed the roles — stop.
 - Footprint violations reported by the implementer go back to `/1-plan`, not into ad-hoc scope expansion.
 

@@ -25,5 +25,7 @@ Input: a work unit whose worktree branch `wt/<slug>` passed the gate.
 
 ## Rules
 
+- For a disputed CRITICAL/HIGH finding, analyze it on the merits, weigh the other reviewer’s severity on the same behavior, escalate to the Owner, and override only with the analysis recorded in the plan’s Review section.
+
 - A reviewer thread or Codex reviewer run is used exactly once. Re-reviews get new fresh reviews — a reviewer that already approved a direction is anchored.
 - Record final verdicts in the worktree plan's Review section as `Code-review verdict: APPROVE|REVISE` and `Codex-review verdict: APPROVE|REQUEST CHANGES`.

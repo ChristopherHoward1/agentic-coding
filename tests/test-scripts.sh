@@ -734,6 +734,22 @@ fi
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
+# --- worktree-dir default without a worktrees config block
+FALLBACK_REPO="$TMP/fallback"
+mkdir -p "$FALLBACK_REPO/scripts"
+cp "$ROOT/scripts/worktree.sh" "$FALLBACK_REPO/scripts/"
+printf 'profile: software\n' >"$FALLBACK_REPO/config.yaml"
+git init -q -b main "$FALLBACK_REPO"
+git -C "$FALLBACK_REPO" add -A
+git -C "$FALLBACK_REPO" -c user.email=t@t -c user.name=t commit -qm init
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check "worktree add defaults to checkout basename without worktrees config" bash -c '
+  unset WORKTREES_DIR
+  cd "$1" && bash scripts/worktree.sh add x &&
+  [[ -d "$1/../fallback-worktrees/x" ]] &&
+  [[ $(git -C "$1/../fallback-worktrees/x" branch --show-current) == wt/x ]]
+' _ "$FALLBACK_REPO"
+
 # --- demo.sh section scoping and exit contract in a hermetic git repo
 DEMO_REPO="$TMP/demo"
 mkdir -p "$DEMO_REPO/work/x"

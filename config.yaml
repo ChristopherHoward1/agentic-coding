@@ -23,6 +23,3 @@ gate:
   command: scripts/gate.sh
   required_tools: shellcheck
   max_retries: 2             # failed-gate feedback loops before escalating to the Owner
-
-worktrees:
-  dir: ../agentic-coding-worktrees
