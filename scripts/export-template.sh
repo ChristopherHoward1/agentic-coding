@@ -19,6 +19,11 @@ elif [[ -e "$dest" || -L "$dest" ]]; then
   echo "export: destination is not a directory: $dest" >&2
   exit 1
 fi
+if [[ -n "$dest" && "$dest" != /* ]]; then
+  dest="$PWD/$dest"
+fi
+root=$(git rev-parse --show-toplevel) || error 'cannot resolve repository root'
+cd "$root" || error 'cannot enter repository root'
 mkdir -p -- "$dest" || error "cannot create $dest"
 git archive HEAD | tar -x -C "$dest" || error 'cannot extract HEAD'
 paths=$(git ls-tree -r --name-only HEAD -- template/) || error 'cannot list overlay'
