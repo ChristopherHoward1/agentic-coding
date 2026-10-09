@@ -26,9 +26,15 @@ Files NOT to touch:
 
 Release note: {{One line for CHANGELOG.md.}}
 
-## Verification
+## Demonstration
 
-- {{command(s) beyond scripts/gate.sh, if any}}
+Run the real changed behavior on real inputs, not test fixtures. Write only under
+`mktemp -d`. Use `None: <reason>` only for units with no runnable behavior.
+
+```sh
+{{Commands demonstrating the changed behavior.}}
+```
+Expected: {{One line stating the expected output.}}
 
 ## Review
 

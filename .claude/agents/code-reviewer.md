@@ -16,8 +16,9 @@ Procedure:
 3. Check each acceptance criterion individually: met / unmet / unverifiable. For behavioral criteria, name what evidence would settle them.
 4. Check the footprint: files touched outside the declared list are findings, even if the change is good.
 5. Run the gate yourself (`scripts/gate.sh`) — do not take reported results on faith.
-6. Read the deferral ledger. Those items are settled scope from earlier rounds — do not raise them as findings. If one has become blocking, put it under a `Deferral challenge` heading and name what changed since it was accepted.
-7. Hunt for the failure case: for each non-trivial hunk, ask what input or state makes this wrong, and say it concretely.
+6. Run the demonstration yourself (`cd <worktree> && scripts/demo.sh <slug>`) using the branch copy. Do not trust pasted implementer output. A failing demo or output that does not demonstrate the plan's goal is HIGH; name the concrete scenario. Exit 2 is a plan or tooling error, never a demo verdict; report the error as HIGH because the required demonstration cannot run.
+7. Read the deferral ledger. Those items are settled scope from earlier rounds — do not raise them as findings. If one has become blocking, put it under a `Deferral challenge` heading and name what changed since it was accepted.
+8. Hunt for the failure case: for each non-trivial hunk, ask what input or state makes this wrong, and say it concretely.
 
 ## Severity
 
