@@ -157,5 +157,9 @@ Plan verdict: APPROVE
   - the per-case working-tree copy cost grows with the repo
 - Codex: APPROVE. MEDIUM: the same ARCHI staleness.
 
+**Round 3:** triggered because PR #51's CI failed. CI's shellcheck is 0.9.0, which reports the indirect-invocation pattern as SC2317, but `tests/test-export.sh` disabled only SC2329, the code for 0.10 and later. The release commit was dropped and fixed in `cfbe052`. That fix was orchestrator-written, so a fresh review round was mandatory.
+- Claude code-reviewer: APPROVE. It verified shellcheck under both 0.9.0 and 0.11.0, plus the gate and demo. LOW: the disable directive is file-wide. The round-2 LOWs remain open.
+- Codex: APPROVE, no findings.
+
 Code-review verdict: APPROVE
 Codex-review verdict: APPROVE
