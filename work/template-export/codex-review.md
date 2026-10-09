@@ -1,5 +1,7 @@
-1. **MEDIUM — `scripts/export-template.sh:24–25`: export depends on the caller’s directory.** Running `cd scripts && ./export-template.sh /tmp/template` archives only the `scripts/` subtree, while the overlay lookup finds no `template/` files. The script exits 0 with an incomplete template lacking the skeletons and bootstrap VERSION. Normalize to the repository root before the Git commands, as `worktree.sh` does.
+1. **MEDIUM — `ARCHI.md`: branch freshness fails.** Running `bash scripts/archi-fresh.sh` on `wt/template-export` exits 1: `ARCHI.md is stale at HEAD; newer source path(s): scripts/`. Refresh ARCHI after the export-script fix to satisfy the explicit acceptance criterion.
 
-ShellCheck and branch freshness passed. The gate could not run: the read-only sandbox denied Bash’s temporary file creation. The demonstration and consumer smoke suite therefore remain independently unverified.
+No CRITICAL/HIGH findings. The round-1 directory-resolution issue is fixed and covered by a mutation-tested regression case.
+
+ShellCheck passed. I could not independently run the gate or demonstration because the read-only sandbox blocks temporary-file creation; the required successful exported smoke-suite demonstration remains unverified.
 
 Codex verdict: APPROVE
