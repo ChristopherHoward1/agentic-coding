@@ -45,6 +45,12 @@ shown**. An empty or short diff is not a git error, so `die`-style handling neve
   after `git add` has already run, so the tree is left dirty. Use a pathspec on both the guard and
   the commit instead of round-tripping through filenames.
 
+- **Give temp dirs an explicit template when a test redirects them.** On macOS, `mktemp -d` with no
+  template did not land under the test's `TMPDIR`. A "TMPDIR stays empty" cleanup pin passed with
+  the cleanup deleted, and a mutation run recorded in the Linux-like codex sandbox claimed it failed.
+  Use `mktemp -d "${TMPDIR:-/tmp}/name.XXXXXX"`, and re-run cleanup mutations on the platform the
+  local gate runs on (`template-sync`).
+
 ## Assert your mutation actually landed
 
 Mutation testing is the only thing that has caught vacuous tests in this repo — but a mutation that
