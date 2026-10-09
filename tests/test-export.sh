@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Export tests use committed copies of working-tree files, never the live HEAD.
 # Test functions are invoked indirectly by check.
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329 # SC2317 on shellcheck <0.10 (CI), SC2329 on >=0.10
 set -uo pipefail
 
 pass=0; fail=0
