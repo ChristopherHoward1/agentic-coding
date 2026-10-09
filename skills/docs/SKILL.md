@@ -10,8 +10,8 @@ Input: a docs work unit slug with `work/<slug>/plan.md`. The plan names which do
 ## Steps
 
 1. **Create the worktree:** `WT=$(scripts/worktree.sh add <slug>)`. Documentation work happens in worktrees, never the primary checkout.
-2. **Render the handoff** from `prompts/handoff.tpl` into `work/<slug>/handoff.md`. It must be self-contained — the docs writer starts cold.
-3. **Dispatch codex/GPT:** `scripts/agent-exec.sh "$WT" work/<slug>/handoff.md`. This intentionally uses the existing two-argument dispatch form and reuses `implementer.command`, which is codex/GPT; GPT authors the prose. Capture the writer's final summary, then from the repo root run `scripts/worktree.sh sync-artifacts <slug>`.
+2. **Render the handoff** from `prompts/handoff.tpl` into `work/<slug>/handoff.md`. Fill `{{SLUG}}` from the plan slug, `{{FILES_TO_MODIFY}}` from the plan's "Files to modify" list, and `{{CONSTRAINTS}}` from the plan's constraints, including "Files NOT to touch". It must be self-contained — the docs writer starts cold — and no unresolved `{{...}}` placeholders may remain.
+3. **Dispatch codex/GPT:** `scripts/agent-exec.sh "$WT" work/<slug>/handoff.md`. This intentionally uses the existing two-argument dispatch form and reuses `implementer.command`, which is codex/GPT; GPT authors the prose. Capture the writer's final summary in `work/<slug>/notes.md`, then from the repo root run `scripts/worktree.sh sync-artifacts <slug>`.
 4. **Present the diff** to the Owner. The Owner and coworkers are the readers of prose quality; there is no automated prose-quality judge.
 5. **Ship lane:** use the small-fix path: branch + tell the Owner. Do not send pure documentation prose through `/3-review` -> `/4-release`, because the dual-vendor `/3-review` bases diffs on `origin/main` and gates on code-review sentinels, which reviews prose as code.
 
