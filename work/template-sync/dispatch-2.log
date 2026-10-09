@@ -1,0 +1,2094 @@
+Dispatching implementer in /Users/cboyfly/Documents/repos/agentic-coding-worktrees/template-sync
+  codex exec --sandbox workspace-write - < /Users/cboyfly/Documents/repos/agentic-coding/work/template-sync/followup-1.md
+OpenAI Codex v0.160.1
+--------
+workdir: /Users/cboyfly/Documents/repos/agentic-coding-worktrees/template-sync
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: none
+reasoning summaries: none
+session id: 01a12253-4507-7ac0-b22e-4b038aa58d95
+--------
+user
+Review round 1 on your implementation of work/template-sync/plan.md raised two MEDIUM findings to fix. You are resuming in the same worktree on branch wt/template-sync.
+
+Findings:
+```
+✗ MEDIUM scripts/sync-template.sh:15 — the release-tag guard treats VERSION as a regex: `grep -qx "v$version"` lets a HEAD tagged only `v2026x10x2` pass for VERSION 2026.10.2. Use `grep -Fqx`. Add a near-match rejection case to sync case (c) (HEAD carries only a tag like v<VERSION with dots replaced by x> → exit 1), and mutation-check it (revert to grep -qx → case (c) fails; record in work/template-sync/mutations.md).
+
+✗ MEDIUM scripts/sync-template.sh:58-59, tests/test-export.sh (case (b) empty-TMPDIR checks) — on macOS, bare `mktemp -d` ignores TMPDIR, so the clone and export dirs never land in the test's TMPDIR. Removing the no-op `rm -rf "$clone"` or the export trap still passes the suite on macOS, and every local gate run leaks template clones into the real temp dir. Use an explicit template for both dirs: `mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX"` (or similar). Then on THIS machine (macOS) re-run the two mutations (remove no-op clone cleanup; remove export trap), confirm each landed and that case (b) fails, restore, and update mutations.md with what you observed here.
+```
+
+Stay inside the plan's footprint. Re-run scripts/gate.sh until it passes and commit the fix. The demo needs network to github.com which your sandbox lacks — do not run it; the orchestrator will. If a finding cannot be fixed within the plan's scope, stop and explain why instead of working around it. End with a short summary of the changes and the mutation results.
+
+hook: SessionStart
+hook: SessionStart Completed
+hook: UserPromptSubmit
+hook: UserPromptSubmit Completed
+codex
+I’ll check the branch and plan footprint, fix both findings, run the requested mutations and gate, then commit. I’ll leave the network demo to the orchestrator.
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/bin/zsh -lc 'git branch --show-current; git status --short; cat work/template-sync/plan.md; cat work/template-sync/mutations.md; cat scripts/sync-template.sh; cat tests/test-export.sh' in /Users/cboyfly/Documents/repos/agentic-coding-worktrees/template-sync
+ succeeded in 276ms:
+wt/template-sync
+# Template sync — keep the GitHub template repo equal to the export
+
+**Slug:** template-sync · **Date:** 2026-10-09 · **Status:** approved
+
+## Goal
+
+`scripts/export-template.sh` (v2026.10.2) writes a clean template tree, but nothing publishes it. The template-export plan left that out of scope as an outward-facing step for the Owner. `ChristopherHoward1/agentic-coding-template` already exists. It is public, not flagged as a template, has a protected `main`, and holds an older, unrelated version of the framework (`conventions/`, numbered-PR planning history). The Owner decided on 2026-10-09: keep that repo and its URL, and replace its tree with the export in one ordinary commit, so the old history stays in `git log`. After that, every release refreshes it.
+
+Done means: `scripts/sync-template.sh` takes no arguments. It clones the template repo itself and makes a commit, on a sync branch, that makes its tree byte-equal to `export-template.sh` output for the released `HEAD`. It does nothing when the tree is already equal, and it never pushes. `/4-release` runs it after the tag push, then pushes the branch and opens a PR. The template repo is flagged as a GitHub template.
+
+## Approach
+
+1. **`scripts/sync-template.sh`** (new, takes no arguments, dogfood-only, export-ignored):
+   - It refuses with exit 1 and a message in two cases:
+     - any argument is given
+     - `HEAD` doesn't carry the tag `v$(cat VERSION)` (`git tag --points-at HEAD | grep -qx "v$version"`); only released states are published
+   - It clones `TEMPLATE_REPO` into a fresh `mktemp -d` clone directory. `TEMPLATE_REPO` is a constant in the script, `https://github.com/ChristopherHoward1/agentic-coding-template.git`, and an env var overrides it; tests point it at a local fixture repo. The repo name lives only in this export-ignored script, so it never ships to consumers. A fresh clone can't be dirty or already have the sync branch, so no `<clone-dir>` argument and no checks for those.
+   - It exports into a separate `mktemp -d` export directory with `scripts/export-template.sh`, and always deletes that directory (trap). The clone directory is never trap-deleted.
+   - In the clone it runs `git switch -c template-sync/v<version>`, `git rm -rq --ignore-unmatch .`, copies the export with `cp -R "$exp/." "$clone/"`, then `git add -Af`. The `-f` keeps a tracked file that matches the exported `.gitignore` from being dropped.
+   - If `git diff --cached --quiet`, it deletes the clone directory, prints `up to date` and exits 0. Otherwise it commits `Sync from agentic-coding v<version> (<short-sha>)` and prints the clone path and branch name on two lines, exit 0. The clone path stays on disk for the push. A tooling failure exits 2. It never pushes.
+2. **`.gitattributes`**: add `scripts/sync-template.sh export-ignore`.
+3. **`skills/4-release/SKILL.md`**: insert step 5 after the tag push and renumber `/5-retro` to step 6. Step 5 has two parts:
+   - **Unconditional:** delete the matching untracked `work/<slug>/` copies, then `git pull --ff-only`. This replaces the Rules line, so consumers keep the post-merge pull.
+   - **Conditional**, because the skill ships to consumers, who have no sync script:
+     > If `scripts/sync-template.sh` exists, confirm `HEAD` carries `v<version>`, then run `bash scripts/sync-template.sh`.
+     >
+     > - `up to date` → nothing to do.
+     > - A printed branch → work from the printed clone, so `gh` resolves the template repo:
+     >   1. Push the branch with `--force-with-lease`, so a retry replaces an earlier failed attempt.
+     >   2. `gh pr create` against `main`.
+     >   3. `gh pr list` / `gh pr close` any older open `template-sync/*` PR as superseded.
+     >   4. Merge once CI is green (full TRIP, as with the release PR).
+     > - Red template CI → report it and leave the PR open. The release is already done and stays done.
+4. **Tests in `tests/test-export.sh`** (already export-ignored and gate-wired). Each case uses the existing `fixture` repo tagged `v$(cat VERSION)` as the source. It also uses a bare "template" fixture repo whose `main` holds stale files (`conventions/x`, an old `README.md`), with `TEMPLATE_REPO` pointing at that bare repo. The cases:
+   - (a) First sync:
+     - The commit lands on `template-sync/v<version>` with the expected subject.
+     - `git rev-parse HEAD^{tree}` in the printed clone equals the tree hash of a scratch repo where a fresh `export-template.sh` of the fixture was committed. This pins byte-equality, including modes and symlinks.
+     - `HEAD~1` equals the bare repo's original `main` tip.
+     - The printed clone path still exists after the script exits.
+     - The bare repo's refs (`git for-each-ref`) are unchanged, which pins "never pushes".
+   - (b) No-op: fast-forward the bare repo's `main` to the (a) commit, then run again with `TMPDIR` set to a fresh empty directory. It prints `up to date` and creates no commit or branch in the bare repo. That `TMPDIR` is empty afterwards, which pins both the export trap and the no-op clone cleanup.
+   - (c) Exits 1 when `HEAD` lacks `v<VERSION>`. A positive variant: `HEAD` carries both `v<VERSION>` and `other-tag`, and the sync succeeds. Together with the lightweight fixture tag in (a), this pins `--points-at` over `describe --exact-match`.
+   - (d) Exits 1 when given an argument.
+   - Every sync case runs the fixture's own copy of the script (`cd "$repo" && bash scripts/sync-template.sh`), never `$ROOT`'s, so the tag check reads the fixture's `HEAD`.
+5. **`ARCHI.md`**: a targeted branch refresh that adds `sync-template.sh` to the `scripts/` line and to Key flows.
+
+Alternatives considered:
+- A `--sync` mode on `export-template.sh`: it mixes the pure export with git mutation of another repo.
+- A `<clone-dir>` argument: it adds dirty-clone and existing-branch handling, and the gate couldn't exercise the real clone path. The env override covers testing.
+- Force-pushing a fresh single-commit history to the template repo's `main`: destructive. The Owner chose replace-in-place.
+- The template repo slug in `config.yaml`: it would ship to consumers.
+
+Out of scope:
+- One-time, Owner-approved repo settings (`gh repo edit --template`, refreshing the description). These run in this unit's `/4-release`, not in code.
+
+## Footprint
+
+Files to modify:
+- `scripts/sync-template.sh` — new
+- `.gitattributes` — one export-ignore line
+- `tests/test-export.sh` — sync cases (a)–(d)
+- `skills/4-release/SKILL.md` — new step 5, renumbering, Rules pull line folded into step 5
+- `ARCHI.md` — targeted branch refresh
+
+Files NOT to touch:
+- `scripts/export-template.sh`: consumed as-is. If its behavior is wrong for syncing, stop and report.
+- `scripts/release.sh`: sync is a post-tag step, not a release precondition.
+
+## Acceptance criteria
+
+- [ ] `bash scripts/gate.sh` exits 0, and `tests/test-export.sh` output shows sync cases (a)–(d) as `ok`.
+- [ ] Every guard is pinned. Each of these mutations, verified as landed, fails a named case, recorded in `work/template-sync/mutations.md`:
+  - removing the tag check
+  - swapping `--points-at` for `describe --exact-match`
+  - removing `git rm`
+  - removing the no-op clone cleanup
+  - trap-deleting the clone directory
+  - adding a `git push`
+- [ ] `git check-attr export-ignore scripts/sync-template.sh` reports `set`, and the existing export `success` case still passes.
+- [ ] `grep -rn 'agentic-coding-template' skills config.yaml CLAUDE.md` finds nothing.
+- [ ] `skills/4-release/SKILL.md` step 5's cleanup and `git pull --ff-only` sit outside the `sync-template.sh` condition (checked by reading the diff), and the Rules pull line is removed.
+- [ ] Step 5's conditional part contains the tag confirmation, running `gh` from the printed clone, the force-with-lease push, closing superseded PRs, merge-on-green, and red-CI handling.
+- [ ] In this unit's `/4-release`: the first sync PR's CI is green and it is merged, and `gh repo view ChristopherHoward1/agentic-coding-template --json isTemplate` reports `true`.
+
+## Release
+
+Release note: `scripts/sync-template.sh` keeps the GitHub template repo in step with the export. Each release opens a sync PR, which merges once its CI is green.
+
+## Demonstration
+
+This runs the real script, through its real clone path, against the real template repo. It writes only under `mktemp -d`, and never pushes. The branch `HEAD` is not tagged before release, so the demo runs from a throwaway clone of the branch and force-tags `v<VERSION>` only inside that clone.
+
+```sh
+d=$(mktemp -d)
+git clone -q -b "$(git branch --show-current)" "$PWD" "$d/src"
+git -C "$d/src" tag -f "v$(cat VERSION)" >/dev/null
+out=$(cd "$d/src" && bash scripts/sync-template.sh); echo "exit=$?"
+clone=$(head -1 <<<"$out")
+git -C "$clone" log --oneline -2
+echo "parent=$(git -C "$clone" rev-parse HEAD~1) template_main=$(git -C "$clone" rev-parse origin/main)"
+(cd "$d/src" && bash scripts/export-template.sh "$d/exp" >/dev/null)
+git -C "$d/exp" init -q && git -C "$d/exp" add -A
+echo "synced=$(git -C "$clone" rev-parse 'HEAD^{tree}') export=$(git -C "$d/exp" write-tree)"
+git -C "$clone" diff --stat HEAD~1 -- conventions | tail -1
+```
+Expected: `exit=0`. The log shows a `Sync from agentic-coding v<version>` commit. `parent=` equals `template_main=`. The `synced=` and `export=` tree hashes are equal. The diff stat shows the old `conventions/` files deleted.
+
+## Review
+
+Plan-reviewer round 1: REVISE (8 findings). All applied:
+1. Step 5 fast-forwards and confirms the tag before syncing.
+2. The re-run/branch-exists problem is gone because each run starts from a fresh clone. Case (b) setup is now explicit.
+3. The temp lifetimes are specified: the export dir is deleted, and the clone dir is kept and printed.
+4. Tree-hash equality replaces `diff -r`.
+5. The `<clone-dir>` arg is dropped in favor of the `TEMPLATE_REPO` env override.
+6. The orchestrator merges the sync PR on green CI, and supersedes older sync PRs.
+7. Template CI must be green. Red CI leaves the PR open and doesn't affect the release.
+8. `--points-at`, the parent check, and the refs-unchanged no-push pin are in.
+
+No disagreements.
+
+Plan-reviewer round 2: REVISE. All 8 round-1 findings were confirmed resolved. The reviewer also confirmed that the template's branch protection allows the orchestrator to merge, and that an exported `HEAD` passes the template's smoke suite (201/0). It raised four new one-line findings, all applied:
+1. "Done means" now describes a script that takes no arguments.
+2. Case (b) checks no-op cleanup through an empty `TMPDIR`.
+3. Case (c) gains a positive multi-tag variant that pins `--points-at`.
+4. The sync cases run the fixture's own copy of the script.
+
+Plan-reviewer round 3: REVISE. All 4 round-2 fixes were confirmed resolved, and 4 new findings were raised, all applied:
+1. HIGH: putting the pull under the sync condition would have dropped the post-merge `git pull --ff-only` for consumers. The cleanup and pull are now unconditional, and a criterion pins that.
+2. The script uses `git add -Af`.
+3. Step 5 runs `gh` from the printed clone.
+4. The demo clones with an explicit `-b` and prints the parent next to `origin/main`.
+
+No round-4 review was run. The Owner approved the plan on 2026-10-09 with the round-3 fixes applied.
+Plan verdict: REVISE
+# Guard mutations
+
+Each mutation was applied to the working script, verified by exact text assertions, tested through the fixture’s own copy, then restored.
+
+- remove tag check: landed (old text absent, replacement present); exit 1; FAIL: sync (c): missing release tag refuses; two lightweight tags succeed. Restored.
+
+- describe --exact-match: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged; FAIL: sync (c): missing release tag refuses; two lightweight tags succeed. Restored.
+
+- remove git rm: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
+
+- remove no-op cleanup: landed (old text absent, replacement present); exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. Restored.
+
+- trap-delete clone: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged; FAIL: sync (c): missing release tag refuses; two lightweight tags succeed. Restored.
+- add git push: landed (push command present, script differs from original); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
+#!/usr/bin/env bash
+# Prepare a template sync commit; publishing belongs to the release skill.
+set -uo pipefail
+
+error() { echo "sync: $*" >&2; exit 2; }
+if [[ $# -ne 0 ]]; then
+  echo 'Usage: scripts/sync-template.sh' >&2
+  exit 1
+fi
+root=$(git rev-parse --show-toplevel) || error 'cannot resolve repository root'
+cd "$root" || error 'cannot enter repository root'
+version=$(cat VERSION) || error 'cannot read VERSION'
+tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+if ! grep -qx "v$version" <<<"$tags"; then
+  echo "sync: HEAD must carry v$version" >&2
+  exit 1
+fi
+sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+clone=$(mktemp -d) || error 'cannot create clone directory'
+exp=$(mktemp -d) || error 'cannot create export directory'
+trap 'rm -rf "$exp"' EXIT
+TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+bash scripts/export-template.sh "$exp" >/dev/null || error 'cannot export template'
+branch="template-sync/v$version"
+cd "$clone" || error 'cannot enter clone'
+git switch -c "$branch" >&2 || error 'cannot create sync branch'
+git rm -rq --ignore-unmatch . || error 'cannot remove old tree'
+cp -R "$exp/." "$clone/" || error 'cannot copy export'
+git add -Af || error 'cannot stage export'
+git diff --cached --quiet
+status=$?
+if [[ $status == 0 ]]; then
+  rm -rf "$clone" || error 'cannot delete up-to-date clone'
+  echo 'up to date'
+  exit 0
+fi
+[[ $status == 1 ]] || error 'cannot compare staged tree'
+git commit -qm "Sync from agentic-coding v$version ($sha)" || error 'cannot commit sync'
+printf '%s\n' "$clone" "$branch"
+#!/usr/bin/env bash
+# Export tests use committed copies of working-tree files, never the live HEAD.
+# Test functions are invoked indirectly by check.
+# shellcheck disable=SC2317,SC2329 # SC2317 on shellcheck <0.10 (CI), SC2329 on >=0.10
+set -uo pipefail
+
+pass=0; fail=0
+check() {
+  local desc="$1"; shift
+  if "$@" >/dev/null 2>&1; then
+    echo "ok: $desc"; pass=$((pass+1))
+  else
+    echo "FAIL: $desc"; fail=$((fail+1))
+  fi
+}
+ROOT=$(git rev-parse --show-toplevel) || exit 2
+cd "$ROOT" || exit 2
+unset GATE_REQUIRED_TOOLS
+TMP=$(mktemp -d) || exit 2
+trap 'rm -rf "$TMP"' EXIT
+
+fixture() {
+  repo="$TMP/$1/repo"
+  dest="$TMP/$1/out"
+  mkdir -p "$repo" || return 2
+  local path
+  local files
+  files=$(mktemp "$TMP/files.XXXXXX") || return 2
+  git ls-files -z --cached --others --exclude-standard >"$files" || return 2
+  while IFS= read -r -d '' path; do
+    mkdir -p "$repo/$(dirname "$path")" || return 2
+    cp -P "$ROOT/$path" "$repo/$path" || return 2
+  done <"$files"
+  git init -q -b main "$repo" &&
+    git -C "$repo" add -A &&
+    git -C "$repo" -c user.email=t@t -c user.name=t commit -qm init
+}
+export_tree() { (cd "$repo" && bash scripts/export-template.sh "$@"); }
+
+success() {
+  fixture success && export_tree "$dest" || return 1
+  local path
+  for path in work template .gitattributes scripts/export-template.sh scripts/sync-template.sh tests/test-export.sh scripts/gate.d/test-scripts.sh; do
+    [[ ! -e "$dest/$path" ]] || return 1
+  done
+  [[ -f "$dest/tests/test-scripts.sh" && -d "$dest/knowledge" ]] &&
+    [[ $(cat "$dest/VERSION") == 1970.1.0 ]] &&
+    cmp "$repo/template/CHANGELOG.md" "$dest/CHANGELOG.md" &&
+    ! grep -q '^## ' "$dest/CHANGELOG.md" &&
+    cmp "$repo/template/PLAN.md" "$dest/PLAN.md" &&
+    cmp "$repo/template/ARCHI.md" "$dest/ARCHI.md" || return 1
+  if grep -rn 'agentic-coding-worktrees\|promoted 2026\|Confirm-delta releases\|export-template' "$dest"; then return 1; fi
+  git init -q -b main "$dest" && git -C "$dest" add -A &&
+    git -C "$dest" -c user.email=t@t -c user.name=t commit -qm init &&
+    (cd "$dest" && bash scripts/gate.sh && bash scripts/archi-fresh.sh)
+}
+arguments() {
+  fixture "$1" || return 1
+  shift
+  export_tree "$@" >"$TMP/stdout" 2>"$TMP/stderr"
+  local status=$?
+  [[ $status == 1 ]] && grep -Fq 'Usage:' "$TMP/stderr" &&
+    [[ ! -s "$TMP/stdout" && ! -e "$dest" ]]
+}
+nonempty() {
+  fixture nonempty && mkdir -p "$dest" || return 1
+  printf 'keep\n' >"$dest/.sentinel"
+  export_tree "$dest" >"$TMP/stdout" 2>"$TMP/stderr"
+  local status=$?
+  [[ $status == 1 && $(ls -A "$dest") == .sentinel ]] &&
+    [[ $(cat "$dest/.sentinel") == keep && ! -s "$TMP/stdout" ]]
+}
+file_destination() {
+  fixture file || return 1
+  printf 'keep\n' >"$dest"
+  export_tree "$dest" >/dev/null 2>&1
+  local status=$?
+  [[ $status == 1 && $(cat "$dest") == keep ]]
+}
+head_content() {
+  fixture head || return 1
+  printf 'uncommitted\n' >"$repo/CLAUDE.md"
+  printf '2099.1.0\n' >"$repo/template/VERSION"
+  export_tree "$dest" &&
+    git -C "$repo" show HEAD:CLAUDE.md >"$TMP/committed" &&
+    cmp "$TMP/committed" "$dest/CLAUDE.md" &&
+    [[ $(cat "$dest/VERSION") == 1970.1.0 ]]
+}
+empty_destination() {
+  fixture empty && mkdir -p "$dest" && export_tree "$dest" &&
+    [[ -f "$dest/CLAUDE.md" ]]
+}
+subdirectory_destination() {
+  fixture subdirectory || return 1
+  dest="$repo/scripts/out"
+  (cd "$repo/scripts" && bash ./export-template.sh out) &&
+    [[ -f "$dest/CLAUDE.md" ]] &&
+    [[ $(cat "$dest/VERSION") == 1970.1.0 ]] &&
+    [[ ! -e "$repo/out" ]]
+}
+sync_fixture() {
+  fixture "$1" || return 1
+  version=$(cat "$repo/VERSION") || return 1
+  git -C "$repo" tag "v$version" || return 1
+  template="$TMP/$1/template.git"
+  local seed="$TMP/$1/seed"
+  mkdir -p "$seed/conventions" || return 1
+  printf 'stale\n' >"$seed/conventions/x"
+  printf 'old README\n' >"$seed/README.md"
+  git init -q -b main "$seed" && git -C "$seed" add -A &&
+    git -C "$seed" -c user.email=t@t -c user.name=t commit -qm old &&
+    git clone -q --bare "$seed" "$template" || return 1
+  original=$(git -C "$template" rev-parse main) || return 1
+  refs=$(git -C "$template" for-each-ref) || return 1
+  tempdir="$TMP/$1/temps"
+  mkdir -p "$tempdir"
+}
+sync_tree() {
+  (cd "$repo" && TMPDIR="$tempdir" TEMPLATE_REPO="$template" \
+    GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \
+    bash scripts/sync-template.sh "$@")
+}
+sync_first() {
+  sync_fixture sync-first || return 1
+  local out clone branch sha
+  out=$(sync_tree) || return 1
+  clone=$(head -1 <<<"$out")
+  branch=$(tail -1 <<<"$out")
+  sha=$(git -C "$repo" rev-parse --short HEAD) || return 1
+  [[ -d "$clone" && "$branch" == "template-sync/v$version" ]] &&
+    [[ $(git -C "$clone" branch --show-current) == "$branch" ]] &&
+    [[ $(git -C "$clone" log -1 --format=%s) == "Sync from agentic-coding v$version ($sha)" ]] &&
+    [[ $(git -C "$clone" rev-parse HEAD~1) == "$original" ]] &&
+    [[ $(git -C "$template" for-each-ref) == "$refs" ]] || return 1
+  export_tree "$dest" && git -C "$dest" init -q && git -C "$dest" add -Af &&
+    git -C "$dest" -c user.email=t@t -c user.name=t commit -qm export || return 1
+  [[ $(git -C "$clone" rev-parse 'HEAD^{tree}') == $(git -C "$dest" rev-parse 'HEAD^{tree}') ]]
+}
+sync_noop() {
+  sync_fixture sync-noop || return 1
+  local out clone
+  out=$(sync_tree) || return 1
+  clone=$(head -1 <<<"$out")
+  git -C "$clone" push -q origin HEAD:main || return 1
+  rm -rf "$clone" || return 1
+  refs=$(git -C "$template" for-each-ref) || return 1
+  [[ -z $(ls -A "$tempdir") ]] || return 1
+  out=$(sync_tree) || return 1
+  [[ "$out" == 'up to date' && -z $(ls -A "$tempdir") ]] &&
+    [[ $(git -C "$template" for-each-ref) == "$refs" ]]
+}
+sync_tags() {
+  sync_fixture sync-tags || return 1
+  git -C "$repo" tag -d "v$version" || return 1
+  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
+  local status=$?
+  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
+  git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+  local out
+  out=$(sync_tree) || return 1
+  [[ -d $(head -1 <<<"$out") && $(tail -1 <<<"$out") == "template-sync/v$version" ]]
+}
+sync_arguments() {
+  sync_fixture sync-arguments || return 1
+  sync_tree extra >"$TMP/stdout" 2>"$TMP/stderr"
+  local status=$?
+  [[ $status == 1 && ! -s "$TMP/stdout" && -z $(ls -A "$tempdir") ]] &&
+    grep -Fq 'Usage:' "$TMP/stderr"
+}
+check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
+check 'sync (d): arguments refuse without writes' sync_arguments
+
+check 'clean export and consumer gate/freshness' success
+check 'no arguments refuses with usage' arguments noargs
+check 'extra arguments refuses with usage and writes nothing' arguments extra "$TMP/extra/out" extra
+check 'non-empty destination refuses without writes' nonempty
+check 'file destination refuses without writes' file_destination
+check 'base and overlay both reflect HEAD' head_content
+check 'existing empty destination succeeds' empty_destination
+check 'subdirectory export resolves relative destination against caller cwd' subdirectory_destination
+
+echo
+echo "passed: $pass, failed: $fail"
+exit "$((fail > 0 ? 1 : 0))"
+
+hook: PostToolUse
+hook: PostToolUse Completed
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/bin/zsh -lc "rg --files -g AGENTS.md; cat scripts/gate.sh; uname -s; rg 'sync-template|sync_tags' scripts tests" in /Users/cboyfly/Documents/repos/agentic-coding-worktrees/template-sync
+ succeeded in 279ms:
+AGENTS.md
+#!/usr/bin/env bash
+# The gate. Exit 0 = pass. Non-zero = fail, and everything printed is the
+# feedback the implementer gets. Agents do not overrule this script.
+#
+# Auto-detects the stacks present and runs every applicable check.
+# Profile- or project-specific checks go in scripts/gate.d/*.sh (run last).
+set -uo pipefail
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+fail=0
+fail_message() {
+  echo "GATE: FAIL — fix everything marked ✗ above."
+}
+
+run() {
+  echo "▶ $*"
+  if ! "$@"; then
+    fail=1
+    echo "✗ FAILED: $*"
+  fi
+}
+
+required_tools=
+if [[ ${GATE_REQUIRED_TOOLS+set} ]]; then
+  required_tools=$GATE_REQUIRED_TOOLS
+elif [[ -f config.yaml ]]; then
+  required_tools=$(awk '
+    /^[^[:space:]#][^:]*:/ {
+      f = ($0 ~ /^gate:[[:space:]]*($|#)/)
+      next
+    }
+    f && /^[[:space:]]*required_tools:/ {
+      sub(/^[[:space:]]*required_tools:[[:space:]]*/, "")
+      sub(/[[:space:]]+#.*$/, "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+      if (($0 ~ /^".*"$/) || ($0 ~ /^'\''.*'\''$/)) {
+        sub(/^["'\'']/, "")
+        sub(/["'\'']$/, "")
+      }
+      print
+      exit
+    }
+  ' config.yaml)
+fi
+
+missing_required=()
+if [[ -n "$required_tools" ]]; then
+  IFS=: read -r -a required_tool_list <<<"$required_tools"
+  for tool in "${required_tool_list[@]}"; do
+    [[ -z "$tool" ]] && continue
+    if ! command -v "$tool" >/dev/null; then
+      missing_required+=("$tool")
+    fi
+  done
+fi
+
+if [[ ${#missing_required[@]} -gt 0 ]]; then
+  for tool in "${missing_required[@]}"; do
+    echo "✗ missing required tool: $tool"
+  done
+  fail_message
+  exit 1
+fi
+
+skip() {
+  echo "⊘ skipped: $1 (not installed)"
+}
+
+# --- Node ---------------------------------------------------------------
+if [[ -f package.json ]]; then
+  if command -v node >/dev/null; then
+    typecheck_script=0
+    for s in lint typecheck test; do
+      if node -e "process.exit(require('./package.json').scripts?.['$s'] ? 0 : 1)" 2>/dev/null; then
+        run npm run --silent "$s"
+        [[ "$s" == typecheck ]] && typecheck_script=1
+      fi
+    done
+    # No typecheck script but a TypeScript project: let the compiler judge.
+    if [[ $typecheck_script -eq 0 && -f tsconfig.json ]]; then
+      if npx --no-install tsc --version >/dev/null 2>&1; then
+        run npx --no-install tsc --noEmit
+      else
+        skip tsc
+      fi
+    fi
+  else
+    skip node
+  fi
+fi
+
+# --- Python -------------------------------------------------------------
+if [[ -f pyproject.toml || -f setup.py || -f requirements.txt ]]; then
+  if command -v ruff >/dev/null; then
+    run ruff check .
+  else
+    skip ruff
+  fi
+  if compgen -G "tests/*" >/dev/null; then
+    if command -v pytest >/dev/null; then
+      run pytest -q
+    else
+      skip pytest
+    fi
+  fi
+fi
+
+# --- Shell --------------------------------------------------------------
+shell_files=()
+while IFS= read -r f; do shell_files+=("$f"); done \
+  < <(git ls-files '*.sh' 2>/dev/null)
+if [[ ${#shell_files[@]} -gt 0 ]]; then
+  if command -v shellcheck >/dev/null; then
+    run shellcheck "${shell_files[@]}"
+  else
+    skip shellcheck
+  fi
+fi
+
+# --- Rust / Go ----------------------------------------------------------
+if [[ -f Cargo.toml ]]; then
+  if command -v cargo >/dev/null; then
+    run cargo clippy -q -- -D warnings
+    run cargo test -q
+  else
+    skip cargo
+  fi
+fi
+if [[ -f go.mod ]]; then
+  if command -v go >/dev/null; then
+    run go vet ./...
+    run go test ./...
+  else
+    skip go
+  fi
+fi
+
+# --- Profile / project extensions ---------------------------------------
+for hook in scripts/gate.d/*.sh; do
+  [[ -f "$hook" ]] && run bash "$hook"
+done
+
+if [[ $fail -eq 0 ]]; then
+  echo "GATE: PASS"
+else
+  fail_message
+fi
+exit $fail
+Darwin
+tests/test-export.sh:  for path in work template .gitattributes scripts/export-template.sh scripts/sync-template.sh tests/test-export.sh scripts/gate.d/test-scripts.sh; do
+tests/test-export.sh:    bash scripts/sync-template.sh "$@")
+tests/test-export.sh:sync_tags() {
+tests/test-export.sh:check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
+scripts/sync-template.sh:  echo 'Usage: scripts/sync-template.sh' >&2
+
+hook: PostToolUse
+hook: PostToolUse Completed
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/bin/zsh -lc 'cat AGENTS.md' in /Users/cboyfly/Documents/repos/agentic-coding-worktrees/template-sync
+ succeeded in 243ms:
+# Implementer Contract
+
+You are the implementer. Your source of truth is the handoff you received; it names the work unit (`work/<slug>/plan.md`), the branch, and the file footprint.
+
+## Rules
+
+1. **Scope is the plan. Nothing more.** No refactoring adjacent code, no speculative features. If the work seems to require a file outside the declared footprint, stop and say so instead of expanding it yourself.
+2. **You are in a worktree on a pre-created branch.** Verify the branch matches the handoff before changing anything. Do not switch, merge, rebase, or reset.
+3. **Run the gate before finishing:** `scripts/gate.sh` from the repo root. Do not report done while it fails.
+4. **Finish with a summary**: what changed and why, any acceptance criteria only partially met (and why), anything you noticed but left out of scope.
+5. **Stop and surface** rather than guess when: acceptance criteria conflict, the plan seems wrong against the actual code, or a decision belongs to the Orchestrator or Owner.
+
+## Build Discipline
+
+Run this after you understand the task and trace the real flow end to end:
+
+1. Does this need to exist at all? If it is speculative, skip it and say so in one line.
+2. Already in this codebase? Reuse the helper, util, type, or pattern that lives here.
+3. Stdlib does it? Use stdlib.
+4. Native platform feature covers it? Use the platform.
+5. Already-installed dependency solves it? Use it. Do not add a dependency for what a few lines do.
+6. Can it be one line? Make it one line.
+7. Only then write the minimum code that works.
+
+For bug fixes, fix the root cause, not the named symptom: grep every caller of the function you touch and prefer one shared guard over per-caller patches.
+
+Never be lazy about understanding the problem, input validation at trust boundaries, error handling that prevents data loss, security, accessibility, or anything explicitly requested or named in the plan.
+
+Use a `ponytail:` comment for a deliberate simplification that cuts a real corner; name the ceiling and upgrade path.
+
+Honest and brief beats thorough and padded.
+
+hook: PostToolUse
+hook: PostToolUse Completed
+hook: PreToolUse
+hook: PreToolUse Completed
+apply patch
+patch: completed
+/Users/cboyfly/Documents/repos/agentic-coding-worktrees/template-sync/scripts/sync-template.sh
+/Users/cboyfly/Documents/repos/agentic-coding-worktrees/template-sync/tests/test-export.sh
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+
+hook: PostToolUse
+hook: PostToolUse Completed
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/bin/zsh -lc "python3 - <<'PY'
+from pathlib import Path
+import subprocess
+p = Path('scripts/sync-template.sh')
+original = p.read_text()
+mutations = [
+ ('regex-tag', 'grep -Fqx \"v"'$version"'"', 'grep -qx \"v"'$version"'"', 'sync (c)'),
+ ('no-op-cleanup', '  rm -rf \""'$clone" || error '"\\'cannot delete up-to-date clone\\'', '  : # mutation: omit no-op clone cleanup', 'sync (b)'),
+ ('export-trap', 'trap \\'rm -rf \""'$exp"'"\\' EXIT', ': # mutation: omit export trap', 'sync (b)'),
+]
+try:
+ for name, old, new, case in mutations:
+  assert original.count(old) == 1
+  p.write_text(original.replace(old, new))
+  landed = p.read_text()
+  assert old not in landed and new in landed
+  print(f'{name}: landed (old absent, replacement present)', flush=True)
+  result = subprocess.run(['bash', 'tests/test-export.sh'], capture_output=True, text=True)
+  Path('/tmp/template-sync-' + name + '.log').write_text(result.stdout + result.stderr)
+  failures = [line for line in result.stdout.splitlines() if line.startswith('FAIL:')]
+  print(f'exit={result.returncode}; ' + '; '.join(failures), flush=True)
+  assert result.returncode == 1 and any(case in line for line in failures)
+  p.write_text(original)
+finally:
+ p.write_text(original)
+assert p.read_text() == original
+print('All three mutations restored.')
+PY" in /Users/cboyfly/Documents/repos/agentic-coding-worktrees/template-sync
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+
+ succeeded in 31794ms:
+regex-tag: landed (old absent, replacement present)
+exit=1; FAIL: sync (c): missing and near-match release tags refuse; two lightweight tags succeed
+no-op-cleanup: landed (old absent, replacement present)
+exit=1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged
+export-trap: landed (old absent, replacement present)
+exit=1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged
+All three mutations restored.
+
+codex
+The branch matches, and both fixes fit the plan’s footprint. On this macOS machine, reverting to regex matching fails case (c), and removing the no-op clone cleanup fails case (b). The export-trap mutation is still running.
+hook: PostToolUse
+hook: PostToolUse Completed
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+
+hook: PreToolUse
+hook: PreToolUse Completed
+apply patch
+patch: completed
+/Users/cboyfly/Documents/repos/agentic-coding-worktrees/template-sync/work/template-sync/mutations.md
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+diff --git a/work/template-sync/mutations.md b/work/template-sync/mutations.md
+index 6ed04f7611c904fd0ef8e4d397e6b93df35e3493..aecf27fbdb95a0d8f2daa352bd5a6e4bdafa14a6
+--- a/work/template-sync/mutations.md
++++ b/work/template-sync/mutations.md
+@@ -8,7 +8,17 @@
+ 
+ - remove git rm: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
+ 
+-- remove no-op cleanup: landed (old text absent, replacement present); exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. Restored.
++- remove no-op cleanup: initial result superseded by the macOS recheck below; bare `mktemp -d` did not put the directories under the test's TMPDIR, so the initial record did not establish cleanup on macOS.
+ 
+ - trap-delete clone: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged; FAIL: sync (c): missing release tag refuses; two lightweight tags succeed. Restored.
+ - add git push: landed (push command present, script differs from original); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
++
++## Review round 1 recheck — macOS (Darwin), 2026-10-09
++
++Both sync directories now use `mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX"`. Each mutation below was applied separately, verified by exact assertions that the original text was absent and the replacement present, and run through `bash tests/test-export.sh` on this machine. The fixture commits the working script and invokes its own copy. All three mutations were restored, with exact equality to the fixed script checked afterwards.
++
++- Replace `grep -Fqx "v$version"` with `grep -qx "v$version"`: landed; exit 1; FAIL: sync (c): missing and near-match release tags refuse; two lightweight tags succeed. The near-match fixture has only `v${version//./x}` on HEAD.
++- Remove the no-op `rm -rf "$clone"` command: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained clone is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++- Remove `trap 'rm -rf "$exp"' EXIT`: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained export is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++
++The test's outer cleanup removes these fixture directories, including retained mutation artifacts.
+
+hook: PostToolUse
+hook: PostToolUse Completed
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/bin/zsh -lc 'bash scripts/gate.sh' in /Users/cboyfly/Documents/repos/agentic-coding-worktrees/template-sync
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+diff --git a/work/template-sync/mutations.md b/work/template-sync/mutations.md
+index 6ed04f7611c904fd0ef8e4d397e6b93df35e3493..aecf27fbdb95a0d8f2daa352bd5a6e4bdafa14a6
+--- a/work/template-sync/mutations.md
++++ b/work/template-sync/mutations.md
+@@ -8,7 +8,17 @@
+ 
+ - remove git rm: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
+ 
+-- remove no-op cleanup: landed (old text absent, replacement present); exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. Restored.
++- remove no-op cleanup: initial result superseded by the macOS recheck below; bare `mktemp -d` did not put the directories under the test's TMPDIR, so the initial record did not establish cleanup on macOS.
+ 
+ - trap-delete clone: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged; FAIL: sync (c): missing release tag refuses; two lightweight tags succeed. Restored.
+ - add git push: landed (push command present, script differs from original); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
++
++## Review round 1 recheck — macOS (Darwin), 2026-10-09
++
++Both sync directories now use `mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX"`. Each mutation below was applied separately, verified by exact assertions that the original text was absent and the replacement present, and run through `bash tests/test-export.sh` on this machine. The fixture commits the working script and invokes its own copy. All three mutations were restored, with exact equality to the fixed script checked afterwards.
++
++- Replace `grep -Fqx "v$version"` with `grep -qx "v$version"`: landed; exit 1; FAIL: sync (c): missing and near-match release tags refuse; two lightweight tags succeed. The near-match fixture has only `v${version//./x}` on HEAD.
++- Remove the no-op `rm -rf "$clone"` command: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained clone is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++- Remove `trap 'rm -rf "$exp"' EXIT`: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained export is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++
++The test's outer cleanup removes these fixture directories, including retained mutation artifacts.
+
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/bin/zsh -lc 'git diff --check; git diff --stat; git diff -- scripts/sync-template.sh tests/test-export.sh; git status --short' in /Users/cboyfly/Documents/repos/agentic-coding-worktrees/template-sync
+ succeeded in 325ms:
+ scripts/sync-template.sh        |  6 +++---
+ tests/test-export.sh            |  8 +++++++-
+ work/template-sync/mutations.md | 12 +++++++++++-
+ 3 files changed, 21 insertions(+), 5 deletions(-)
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b..173ebe4 100755
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@ root=$(git rev-parse --show-toplevel) || error 'cannot resolve repository root'
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2..6513e9c 100755
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@ sync_tags() {
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@ sync_arguments() {
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+ M scripts/sync-template.sh
+ M tests/test-export.sh
+ M work/template-sync/mutations.md
+
+hook: PostToolUse
+hook: PostToolUse Completed
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+diff --git a/work/template-sync/mutations.md b/work/template-sync/mutations.md
+index 6ed04f7611c904fd0ef8e4d397e6b93df35e3493..aecf27fbdb95a0d8f2daa352bd5a6e4bdafa14a6
+--- a/work/template-sync/mutations.md
++++ b/work/template-sync/mutations.md
+@@ -8,7 +8,17 @@
+ 
+ - remove git rm: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
+ 
+-- remove no-op cleanup: landed (old text absent, replacement present); exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. Restored.
++- remove no-op cleanup: initial result superseded by the macOS recheck below; bare `mktemp -d` did not put the directories under the test's TMPDIR, so the initial record did not establish cleanup on macOS.
+ 
+ - trap-delete clone: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged; FAIL: sync (c): missing release tag refuses; two lightweight tags succeed. Restored.
+ - add git push: landed (push command present, script differs from original); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
++
++## Review round 1 recheck — macOS (Darwin), 2026-10-09
++
++Both sync directories now use `mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX"`. Each mutation below was applied separately, verified by exact assertions that the original text was absent and the replacement present, and run through `bash tests/test-export.sh` on this machine. The fixture commits the working script and invokes its own copy. All three mutations were restored, with exact equality to the fixed script checked afterwards.
++
++- Replace `grep -Fqx "v$version"` with `grep -qx "v$version"`: landed; exit 1; FAIL: sync (c): missing and near-match release tags refuse; two lightweight tags succeed. The near-match fixture has only `v${version//./x}` on HEAD.
++- Remove the no-op `rm -rf "$clone"` command: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained clone is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++- Remove `trap 'rm -rf "$exp"' EXIT`: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained export is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++
++The test's outer cleanup removes these fixture directories, including retained mutation artifacts.
+
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+diff --git a/work/template-sync/mutations.md b/work/template-sync/mutations.md
+index 6ed04f7611c904fd0ef8e4d397e6b93df35e3493..aecf27fbdb95a0d8f2daa352bd5a6e4bdafa14a6
+--- a/work/template-sync/mutations.md
++++ b/work/template-sync/mutations.md
+@@ -8,7 +8,17 @@
+ 
+ - remove git rm: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
+ 
+-- remove no-op cleanup: landed (old text absent, replacement present); exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. Restored.
++- remove no-op cleanup: initial result superseded by the macOS recheck below; bare `mktemp -d` did not put the directories under the test's TMPDIR, so the initial record did not establish cleanup on macOS.
+ 
+ - trap-delete clone: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged; FAIL: sync (c): missing release tag refuses; two lightweight tags succeed. Restored.
+ - add git push: landed (push command present, script differs from original); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
++
++## Review round 1 recheck — macOS (Darwin), 2026-10-09
++
++Both sync directories now use `mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX"`. Each mutation below was applied separately, verified by exact assertions that the original text was absent and the replacement present, and run through `bash tests/test-export.sh` on this machine. The fixture commits the working script and invokes its own copy. All three mutations were restored, with exact equality to the fixed script checked afterwards.
++
++- Replace `grep -Fqx "v$version"` with `grep -qx "v$version"`: landed; exit 1; FAIL: sync (c): missing and near-match release tags refuse; two lightweight tags succeed. The near-match fixture has only `v${version//./x}` on HEAD.
++- Remove the no-op `rm -rf "$clone"` command: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained clone is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++- Remove `trap 'rm -rf "$exp"' EXIT`: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained export is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++
++The test's outer cleanup removes these fixture directories, including retained mutation artifacts.
+
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+diff --git a/work/template-sync/mutations.md b/work/template-sync/mutations.md
+index 6ed04f7611c904fd0ef8e4d397e6b93df35e3493..aecf27fbdb95a0d8f2daa352bd5a6e4bdafa14a6
+--- a/work/template-sync/mutations.md
++++ b/work/template-sync/mutations.md
+@@ -8,7 +8,17 @@
+ 
+ - remove git rm: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
+ 
+-- remove no-op cleanup: landed (old text absent, replacement present); exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. Restored.
++- remove no-op cleanup: initial result superseded by the macOS recheck below; bare `mktemp -d` did not put the directories under the test's TMPDIR, so the initial record did not establish cleanup on macOS.
+ 
+ - trap-delete clone: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged; FAIL: sync (c): missing release tag refuses; two lightweight tags succeed. Restored.
+ - add git push: landed (push command present, script differs from original); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
++
++## Review round 1 recheck — macOS (Darwin), 2026-10-09
++
++Both sync directories now use `mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX"`. Each mutation below was applied separately, verified by exact assertions that the original text was absent and the replacement present, and run through `bash tests/test-export.sh` on this machine. The fixture commits the working script and invokes its own copy. All three mutations were restored, with exact equality to the fixed script checked afterwards.
++
++- Replace `grep -Fqx "v$version"` with `grep -qx "v$version"`: landed; exit 1; FAIL: sync (c): missing and near-match release tags refuse; two lightweight tags succeed. The near-match fixture has only `v${version//./x}` on HEAD.
++- Remove the no-op `rm -rf "$clone"` command: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained clone is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++- Remove `trap 'rm -rf "$exp"' EXIT`: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained export is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++
++The test's outer cleanup removes these fixture directories, including retained mutation artifacts.
+
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+diff --git a/work/template-sync/mutations.md b/work/template-sync/mutations.md
+index 6ed04f7611c904fd0ef8e4d397e6b93df35e3493..aecf27fbdb95a0d8f2daa352bd5a6e4bdafa14a6
+--- a/work/template-sync/mutations.md
++++ b/work/template-sync/mutations.md
+@@ -8,7 +8,17 @@
+ 
+ - remove git rm: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
+ 
+-- remove no-op cleanup: landed (old text absent, replacement present); exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. Restored.
++- remove no-op cleanup: initial result superseded by the macOS recheck below; bare `mktemp -d` did not put the directories under the test's TMPDIR, so the initial record did not establish cleanup on macOS.
+ 
+ - trap-delete clone: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged; FAIL: sync (c): missing release tag refuses; two lightweight tags succeed. Restored.
+ - add git push: landed (push command present, script differs from original); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
++
++## Review round 1 recheck — macOS (Darwin), 2026-10-09
++
++Both sync directories now use `mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX"`. Each mutation below was applied separately, verified by exact assertions that the original text was absent and the replacement present, and run through `bash tests/test-export.sh` on this machine. The fixture commits the working script and invokes its own copy. All three mutations were restored, with exact equality to the fixed script checked afterwards.
++
++- Replace `grep -Fqx "v$version"` with `grep -qx "v$version"`: landed; exit 1; FAIL: sync (c): missing and near-match release tags refuse; two lightweight tags succeed. The near-match fixture has only `v${version//./x}` on HEAD.
++- Remove the no-op `rm -rf "$clone"` command: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained clone is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++- Remove `trap 'rm -rf "$exp"' EXIT`: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained export is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++
++The test's outer cleanup removes these fixture directories, including retained mutation artifacts.
+
+codex
+All three mutations landed and failed their expected cases on macOS, then were restored. I recorded the results and corrected the earlier cleanup claim in `mutations.md`. The gate’s 201 script tests have passed; export and sync checks are next.
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+diff --git a/work/template-sync/mutations.md b/work/template-sync/mutations.md
+index 6ed04f7611c904fd0ef8e4d397e6b93df35e3493..aecf27fbdb95a0d8f2daa352bd5a6e4bdafa14a6
+--- a/work/template-sync/mutations.md
++++ b/work/template-sync/mutations.md
+@@ -8,7 +8,17 @@
+ 
+ - remove git rm: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
+ 
+-- remove no-op cleanup: landed (old text absent, replacement present); exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. Restored.
++- remove no-op cleanup: initial result superseded by the macOS recheck below; bare `mktemp -d` did not put the directories under the test's TMPDIR, so the initial record did not establish cleanup on macOS.
+ 
+ - trap-delete clone: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged; FAIL: sync (c): missing release tag refuses; two lightweight tags succeed. Restored.
+ - add git push: landed (push command present, script differs from original); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
++
++## Review round 1 recheck — macOS (Darwin), 2026-10-09
++
++Both sync directories now use `mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX"`. Each mutation below was applied separately, verified by exact assertions that the original text was absent and the replacement present, and run through `bash tests/test-export.sh` on this machine. The fixture commits the working script and invokes its own copy. All three mutations were restored, with exact equality to the fixed script checked afterwards.
++
++- Replace `grep -Fqx "v$version"` with `grep -qx "v$version"`: landed; exit 1; FAIL: sync (c): missing and near-match release tags refuse; two lightweight tags succeed. The near-match fixture has only `v${version//./x}` on HEAD.
++- Remove the no-op `rm -rf "$clone"` command: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained clone is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++- Remove `trap 'rm -rf "$exp"' EXIT`: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained export is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++
++The test's outer cleanup removes these fixture directories, including retained mutation artifacts.
+
+ succeeded in 45237ms:
+▶ shellcheck scripts/agent-exec.sh scripts/archi-fresh.sh scripts/codex-review.sh scripts/demo.sh scripts/export-template.sh scripts/fan-exec.sh scripts/gate.d/examples/ds-hygiene.sh scripts/gate.d/examples/nb-clean.sh scripts/gate.d/test-scripts.sh scripts/gate.sh scripts/release.sh scripts/state.sh scripts/sync-template.sh scripts/worktree.sh tests/test-export.sh tests/test-scripts.sh
+▶ bash scripts/gate.d/test-scripts.sh
+ok: shellcheck scripts
+ok: worktree add defaults to checkout basename without worktrees config
+ok: demo passes with plain bash despite an intermediate failure
+ok: demo runs the full first block in the requested cwd
+ok: demo never runs earlier or second blocks
+ok: demo refuses an empty section before a later shell block
+ok: demo never runs a later section block
+ok: demo accepts bash fences and defaults cwd to dot
+ok: demo maps a failing block to 1 and names its real code
+ok: demo refuses an untracked worktree write
+ok: demo None prints the reason and passes
+ok: demo missing plan is a tooling error
+ok: demo missing section is a tooling error
+ok: demo empty section is a tooling error
+ok: demo non-git directory is a tooling error
+ok: demo help documents its arguments
+ok: demo refuses missing arguments
+ok: archi-fresh passes when ARCHI is newer than source paths
+ok: archi-fresh reports stale source paths
+ok: archi-fresh stale message says to refresh branch ARCHI
+ok: archi-fresh treats equal epochs as fresh
+ok: archi-fresh default ref checks current branch history
+ok: archi-fresh explicit ref selects branch history
+ok: archi-fresh exits 2 when one side has no history
+ok: archi-fresh help documents optional ref
+ok: state missing plan exits non-zero
+ok: state derives plan stage
+ok: state derives implement stage
+ok: state derives review stage before codex review
+ok: state derives release stage before marker
+ok: state derives release stage for retro
+ok: state derives done stage
+ok: state reads review sentinels from wt branch when it exists
+ok: state run is read-only
+ok: state requires both review approval sentinels
+ok: codex-review reads plan body from branch
+ok: codex-review reads config from main
+ok: codex-review prompt names exact verdict format
+ok: codex-review emits verdict instruction after diff
+ok: codex-review reads deferrals from branch
+ok: codex-review emits deferrals before the diff
+ok: 3-review skill routes deferrals to the ledger
+ok: code-reviewer agent is told deferrals are settled scope
+ok: code-reviewer agent defines severity taxonomy
+ok: code-reviewer agent has calibration section
+ok: code-reviewer agent requires concrete failure for blocking
+ok: codex-review prompt includes severity taxonomy
+ok: codex-review prompt includes calibration guidance
+ok: codex-review prompt passes round number
+ok: 3-review skill tracks round counter
+ok: 3-review skill routes by severity
+ok: 3-review skill caps at round 3 mechanically
+ok: 3-review skill keeps codex-review work artifacts out of diff
+ok: codex-review approve exits 0
+ok: codex-review writes stdout artifact
+ok: codex-review accepts indented approve verdict
+ok: codex-review request-changes exits 1
+ok: codex-review ignores branch reviewer.command override
+ok: codex-review missing verdict exits 2
+ok: codex-review missing reviewer.command exits 2
+ok: codex-review parser stops before later command
+ok: codex-review ignores commented command and uses real one
+ok: codex-review missing branch plan exits 2 before reviewer
+ok: codex-review does not invoke reviewer when branch plan is missing
+ok: codex-review reviewer failure exits 2 before verdict parsing
+ok: codex-review reviewer failure preserves previous artifact
+ok: codex-review refuses wt checkout as root
+ok: codex-review artifact-only run exits 0
+ok: codex-review only dirties primary artifact
+ok: codex-review leaves worktree branch clean
+ok: codex-review with branch artifacts exits 0
+ok: codex-review excludes work unit artifacts from reviewer diff
+ok: codex-review from subdirectory exits 0
+ok: codex-review from subdirectory includes top-level branch diff
+ok: codex-review from subdirectory excludes work unit artifacts
+ok: codex-review marks an absent deferral ledger explicitly
+ok: codex-review with a deferral ledger exits 0
+ok: codex-review injects the deferral ledger into the prompt
+ok: codex-review deferral ledger is not treated as absent
+ok: codex-review prompt includes round number from REVIEW_ROUND
+ok: codex-review passes custom round number
+ok: codex-review prompt contains round 3
+branch 'wt/demo' set up to track 'origin/main'.
+ok: codex-review excludes origin-main-only changes
+ok: codex-review bases diff on origin/main when local main is stale
+ok: codex-review falls back to local main without origin/main
+ok: codex-review fallback prompt uses local main base
+ok: worktree add creates directory
+ok: worktree branch checked out
+ok: worktree.sh works FROM INSIDE a worktree (.git-as-file)
+ok: worktree remove
+ok: worktree add without slug fails
+ok: worktree add bases new branch on origin/main from feature branch
+ok: worktree add falls back to HEAD without origin/main
+ok: worktree add uses stale origin/main when fetch fails
+ok: worktree add commits plan.md and leaves worktree clean
+ok: worktree add resume path does not duplicate plan commit
+ok: worktree sync-artifacts without slug fails
+ok: worktree sync-artifacts refuses missing worktree
+ok: worktree sync-artifacts refuses missing primary work dir
+ok: worktree sync-artifacts refuses invocation from unit worktree
+ok: worktree sync-artifacts copies primary artifacts
+ok: worktree sync-artifacts records handoff notes followup and codex review
+ok: worktree sync-artifacts commits non-ASCII artifact filename
+ok: worktree sync-artifacts preserves worktree plan sentinels
+ok: worktree sync-artifacts excludes dotfiles and subdirectories
+ok: worktree sync-artifacts keeps ignored primary stray absent after successful sync
+ok: worktree sync-artifacts deliberately commits existing worktree-side unit files
+ok: worktree sync-artifacts does not materialize symlink targets
+ok: worktree sync-artifacts leaves worktree clean
+ok: worktree sync-artifacts idempotent no-op exits zero
+ok: worktree sync-artifacts no-op makes no extra commit
+ok: worktree sync-artifacts refreshes changed artifact
+ok: worktree sync-artifacts copied refreshed notes
+ok: worktree sync-artifacts leaves pending worktree plan edit uncommitted
+ok: worktree sync-artifacts keeps pending plan edit in worktree
+ok: worktree sync-artifacts artifact commit excludes pending plan edit
+ok: worktree sync-artifacts ignores unrelated staged files
+ok: worktree sync-artifacts commit excludes unrelated staged file
+ok: worktree sync-artifacts leaves unrelated unstaged edit alone
+ok: worktree sync-artifacts does not stage unrelated worktree edit
+ok: worktree sync-artifacts propagates a failed artifact commit
+ok: worktree sync-artifacts accepts primary checkout on non-main branch
+ok: worktree sync-artifacts synced from non-main primary checkout
+ok: worktree sync-artifacts refuses expected path on wrong branch
+ok: worktree sync-artifacts wrong branch receives no artifact commit
+ok: gate reports skipped node when package.json exists and node is missing
+ok: gate reports skipped lines for every missing guarded tool
+ok: gate does not report absent cargo go or node in shell-only repo
+ok: gate does not report skipped pytest when no tests match
+ok: gate does not report skipped node when node check runs
+ok: gate runs tsc --noEmit when TS project has no typecheck script
+ok: gate does not add tsc fallback when a typecheck script exists
+ok: gate reports skipped tsc when TS project has no typecheck script and tsc is absent
+ok: gate required tool passes when fake executable is on PATH
+ok: gate required tool fails and names missing executable
+ok: gate required tool preflight reports every missing executable
+ok: gate required tool preflight aborts before stack checks
+ok: gate runs without config.yaml or GATE_REQUIRED_TOOLS
+ok: gate uses GATE_REQUIRED_TOOLS instead of config required_tools
+ok: gate reads required_tools from config.yaml
+ok: gate ignores commented-out required_tools
+ok: gate ignores required_tools outside gate section
+ok: gate treats empty GATE_REQUIRED_TOOLS as no required tools
+ok: agent-exec rejects missing handoff
+ok: agent-exec exits 0 when implementer commits
+ok: agent-exec exits 0 with relative worktree path when implementer commits
+ok: agent-exec exits 0 when implementer cd's elsewhere then commits
+ok: agent-exec exits 0 when implementer leaves uncommitted changes
+ok: agent-exec exits 0 when dirty redispatch cleans tree without commit
+ok: agent-exec exits non-zero when implementer produces nothing
+ok: notebook hook flags dirty tracked notebook
+ok: notebook hook passes cleaned tracked notebook
+ok: ds hygiene hook flags oversized tracked artifact
+ok: ds hygiene hook exempts default allowed directory
+ok: ds hygiene hook treats empty allow dirs as no allowed dirs
+ok: ds hygiene hook flags Unix local path in Python
+ok: ds hygiene hook flags Windows local path in Python
+ok: ds hygiene hook still flags artifact when path scan is disabled
+ok: ds hygiene hook still flags local path when artifact scan is disabled
+ok: ds hygiene hook disables artifact scan independently
+ok: ds hygiene hook reports artifact and local path together
+ok: ds hygiene hook passes clean fixture
+ok: ds hygiene hook disables path scan independently
+ok: ds hygiene hook skips deleted tracked artifact without stderr
+ok: ds hygiene hook honours colon-separated allow dirs
+ok: ds hygiene hook ignores empty allow-dir prefix
+ok: fan dispatch manifest lists only gate passers
+ok: fan adopt repoints canonical branch and cleans samples
+ok: fan dispatch auto-commits non-committing sample work
+ok: fan adopt preserves auto-committed sample work and cleans samples
+ok: fan adopt force-cleans dirty sample worktrees and branches
+ok: fan dispatch emits empty manifest and exits 0 with no survivors
+ok: release version compare accepts .10 over .9
+ok: release version compare rejects .9 after .10
+ok: release refuses without code-review approval
+ok: release refuses without codex-review approval
+ok: release refuses when gate fails
+ok: release refuses when ARCHI.md is stale
+ok: release refuses when computed version does not exceed VERSION
+ok: release can be invoked from primary checkout
+ok: release commits bump on branch without touching main, origin/main, or tagging
+ok: release writes last-released marker into release commit
+ok: release rollback removes first-time last-released marker
+ok: release refuses marker with missing retro
+ok: release refuses marker with empty retro
+ok: release proceeds when previous retro is non-empty
+ok: release refuses deleted last-released marker
+ok: release refuses mutated last-released marker
+ok: release refuses symlinked last-released marker
+ok: release refuses last-released marker with extra trailing newline
+ok: release re-run on release branch names merge guidance
+ok: release refuses empty bootstrap last-released marker
+ok: release refuses multi-line bootstrap last-released marker
+ok: release refuses symlinked bootstrap last-released marker
+ok: release proceeds without last-released marker
+ok: release reports stale branch before missing retro
+ok: release refuses stale branch, then computes next micro after sync
+ok: release catches origin/main moving during gate
+ok: tag-after-merge creates local tag on origin/main and pushes nothing
+ok: tag-after-merge refuses when origin/main advanced past the release
+ok: gate.sh runs on this repo
+
+passed: 201, failed: 0
+ok: sync (a): exact export tree, preserved parent and clone, no push
+ok: sync (b): up to date leaves TMPDIR empty and refs unchanged
+ok: sync (c): missing and near-match release tags refuse; two lightweight tags succeed
+ok: sync (d): arguments refuse without writes
+ok: clean export and consumer gate/freshness
+ok: no arguments refuses with usage
+ok: extra arguments refuses with usage and writes nothing
+ok: non-empty destination refuses without writes
+ok: file destination refuses without writes
+ok: base and overlay both reflect HEAD
+ok: existing empty destination succeeds
+ok: subdirectory export resolves relative destination against caller cwd
+
+passed: 12, failed: 0
+GATE: PASS
+
+hook: PostToolUse
+hook: PostToolUse Completed
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+diff --git a/work/template-sync/mutations.md b/work/template-sync/mutations.md
+index 6ed04f7611c904fd0ef8e4d397e6b93df35e3493..aecf27fbdb95a0d8f2daa352bd5a6e4bdafa14a6
+--- a/work/template-sync/mutations.md
++++ b/work/template-sync/mutations.md
+@@ -8,7 +8,17 @@
+ 
+ - remove git rm: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
+ 
+-- remove no-op cleanup: landed (old text absent, replacement present); exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. Restored.
++- remove no-op cleanup: initial result superseded by the macOS recheck below; bare `mktemp -d` did not put the directories under the test's TMPDIR, so the initial record did not establish cleanup on macOS.
+ 
+ - trap-delete clone: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged; FAIL: sync (c): missing release tag refuses; two lightweight tags succeed. Restored.
+ - add git push: landed (push command present, script differs from original); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
++
++## Review round 1 recheck — macOS (Darwin), 2026-10-09
++
++Both sync directories now use `mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX"`. Each mutation below was applied separately, verified by exact assertions that the original text was absent and the replacement present, and run through `bash tests/test-export.sh` on this machine. The fixture commits the working script and invokes its own copy. All three mutations were restored, with exact equality to the fixed script checked afterwards.
++
++- Replace `grep -Fqx "v$version"` with `grep -qx "v$version"`: landed; exit 1; FAIL: sync (c): missing and near-match release tags refuse; two lightweight tags succeed. The near-match fixture has only `v${version//./x}` on HEAD.
++- Remove the no-op `rm -rf "$clone"` command: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained clone is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++- Remove `trap 'rm -rf "$exp"' EXIT`: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained export is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++
++The test's outer cleanup removes these fixture directories, including retained mutation artifacts.
+
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/bin/zsh -lc "git diff --check; git add scripts/sync-template.sh tests/test-export.sh work/template-sync/mutations.md; git commit -m 'Fix literal release tag and macOS sync temp cleanup'; git status --short; git log -1 --format='%h %s'" in /Users/cboyfly/Documents/repos/agentic-coding-worktrees/template-sync
+ succeeded in 263ms:
+fatal: Unable to create '/Users/cboyfly/Documents/repos/agentic-coding/.git/worktrees/template-sync/index.lock': Operation not permitted
+fatal: Unable to create '/Users/cboyfly/Documents/repos/agentic-coding/.git/worktrees/template-sync/index.lock': Operation not permitted
+ M scripts/sync-template.sh
+ M tests/test-export.sh
+ M work/template-sync/mutations.md
+09abfa3 Record artifacts for template-sync
+
+hook: PostToolUse
+hook: PostToolUse Completed
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+diff --git a/work/template-sync/mutations.md b/work/template-sync/mutations.md
+index 6ed04f7611c904fd0ef8e4d397e6b93df35e3493..aecf27fbdb95a0d8f2daa352bd5a6e4bdafa14a6
+--- a/work/template-sync/mutations.md
++++ b/work/template-sync/mutations.md
+@@ -8,7 +8,17 @@
+ 
+ - remove git rm: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
+ 
+-- remove no-op cleanup: landed (old text absent, replacement present); exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. Restored.
++- remove no-op cleanup: initial result superseded by the macOS recheck below; bare `mktemp -d` did not put the directories under the test's TMPDIR, so the initial record did not establish cleanup on macOS.
+ 
+ - trap-delete clone: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged; FAIL: sync (c): missing release tag refuses; two lightweight tags succeed. Restored.
+ - add git push: landed (push command present, script differs from original); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
++
++## Review round 1 recheck — macOS (Darwin), 2026-10-09
++
++Both sync directories now use `mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX"`. Each mutation below was applied separately, verified by exact assertions that the original text was absent and the replacement present, and run through `bash tests/test-export.sh` on this machine. The fixture commits the working script and invokes its own copy. All three mutations were restored, with exact equality to the fixed script checked afterwards.
++
++- Replace `grep -Fqx "v$version"` with `grep -qx "v$version"`: landed; exit 1; FAIL: sync (c): missing and near-match release tags refuse; two lightweight tags succeed. The near-match fixture has only `v${version//./x}` on HEAD.
++- Remove the no-op `rm -rf "$clone"` command: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained clone is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++- Remove `trap 'rm -rf "$exp"' EXIT`: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained export is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++
++The test's outer cleanup removes these fixture directories, including retained mutation artifacts.
+
+codex
+Fixed both findings: literal tag matching with near-match rejection, and explicit TMPDIR templates for both directories.
+
+All three mutations landed on macOS: regex matching failed case (c); removing clone cleanup or the export trap failed case (b). Restored and recorded in `work/template-sync/mutations.md`. Gate passes. Demo skipped as requested.
+
+Commit blocked: the sandbox denied creating `index.lock` in the parent repository’s worktree metadata. The three changed files remain uncommitted.
+diff --git a/scripts/sync-template.sh b/scripts/sync-template.sh
+index 516cb4b94a835f99d5d96683131eecdf9f254b70..173ebe409ff37b66a93f6bda3dbc2996603d436f
+--- a/scripts/sync-template.sh
++++ b/scripts/sync-template.sh
+@@ -11,13 +11,13 @@
+ cd "$root" || error 'cannot enter repository root'
+ version=$(cat VERSION) || error 'cannot read VERSION'
+ tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
+-if ! grep -qx "v$version" <<<"$tags"; then
++if ! grep -Fqx "v$version" <<<"$tags"; then
+   echo "sync: HEAD must carry v$version" >&2
+   exit 1
+ fi
+ sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
+-clone=$(mktemp -d) || error 'cannot create clone directory'
+-exp=$(mktemp -d) || error 'cannot create export directory'
++clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
++exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+ trap 'rm -rf "$exp"' EXIT
+ TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
+ git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
+diff --git a/tests/test-export.sh b/tests/test-export.sh
+index f6a72c2a3e0e60c92179394ab6507327f3021499..6513e9c7be32446caf100759f39de6c3460bfe8b
+--- a/tests/test-export.sh
++++ b/tests/test-export.sh
+@@ -156,6 +156,12 @@
+   local status=$?
+   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag "v${version//./x}" || return 1
++  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
++  status=$?
++  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
++    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
++  git -C "$repo" tag -d "v${version//./x}" || return 1
+   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+   local out
+   out=$(sync_tree) || return 1
+@@ -170,7 +176,7 @@
+ }
+ check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+ check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
++check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+ check 'sync (d): arguments refuse without writes' sync_arguments
+ 
+ check 'clean export and consumer gate/freshness' success
+diff --git a/work/template-sync/mutations.md b/work/template-sync/mutations.md
+index 6ed04f7611c904fd0ef8e4d397e6b93df35e3493..aecf27fbdb95a0d8f2daa352bd5a6e4bdafa14a6
+--- a/work/template-sync/mutations.md
++++ b/work/template-sync/mutations.md
+@@ -8,7 +8,17 @@
+ 
+ - remove git rm: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
+ 
+-- remove no-op cleanup: landed (old text absent, replacement present); exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. Restored.
++- remove no-op cleanup: initial result superseded by the macOS recheck below; bare `mktemp -d` did not put the directories under the test's TMPDIR, so the initial record did not establish cleanup on macOS.
+ 
+ - trap-delete clone: landed (old text absent, replacement present); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged; FAIL: sync (c): missing release tag refuses; two lightweight tags succeed. Restored.
+ - add git push: landed (push command present, script differs from original); exit 1; FAIL: sync (a): exact export tree, preserved parent and clone, no push. Restored.
++
++## Review round 1 recheck — macOS (Darwin), 2026-10-09
++
++Both sync directories now use `mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX"`. Each mutation below was applied separately, verified by exact assertions that the original text was absent and the replacement present, and run through `bash tests/test-export.sh` on this machine. The fixture commits the working script and invokes its own copy. All three mutations were restored, with exact equality to the fixed script checked afterwards.
++
++- Replace `grep -Fqx "v$version"` with `grep -qx "v$version"`: landed; exit 1; FAIL: sync (c): missing and near-match release tags refuse; two lightweight tags succeed. The near-match fixture has only `v${version//./x}` on HEAD.
++- Remove the no-op `rm -rf "$clone"` command: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained clone is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++- Remove `trap 'rm -rf "$exp"' EXIT`: landed; exit 1; FAIL: sync (b): up to date leaves TMPDIR empty and refs unchanged. The retained export is now inside the test's TMPDIR, so the empty-directory assertion detects it.
++
++The test's outer cleanup removes these fixture directories, including retained mutation artifacts.
+
+hook: Stop
+hook: Stop Completed
+tokens used
+42,482
+Fixed both findings: literal tag matching with near-match rejection, and explicit TMPDIR templates for both directories.
+
+All three mutations landed on macOS: regex matching failed case (c); removing clone cleanup or the export trap failed case (b). Restored and recorded in `work/template-sync/mutations.md`. Gate passes. Demo skipped as requested.
+
+Commit blocked: the sandbox denied creating `index.lock` in the parent repository’s worktree metadata. The three changed files remain uncommitted.
