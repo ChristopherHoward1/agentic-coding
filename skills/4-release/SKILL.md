@@ -13,9 +13,10 @@ Input: a work unit slug.
 2. **React to the exit code:**
    - Exit 0 → report the bump commit on the release branch, that no tag exists yet, and that `main` was untouched.
    - Non-zero → report the script output and stop.
-3. **Push the release branch and open the PR** against `main` autonomously; never push `main` directly. `main` stays protected, so a PR + merge is still required.
-4. **After the PR merges,** run `bash scripts/release.sh tag-after-merge <slug>`. If it exits non-zero, report the output and stop. If it succeeds, run `git push origin v<version>`.
-5. **Invoke `/5-retro`** for the released unit.
+3. **Check README drift:** confirm README's loop, skills and Layout sections still match the shipped skills and scripts; fix drift via the small-fix path, never mentioning dogfood-only scripts (README ships in exported templates).
+4. **Push the release branch and open the PR** against `main` autonomously; never push `main` directly. `main` stays protected, so a PR + merge is still required.
+5. **After the PR merges,** run `bash scripts/release.sh tag-after-merge <slug>`. If it exits non-zero, report the output and stop. If it succeeds, run `git push origin v<version>`.
+6. **Invoke `/5-retro`** for the released unit.
 
 ## Rules
 

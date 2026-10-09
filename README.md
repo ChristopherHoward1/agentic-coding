@@ -102,8 +102,8 @@ AGENTS.md            the implementer's contract
 config.yaml          the one knob: profile, model per role, implementer command, gate + worktree settings
 
 skills/              the loop as skills:
-                       1-plan · 2-implement · 3-review · 4-release · 5-retro · init · compact
-                       (1-plan & 2-implement carry prompts/*.tpl)
+                       1-plan · 2-implement · 3-review · 4-release · 5-retro · init · compact · docs
+                       (1-plan, 2-implement & docs carry prompts/*.tpl)
 .claude/agents/      the checkers (read-only, own models, cold context):
                        plan-reviewer · code-reviewer · fan-selector
 scripts/             the deterministic layer:
@@ -111,6 +111,10 @@ scripts/             the deterministic layer:
                        worktree.sh    isolated-checkout lifecycle
                        agent-exec.sh  dispatch the implementer into a worktree
                        fan-exec.sh    best-of-N dispatch + winner adoption
+                       codex-review.sh second-vendor (codex) code reviewer
+                       demo.sh        run a plan's ## Demonstration block
+                       archi-fresh.sh ARCHI.md freshness check
+                       state.sh       derive a work unit's stage and next action
                        release.sh     preconditions, version/changelog, tag-after-merge
                        gate.d/*.sh    project-specific gate extensions
 profiles/            software · machine-learning · database · work — add slots, never override
