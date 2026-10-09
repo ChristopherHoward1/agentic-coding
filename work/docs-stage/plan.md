@@ -1,6 +1,6 @@
 # Docs stage — codex/GPT documentation writer
 
-**Slug:** docs-stage · **Date:** 2026-09-20 · **Status:** approved
+**Slug:** docs-stage · **Date:** 2026-09-20 · **Status:** implemented
 
 ## Goal
 
@@ -52,3 +52,12 @@ Plan-reviewer verdict: APPROVE (first draft, 6-file version). Findings folded in
 - #2/#3 (role-key error message, test fixture): moot — no `agent-exec.sh` or test change in the lean path.
 
 Plan verdict: APPROVE
+
+### Code review
+
+**Round 1:** Claude code-reviewer APPROVE (MEDIUM: handoff pointed at AGENTS.md, whose gate rule contradicts "no gate"; LOW: summary destination unnamed; LOW: relies on `implementer.command` being codex). Codex REQUEST CHANGES (HIGH: SKILL step 2 didn't say how to fill `{{FILES_TO_MODIFY}}`/`{{CONSTRAINTS}}`). HIGH + MEDIUM + summary LOW fixed in `987973d`; gate green. Note: codex ran without its severity definitions (printf bug in `codex-review.sh`, fixed on `wt/codex-review-printf`).
+
+**Round 2:** Claude code-reviewer APPROVE (MEDIUM: ARCHI commit-time staleness after `987973d` — healed per /3-review step 7; LOW: plans have no Constraints section, same as /2-implement; LOW: small-fix lane doesn't say how docs worktrees are cleaned up). Codex APPROVE, no findings (run with the severity-fix script).
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
