@@ -1,6 +1,6 @@
 # Template sync — keep the GitHub template repo equal to the export
 
-**Slug:** template-sync · **Date:** 2026-10-09 · **Status:** approved
+**Slug:** template-sync · **Date:** 2026-10-09 · **Status:** implemented
 
 ## Goal
 
@@ -133,3 +133,15 @@ Plan-reviewer round 3: REVISE. All 4 round-2 fixes were confirmed resolved, and 
 
 No round-4 review was run. The Owner approved the plan on 2026-10-09 with the round-3 fixes applied.
 Plan verdict: REVISE
+
+Code review:
+- **Round 1.** Both reviewers approved. They raised two MEDIUMs, sent back and fixed in `f5e94b2`:
+  - The tag guard used a regex match. It is now `grep -Fqx`, with a near-match test case.
+  - Bare `mktemp -d` ignores `TMPDIR` on macOS, so the cleanup pins checked nothing there. The script now uses explicit templates, and both mutations were re-run on macOS.
+- **Round 2.** Both reviewers approved with no CRITICAL, HIGH or MEDIUM findings. Recorded LOWs, not acted on:
+  - The `/4-release` step numbering differs from the plan's literal instruction: tag-after-merge was folded into step 4.
+  - A same-version retry after a PR already exists needs PR reuse.
+  - The clone dir leaks on an exit-2 tooling failure.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
