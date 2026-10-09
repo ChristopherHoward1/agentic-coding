@@ -156,6 +156,12 @@ sync_tags() {
   local status=$?
   [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
     grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
+  git -C "$repo" tag "v${version//./x}" || return 1
+  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
+  status=$?
+  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
+  git -C "$repo" tag -d "v${version//./x}" || return 1
   git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
   local out
   out=$(sync_tree) || return 1
@@ -170,7 +176,7 @@ sync_arguments() {
 }
 check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
 check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
-check 'sync (c): missing release tag refuses; two lightweight tags succeed' sync_tags
+check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
 check 'sync (d): arguments refuse without writes' sync_arguments
 
 check 'clean export and consumer gate/freshness' success
