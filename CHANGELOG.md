@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.10.1] - 2026-10-09
+
+- `scripts/demo.sh` runs each plan's `## Demonstration` block. The implementer runs it before finishing, and the code-reviewer re-runs it cold, so a change is shown working on real inputs, not just matched against its plan.
+- Confirm-delta: none
+
 ## [2026.10.0] - 2026-10-09
 
 - Add `/docs` stage — codex/GPT authors and rewrites documentation via the existing dispatch point; ships via the small-fix path.
