@@ -1,0 +1,10 @@
+root=/Users/cboyfly/Documents/repos/agentic-coding-worktrees/harness-split/harness
+gate_exit=0
+▶ shellcheck a.sh
+GATE: PASS
+slug: template-sync
+stage: plan
+review: approve
+next_action: finish /1-plan
+archi_exit=0
+traversal_exit=2
