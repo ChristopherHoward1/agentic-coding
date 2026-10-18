@@ -7,5 +7,5 @@ if [[ "${TEST_SCRIPTS_RUNNING:-}" == 1 ]]; then
   exit 0
 fi
 
-TEST_SCRIPTS_RUNNING=1 bash tests/test-scripts.sh
+TEST_SCRIPTS_RUNNING=1 bash harness/tests/test-scripts.sh
 bash tests/test-export.sh

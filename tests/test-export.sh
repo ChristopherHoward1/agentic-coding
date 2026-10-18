@@ -43,7 +43,7 @@ success() {
   for path in work template .gitattributes scripts/export-template.sh scripts/sync-template.sh tests/test-export.sh scripts/gate.d/test-scripts.sh; do
     [[ ! -e "$dest/$path" ]] || return 1
   done
-  [[ -f "$dest/tests/test-scripts.sh" && -d "$dest/knowledge" ]] &&
+  [[ -f "$dest/harness/tests/test-scripts.sh" && -d "$dest/knowledge" ]] &&
     [[ $(cat "$dest/VERSION") == 1970.1.0 ]] &&
     cmp "$repo/template/CHANGELOG.md" "$dest/CHANGELOG.md" &&
     ! grep -q '^## ' "$dest/CHANGELOG.md" &&
@@ -52,7 +52,7 @@ success() {
   if grep -rn 'agentic-coding-worktrees\|promoted 2026\|Confirm-delta releases\|export-template' "$dest"; then return 1; fi
   git init -q -b main "$dest" && git -C "$dest" add -A &&
     git -C "$dest" -c user.email=t@t -c user.name=t commit -qm init &&
-    (cd "$dest" && bash scripts/gate.sh && bash scripts/archi-fresh.sh)
+    (cd "$dest" && bash "$dest/harness/bin/harness" gate && bash "$dest/harness/bin/harness" archi-fresh)
 }
 arguments() {
   fixture "$1" || return 1
