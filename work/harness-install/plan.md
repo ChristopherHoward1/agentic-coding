@@ -1,6 +1,6 @@
 # Harness install — one command links the harness into the home directory; the repo stops carrying bootstrap glue
 
-**Slug:** harness-install · **Date:** 2026-10-18 · **Status:** approved
+**Slug:** harness-install · **Date:** 2026-10-18 · **Status:** implemented
 
 ## Goal
 
@@ -207,3 +207,15 @@ No disagreements. Round 3 is the cap, so the plan goes to the Owner.
 Owner approval: 2026-10-18, approved as-is with the round-3 fixes applied. The `PLAN.md → Now` entry goes on the unit branch together with the roadmap record.
 
 Plan verdict: APPROVE
+
+Code review:
+- **Round 1.** Both reviewers approved.
+  - The Claude reviewer re-ran the gate (224/0, export 12/0) and the demo, which matched Expected line for line. In its own clones it re-ran all four mutation pins, each verified to land. It also ran `install.sh` and `archi-fresh.sh` under `/bin/bash` 3.2.57.
+  - Codex passed shellcheck. Its read-only sandbox could not run the gate or the mutations (the known residual risk).
+  - LOWs, recorded and not acted on:
+    - `install.sh`'s preflight checks only the link targets, not their parent dirs. A regular file at `~/.claude/agents` would leave a partial install.
+    - The install tests run a copy at `$HOME/clone/harness`, not `$ROOT/harness`. The demo covers the real path.
+    - A malformed `archi.sources` value exits 2 saying "no git history" instead of pointing at the config.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
