@@ -17,3 +17,17 @@ The traversal fixture includes a real `x.sh` outside `scripts/` that exits 0. Th
 - `bash tests/test-export.sh`: 0 passed, 12 failed. Exposing the existing fixture diagnostics without modifying the suite confirms `fixture` aborts while copying indexed `profiles/database.md`, which has moved to `harness/profiles/database.md`. Every case uses this fixture. No export/sync implementation or fixture workaround was added; rerun after orchestrator staging.
 - Reference acceptance greps and `git diff --check`: PASS. Symlinks resolve to the three agent files; direct demo forwarder help prints `Usage: harness demo <slug> [<dir>]`.
 - Commit, clean-tree demo, index modes/history, full green gate, and fresh Claude agent discovery remain orchestrator checks under Dispatch 2.
+
+## Round-1 review: directory invocation regression
+
+Added the named case `command references avoid bash harness directory invocation`. It runs `grep -rnE 'bash harness( |$)'` against the requested skills, agents, profiles, constitution, ARCHI and README paths under `$ROOT`, requiring exit 1 (no matches).
+
+Reintroduced `bash harness release <slug>` in `harness/skills/4-release/SKILL.md`. Verified the mutation landed with `grep -nE 'bash harness( |$)' harness/skills/4-release/SKILL.md`, which printed line 12. Ran the actual new case extracted from the suite with its unchanged helpers and ROOT setup: it failed with `exit 0, expected 1`, and the runner exited 1. Restored the file; the same case passed and the runner exited 0.
+
+Round-1 review pre-checks on `wt/harness-split`:
+- Requested footprint-wide shellcheck: PASS.
+- `bash harness/tests/test-scripts.sh`: 206 passed, 0 failed, including the new reference check and self-gate.
+- `bash tests/test-export.sh`: 12 passed, 0 failed.
+- Diagnostic `TEST_SCRIPTS_RUNNING=1 bash harness/bin/harness gate`: PASS (suite recursion skipped).
+- `git diff --check`: PASS. No index-dependent failures this round.
+- No worktree index writes, staging, commits or demo runs performed; full gate and demo remain with the orchestrator as dispatched.

@@ -9,7 +9,7 @@ Input: a work unit slug.
 
 ## Steps
 
-1. **Create the retro branch:** from the primary checkout, run `bash harness worktree add retro-<slug>` and work in the returned worktree on branch `wt/retro-<slug>`. If the worktree already exists, reuse it instead of running worktree.sh add again.
+1. **Create the retro branch:** from the primary checkout, run `harness worktree add retro-<slug>` and work in the returned worktree on branch `wt/retro-<slug>`. If the worktree already exists, reuse it instead of running worktree.sh add again.
 2. **Answer the four questions:**
    - What did the gate miss that a reviewer caught?
    - What did every check miss?
@@ -24,7 +24,7 @@ Input: a work unit slug.
 5. **Apply every routing on the retro branch.** An unapplied routing means the stage is not done.
 6. **Respect the mechanical file boundary:** the retro branch may only touch `knowledge/`, `PLAN.md`, and `work/<slug>/retro.md`. Any routing that would edit `harness/` or root `scripts/gate.d/` becomes a `/1-plan` unit named in the retro instead of being applied here.
 7. **Publish for review:** push `wt/retro-<slug>` and open a PR to `main`.
-8. **Clean up after merge:** run `bash harness worktree remove retro-<slug>` after the PR merges.
+8. **Clean up after merge:** run `harness worktree remove retro-<slug>` after the PR merges.
 
 ## Rules
 
