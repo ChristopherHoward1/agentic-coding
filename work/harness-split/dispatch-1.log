@@ -1,0 +1,2362 @@
+Dispatching implementer in /Users/cboyfly/Documents/repos/agentic-coding-worktrees/harness-split
+  codex exec --sandbox workspace-write - < /Users/cboyfly/Documents/repos/agentic-coding/work/harness-split/handoff.md
+OpenAI Codex v0.160.1
+--------
+workdir: /Users/cboyfly/Documents/repos/agentic-coding-worktrees/harness-split
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: none
+reasoning summaries: none
+session id: 01a14f66-fefa-7f72-9081-21c506015baa
+--------
+user
+You are the implementer for this work unit. Read AGENTS.md in the repo root first — it is your contract.
+Follow its build-discipline section while staying inside the plan footprint.
+
+Work unit: work/harness-split/plan.md  (read it in full; it is your source of truth)
+Branch: wt/harness-split (already checked out in this worktree — verify with `git branch --show-current` before changing anything)
+
+Footprint (from the plan, repeated here as the hard boundary):
+- `harness/**` — every file moved per Approach 1 (use `git mv`), new `harness/bin/harness`, and the reference rewrites inside them
+- `scripts/gate.sh`, `scripts/archi-fresh.sh`, `scripts/demo.sh` — recreated at the old paths as two-line bootstrap forwarders (mode 100755)
+- `scripts/gate.d/test-scripts.sh`, `tests/test-export.sh`
+- `CLAUDE.md` (single line `@harness/CONSTITUTION.md`), `config.yaml` (`gate.command: harness gate`)
+- `.claude/skills`, `.claude/agents` (symlinks into `harness/`)
+- `.github/workflows/ci.yml`, `bitbucket-pipelines.yml`
+- `README.md`, `ARCHI.md`, `knowledge/release-script-binding.md`
+- `work/harness-split/mutations.md` (new: your mutation record)
+
+Key constraints:
+- Files NOT to touch: `scripts/export-template.sh`, `scripts/sync-template.sh`, `template/`, root `AGENTS.md`, other `knowledge/**` files, `work/**` outside `work/harness-split/`, `.claude/settings.local.json`. If the export breaks under the new layout beyond expected-path updates in `tests/test-export.sh`, stop and report instead of editing those files.
+- Behavior-preserving relocation. No script behavior changes beyond: `HERE`-relative sibling lookup (computed before any `cd`), the new `SOURCE_PATHS` list in archi-fresh, usage strings / `state.sh` next_action wording, and the new dispatcher.
+- Approach 6 lists exact test-file line changes, including the bare cwd-relative paths at `:942-959`, `:1459`, `:1738-1739` — a `check_fails` against a missing file passes vacuously (exit 127), so those must point at real files.
+- Every new guard must be pinned by a mutation that you verified actually landed (grep the mutated file) and that fails a named case; record each in `work/harness-split/mutations.md`. Why and how: `knowledge/silent-no-op-hazards.md` and `knowledge/test-helper-contract.md`.
+- Gate command for this unit: `bash harness/bin/harness gate` (the `scripts/gate.sh` forwarder must also work). Neither `harness` on PATH nor network is available to you — don't rely on them.
+- The orchestrator (not you) performs the fresh-`claude -p` agent-discovery check and the post-merge steps from Approach 8; leave those to it.
+- If your sandbox can't create commits, leave the finished work uncommitted and say so in your summary — the orchestrator will commit.
+
+When done:
+1. Run `bash harness/bin/harness gate` from the repo root — it must pass.
+2. Commit your work on this branch with a clear message.
+3. Run `bash harness/bin/harness demo harness-split` on the now-clean tree. If it fails, fix the problem, re-run the gate, commit, and re-run the demo. Exit 2 is a plan or tooling error, never a demo verdict; stop and surface it if it cannot be fixed within scope.
+4. Print a final summary: what changed and why, paste the demo output, criteria partially met (if any), out-of-scope observations.
+
+hook: SessionStart
+hook: SessionStart Completed
+hook: UserPromptSubmit
+hook: UserPromptSubmit Completed
+codex
+I’ll read the contract and full plan, verify the branch, then trace the scripts and tests before making changes.
+
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/bin/zsh -lc 'cat AGENTS.md
+cat work/harness-split/plan.md
+git branch --show-current' in /Users/cboyfly/Documents/repos/agentic-coding-worktrees/harness-split
+ succeeded in 241ms:
+# Implementer Contract
+
+You are the implementer. Your source of truth is the handoff you received; it names the work unit (`work/<slug>/plan.md`), the branch, and the file footprint.
+
+## Rules
+
+1. **Scope is the plan. Nothing more.** No refactoring adjacent code, no speculative features. If the work seems to require a file outside the declared footprint, stop and say so instead of expanding it yourself.
+2. **You are in a worktree on a pre-created branch.** Verify the branch matches the handoff before changing anything. Do not switch, merge, rebase, or reset.
+3. **Run the gate before finishing:** `scripts/gate.sh` from the repo root. Do not report done while it fails.
+4. **Finish with a summary**: what changed and why, any acceptance criteria only partially met (and why), anything you noticed but left out of scope.
+5. **Stop and surface** rather than guess when: acceptance criteria conflict, the plan seems wrong against the actual code, or a decision belongs to the Orchestrator or Owner.
+
+## Build Discipline
+
+Run this after you understand the task and trace the real flow end to end:
+
+1. Does this need to exist at all? If it is speculative, skip it and say so in one line.
+2. Already in this codebase? Reuse the helper, util, type, or pattern that lives here.
+3. Stdlib does it? Use stdlib.
+4. Native platform feature covers it? Use the platform.
+5. Already-installed dependency solves it? Use it. Do not add a dependency for what a few lines do.
+6. Can it be one line? Make it one line.
+7. Only then write the minimum code that works.
+
+For bug fixes, fix the root cause, not the named symptom: grep every caller of the function you touch and prefer one shared guard over per-caller patches.
+
+Never be lazy about understanding the problem, input validation at trust boundaries, error handling that prevents data loss, security, accessibility, or anything explicitly requested or named in the plan.
+
+Use a `ponytail:` comment for a deliberate simplification that cuts a real corner; name the ceiling and upgrade path.
+
+Honest and brief beats thorough and padded.
+# Harness split — move the framework under `harness/`, reached through one location-independent command
+
+**Slug:** harness-split · **Date:** 2026-10-18 · **Status:** approved
+
+## Goal
+
+The Owner wants the framework to become a standalone harness. It should be cloned once from the public `agentic-coding-template` repo into the Owner's home, and leave nothing in work repos (Owner decisions 2026-10-17/18).
+
+Today that's impossible. Framework and instance files share one root, and every skill, agent, template and test names framework scripts by repo-relative paths (`scripts/gate.sh` and similar).
+
+This unit is the first slice: a relocation that separates **where the harness lives** from **which repo it acts on**. Done means:
+- every framework file lives under `harness/`
+- every skill and agent reaches a script through a `harness <command>` dispatcher that resolves its own location
+- this repo still dogfoods the full loop, with the gate green
+
+The Owner's requirements are split into units:
+- **This unit:** relocation and the separation of harness root from git root (requirements 1 and 3a).
+- **`harness-install`** (requirements 2, 3b and 4):
+  - links into `~/.claude/`
+  - registers each repo under `~/.harness/projects/<repo>/`, with its config and unit artifacts
+  - lets the project root be a subfolder of the git root
+  - makes ARCHI sources config-driven
+  - moves `AGENTS.md` into `harness/` and sends it with the handoff
+  - records the local gate result against the commit SHA
+  - drops committed CI files and the bootstrap forwarders added here
+- **`harness-publish`** (requirements 6 and 7): the public sync publishes only `harness/`, replacing `export-template.sh`, `sync-template.sh`, `template/` and `test-export.sh`. It also adds the pre-push denylist guard.
+- **`forge: none`** (requirement 5) goes with the later `pr-release` unit, since both define the forge abstraction.
+
+## Approach
+
+1. **Move with `git mv`.** Framework files go under `harness/`; instance files stay at root.
+
+   | From | To |
+   |---|---|
+   | `scripts/{gate,worktree,agent-exec,fan-exec,codex-review,demo,release,state,archi-fresh}.sh` | `harness/scripts/` |
+   | `scripts/gate.d/examples/*.sh` | `harness/examples/gate.d/` |
+   | `skills/` | `harness/skills/` |
+   | `.claude/agents/*.md` | `harness/agents/` |
+   | `profiles/` | `harness/profiles/` |
+   | `tests/test-scripts.sh` | `harness/tests/test-scripts.sh` |
+   | `CLAUDE.md` body | `harness/CONSTITUTION.md` |
+
+   - Root `CLAUDE.md` becomes the single line `@harness/CONSTITUTION.md`.
+   - These stay at root:
+     - **Dogfood-only:** `scripts/export-template.sh`, `scripts/sync-template.sh`, `scripts/gate.d/test-scripts.sh`, `scripts/gate.d/.gitkeep`, `tests/test-export.sh` and `template/`.
+     - **Instance files:** `ARCHI.md`, `PLAN.md`, `config.yaml`, `VERSION`, `CHANGELOG.md`, `knowledge/`, `work/`, `README.md`, `LICENSE`, `.github/`, `bitbucket-pipelines.yml` and `.gitattributes`.
+     - **`AGENTS.md`**, unchanged. It moves in `harness-install`, where it first matters (plan-reviewer round 2, finding 7). Until then, its `scripts/gate.sh` references reach the bootstrap forwarder.
+     - The three bootstrap forwarders (step 8).
+   - Symlinks: retarget `.claude/skills → ../harness/skills`. Replace the `.claude/agents` directory with the symlink `.claude/agents → ../harness/agents`.
+2. **`harness/bin/harness` dispatcher** (new, bash 3.2-safe, shellchecked):
+   - It resolves its own real path through any chain of symlinks with a `readlink` loop; macOS has no `readlink -f`. Its root is the parent of `bin/`.
+   - `harness root` prints that root.
+   - `harness <name> [args]` first rejects any name not matching `^[a-z-]+$`. It then runs `exec bash "$root/scripts/<name>.sh" "$@"` if that file exists.
+   - No arguments, a rejected name, or an unknown name prints usage, listing the available names, to stderr and exits 2.
+3. **Two locations inside the scripts.**
+   - Each script that calls a sibling first sets `HERE=$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)`, **before any `cd`** (`release.sh:5` and `fan-exec.sh:9` both `cd`). It then calls `"$HERE/<sibling>.sh"`.
+   - That covers `release.sh` (gate at `:115`, archi-fresh at `:119`) and `fan-exec.sh` (worktree at `:70` and `:113`, agent-exec at `:73`, gate at `:79`).
+   - Project-side paths stay relative to the git toplevel, unchanged: `config.yaml`, `work/`, `VERSION` and the project gate hooks in `scripts/gate.d/*.sh`.
+   - Usage strings and `state.sh`'s `next_action` change to `harness <name>` forms.
+4. **ARCHI sources.** `archi-fresh.sh:7` becomes `SOURCE_PATHS=(harness/ scripts/ config.yaml CLAUDE.md)`. That's the same coverage under the new layout: root `scripts/` stays watched for the export/sync scripts and `gate.d`. Config-driven sources come in `harness-install`.
+5. **Rewrite references.**
+   - Skills, agents, the constitution, profiles and the handoff/followup templates replace every `scripts/<framework>.sh` with `harness <name>`, for example `harness worktree add <slug>`, `harness demo <slug>` and `harness release tag-after-merge <slug>`. They also replace every `tests/test-scripts.sh` with `harness/tests/test-scripts.sh`; `profiles/work.md:65` is one.
+   - Example-hook references in profiles become `$(harness root)/examples/gate.d/<hook>.sh`.
+   - `config.yaml → profiles/` becomes `$(harness root)/profiles/`.
+   - `config.yaml`'s `gate.command` becomes `harness gate`.
+   - The `5-retro` file boundary ("edit `scripts/` or `gate.d/`", `skills/5-retro/SKILL.md:25`) becomes `harness/` plus root `scripts/gate.d/`.
+   - Skill-local `prompts/*.tpl` references stay relative to the skill directory.
+   - `skills/4-release` keeps `scripts/sync-template.sh` as a repo-root path, because it's dogfood-only.
+6. **Tests.** Changes to `harness/tests/test-scripts.sh`:
+   - **Source paths:** `$ROOT/scripts/X` becomes `$ROOT/harness/scripts/X`, and likewise for examples, skills and agents. `ROOT` is the git toplevel, so these resolve after the move. Fixture repos keep their internal `scripts/` layout, so `HERE`-relative sibling calls resolve as they do today.
+   - **Bare cwd-relative paths:** the file `cd "$ROOT"`s at `:48`, so some top-level checks use bare paths, and these must be rewritten to `harness/…` too:
+     - `:942-947` and `:953-955` (`scripts/codex-review.sh`)
+     - `:948` and `:956-959` (`skills/3-review/SKILL.md`)
+     - `:1459` (`check_fails … bash scripts/agent-exec.sh …`)
+     - `:1738-1739` (`bash scripts/release.sh check-version …`)
+
+     The `check_fails` cases at `:1459` and `:1739` would otherwise pass without testing anything, because a missing file exits 127. The `.claude/agents/code-reviewer.md` checks (`:949-952`) still resolve through the symlink.
+   - **ARCHI-fresh fixture:** `setup_archi_fresh_fixture` (`:183-215`) makes its edit in `harness/skills/fixture.md` instead of `skills/fixture.md`.
+   - **Five assertions** follow the new strings:
+     - `:829`: `Usage: harness demo`
+     - `:838` and `:846`: stderr names `harness/`
+     - `:853`: `Usage: harness archi-fresh`
+     - `:883`: `next_action: run harness gate`
+
+     The `release-archi-stale` fixture (`:155`, which edits `CLAUDE.md`) is unaffected.
+   - **Shellcheck coverage:** the explicit shellcheck line (`:730`) becomes `shellcheck harness/scripts/*.sh harness/tests/*.sh harness/bin/harness`. `gate.sh:112` only checks `*.sh`, so this line is what covers the extensionless dispatcher.
+   - **Self-gate:** `:2023` (`gate.sh runs on this repo`) runs `bash "$ROOT/harness/bin/harness" gate`, so it survives the deletion of the forwarders.
+   - **New cases:**
+     - (a) The dispatcher through a two-link symlink chain, one absolute link and one relative (`ln -s link1 "$d/bin/harness"`), run from a directory outside any repo: `harness root` prints the real harness path, and `harness demo --help` prints `Usage: harness demo <slug> [<dir>]`.
+     - (b) No arguments, an unknown name, and `harness ../x` each exit 2 with usage on stderr.
+
+   Other test files:
+   - Root `scripts/gate.d/test-scripts.sh` runs `harness/tests/test-scripts.sh` and `tests/test-export.sh`.
+   - `tests/test-export.sh` updates its expected paths (e.g. `$dest/harness/tests/test-scripts.sh`). It runs the exported dispatcher by path at `:55`: `bash "$dest/harness/bin/harness" gate` and `… archi-fresh`. Its `:52` check that no exported file contains `export-template` still holds, so the README rewrite must not name the export script.
+7. **CI and docs.**
+   - `.github/workflows/ci.yml` and `bitbucket-pipelines.yml` run `bash harness/tests/test-scripts.sh` and `bash harness/bin/harness gate`.
+   - `.gitattributes` export-ignore paths don't change.
+   - Refresh README Layout and Getting started, and make a targeted `ARCHI.md` refresh on the branch.
+   - `knowledge/release-script-binding.md` gains a section on the binding shift (step 9).
+8. **Bootstrap.** Main's loop machinery, which uses the old paths, drives this unit.
+   - Keep `scripts/gate.sh`, `scripts/archi-fresh.sh` and `scripts/demo.sh` at root as two-line forwarders: `exec bash "$(dirname "$0")/../harness/scripts/<name>.sh" "$@"`. These keep three callers working on this branch:
+     - main's `/2-implement` (`cd "$WT" && scripts/gate.sh`)
+     - main's `release.sh` (`:115` and `:119`, which run inside the release worktree)
+     - main's code-reviewer and handoff/followup templates (`scripts/demo.sh <slug>`)
+
+     `harness-install` deletes the forwarders.
+   - Before merge, the orchestrator confirms agent discovery through the symlinked directory. From `$WT`, a fresh `claude -p` session lists its available subagents, and the output goes in `work/harness-split/notes.md`. If any reviewer agent is missing, the branch switches to per-file symlinks (`.claude/agents/<name>.md → ../../harness/agents/<name>.md`) before review.
+   - After merge, in `/4-release`, `tag-after-merge` runs in its usual place: step 4, before the pull, where the primary still has the old `scripts/release.sh`. After the pull, and before the sync-template step and `/5-retro`, run a one-time `ln -sf "$PWD/harness/bin/harness" ~/.local/bin/harness`.
+   - This release's template sync publishes the new layout, so README Getting started gains the same one-line `ln -s` install step. That way a consumer's `/init` finds `harness`. The README still never names the export script.
+9. **Accepted binding shift.**
+   - **Today:** the branch's own `gate.sh`, `archi-fresh.sh` and `demo.sh` run against the branch, through `cd "$WT" && scripts/gate.sh`, `fan-exec.sh:79`, release's checks, and the reviewer's demo re-run.
+   - **After this unit:** the global `harness` and `$HERE` run the **installed (main) copies** against the branch tree. That's the intended harness model, since work repos can only ever run the installed harness.
+   - **Coverage stays:** the branch's scripts are still exercised, because the gate hook runs the branch's `harness/tests/test-scripts.sh` against the branch's script copies through `$ROOT`.
+   - This is recorded in `knowledge/release-script-binding.md`.
+
+Alternatives considered:
+- **Repo-relative `harness/scripts/…` in skills:** only works inside this repo, so `harness-install` would rewrite every reference again.
+- **Harness root from the skill's base directory:** Claude Code reports the symlink path (`.claude/skills/<name>`), so going two levels up lands in `.claude/`.
+- **A SessionStart hook exporting `HARNESS_ROOT`:** wouldn't reach the headless implementer, and it's unverified.
+- **Config-driven `archi.sources`, and moving `AGENTS.md`, now:** deferred to `harness-install` (plan-reviewer findings: round 1 #5, round 2 #7). No consumer repo exists until then, and both add test churn here.
+
+Out of scope: everything Goal assigns to later units. Also out of scope: moving `knowledge/`, and any script behavior change beyond the sibling lookup and the `SOURCE_PATHS` list.
+
+## Footprint
+
+Files to modify:
+- `harness/**`: all moved files in Approach 1, the new `harness/bin/harness`, and the reference rewrites inside them
+- `scripts/gate.sh`, `scripts/archi-fresh.sh`, `scripts/demo.sh`: become bootstrap forwarders
+- `scripts/gate.d/test-scripts.sh` and `tests/test-export.sh`
+- `CLAUDE.md` (the import line) and `config.yaml` (`gate.command`)
+- `.claude/skills` and `.claude/agents` (symlinks, or the per-file fallback in Approach 8)
+- `.github/workflows/ci.yml` and `bitbucket-pipelines.yml`
+- `README.md`, `ARCHI.md` and `knowledge/release-script-binding.md`
+
+Files NOT to touch:
+- `scripts/export-template.sh`, `scripts/sync-template.sh` and `template/`. `harness-publish` replaces them. If the export breaks under the new layout beyond the expected-path updates in `tests/test-export.sh`, stop and report.
+- `AGENTS.md`: it moves in `harness-install`.
+- Other `knowledge/**` files, and `work/**` outside this unit's directory.
+- `.claude/settings.local.json`.
+
+## Acceptance criteria
+
+- [ ] `bash harness/bin/harness gate` exits 0 from the worktree root and from `harness/scripts/`. The test output shows new cases (a) and (b) as `ok`. `shellcheck harness/bin/harness` exits 0.
+- [ ] At root, `git ls-files scripts tests` lists exactly eight files:
+  - `scripts/archi-fresh.sh`, `scripts/demo.sh` and `scripts/gate.sh` (the forwarders)
+  - `scripts/export-template.sh` and `scripts/sync-template.sh`
+  - `scripts/gate.d/.gitkeep` and `scripts/gate.d/test-scripts.sh`
+  - `tests/test-export.sh`
+
+  `git log --follow --oneline` shows pre-move history for `harness/scripts/release.sh`, `harness/skills/3-review/SKILL.md` and `harness/agents/code-reviewer.md`.
+- [ ] All of these print nothing:
+  - `grep -rnE '(^|[^/a-z])scripts/(gate|worktree|agent-exec|fan-exec|codex-review|demo|release|state|archi-fresh)\.sh' harness/skills harness/agents harness/profiles harness/scripts harness/CONSTITUTION.md CLAUDE.md config.yaml README.md`
+  - `grep -rnE '(^|[^/])tests/test-scripts\.sh' harness/skills harness/agents harness/profiles harness/CONSTITUTION.md README.md`
+  - `grep -rnE 'scripts/gate\.d/examples/|(^|[^/a-z)])profiles/' harness/skills harness/agents harness/profiles harness/scripts harness/CONSTITUTION.md CLAUDE.md`
+  - `grep -nE '^check(_fails|_exit)? .*[ ](scripts/[a-z-]+\.sh|skills/)' harness/tests/test-scripts.sh | grep -v "cd '"`
+- [ ] `grep -F 'harness/bin/harness' README.md` matches (the Getting started install step).
+- [ ] `readlink .claude/skills` prints `../harness/skills`. `.claude/agents` is either the symlink `../harness/agents` or the per-file fallback. `ls -L .claude/agents/` lists the three agent files. `work/harness-split/notes.md` records a fresh `claude -p` session from `$WT` listing `plan-reviewer`, `code-reviewer` and `fan-selector`.
+- [ ] Root `CLAUDE.md` is the single line `@harness/CONSTITUTION.md`. `git diff main:CLAUDE.md HEAD:harness/CONSTITUTION.md` shows only the script-reference rewrites.
+- [ ] Inside the worktree:
+  - `scripts/gate.sh`, executed directly, forwards and exits 0
+  - `scripts/archi-fresh.sh HEAD` forwards with the same exit as `bash harness/bin/harness archi-fresh HEAD`
+  - `scripts/demo.sh --help`, executed directly, prints the `harness demo` usage
+  - `git ls-files -s scripts/gate.sh scripts/demo.sh scripts/archi-fresh.sh harness/bin/harness` shows mode `100755` for all four
+- [ ] Every new guard is pinned. Each of these mutations, verified as landed, fails a named case, recorded in `work/harness-split/mutations.md`:
+  - removing the dispatcher's symlink loop (fails a)
+  - making an unknown name exit 0 (fails b)
+  - removing the `^[a-z-]+$` name check (fails b, via `../x`)
+- [ ] The existing export cases pass with the updated expected paths. The exported copy's `harness gate`, run by path, passes inside `tests/test-export.sh`.
+
+## Release
+
+Release note: The framework moves under `harness/`, and skills and agents reach its scripts through the `harness` command.
+
+Binding note (`knowledge/release-script-binding.md`): this unit is released by main's pre-move `release.sh`, through the bootstrap forwarders. From the next unit onward, `harness release` runs the installed copy.
+
+## Demonstration
+
+This runs the branch's real dispatcher through a symlink chain outside the repo:
+- it gates an unrelated fresh repo, which shows the harness root and target repo are separate
+- it reads this repo's real unit state
+- it checks ARCHI freshness
+
+It writes only under `mktemp -d`.
+
+```sh
+d=$(mktemp -d); mkdir "$d/bin"
+ln -s "$PWD/harness/bin/harness" "$d/bin/link1"; ln -s "$d/bin/link1" "$d/bin/harness"
+export PATH="$d/bin:$PATH"
+echo "root=$(harness root)"
+git init -q "$d/proj"; printf '#!/usr/bin/env bash\necho hi\n' > "$d/proj/a.sh"
+git -C "$d/proj" add a.sh; git -C "$d/proj" -c user.name=d -c user.email=d@d commit -qm init
+(cd "$d/proj" && harness gate) > "$d/gate.log"; echo "gate_exit=$?"
+grep -F '▶ shellcheck' "$d/gate.log"; tail -1 "$d/gate.log"
+harness state template-sync
+harness archi-fresh; echo "archi_exit=$?"
+harness ../x 2>/dev/null; echo "traversal_exit=$?"
+```
+
+Expected:
+- `root=` prints this worktree's `harness` directory as a real path.
+- `gate_exit=0`, then `▶ shellcheck a.sh`, then `GATE: PASS`.
+- The state lines `slug: template-sync` / `stage: plan` / `review: approve` / `next_action: finish /1-plan`, the same as on main today (the known `state-owner-approval` candidate).
+- `archi_exit=0`.
+- `traversal_exit=2`.
+
+## Review
+
+Plan-reviewer round 1: REVISE (11 findings), all applied. The main changes:
+- Bootstrap forwarders and post-merge steps.
+- Explicit test churn.
+- A scoped grep.
+- The binding shift is accepted and recorded.
+- `archi.sources` is deferred.
+- The export runs the exported dispatcher.
+- An agent-discovery check.
+- A fuller demo.
+- `HERE` is set before the `cd`.
+- Named case (a) and the history samples.
+
+Plan-reviewer round 2: REVISE (8 findings), all applied:
+1. The demo commits in `proj` (`agent-exec`'s `rev-parse HEAD` dies on an empty repo; that dispatch step is gone now anyway), and it shows the shellcheck line.
+2. Added a `scripts/demo.sh` forwarder, so the root has 8 files.
+3. ARCHI-fresh fixture churn: the edit moves to `harness/skills/fixture.md`, `:838` and `:846` expect `harness/` (five assertion updates), and `release-archi-stale` is unaffected.
+4. The dispatcher is shellchecked via `:730`, and the self-gate at `:2023` uses the dispatcher.
+5. The agent-discovery check is now before merge, with the per-file fallback in the footprint.
+6. A second grep for `tests/test-scripts.sh`, and the `5-retro` boundary rewrite.
+7. Took the simpler version: `AGENTS.md` and the contract piping are deferred to `harness-install`, which drops case (c), the fixture stubs and the special follow-up dispatch.
+8. Fixed the `:52` reference, removed the follow-up piping wording, and added the dispatcher name check plus `../x` to case (b).
+
+No disagreements.
+
+Plan-reviewer round 3: REVISE (6 findings), all applied:
+1. Bare cwd-relative test paths (`:942-959`, `:1459`, `:1738-1739`) are listed, so the two `check_fails` cases can't pass without testing anything, and a grep criterion pins it.
+2. README Getting started gains the `ln -s` install step, because this release's sync publishes the new layout.
+3. The forwarders are executed directly, and the 100755 modes are checked.
+4. `tag-after-merge` keeps its usual step-4 place. Only the post-pull `ln -sf` is added.
+5. `gate.d/examples/` and `profiles/` references are added to the grep.
+6. Case (a) uses one relative symlink.
+
+No disagreements. Round 3 is the cap; this goes to the Owner.
+
+Owner approval: 2026-10-18, approved as-is with the round-3 fixes applied. The Owner made no separate call on skipping the sync, so this release's template sync runs as normal.
+
+Plan verdict: APPROVE
+wt/harness-split
+
+hook: PostToolUse
+hook: PostToolUse Completed
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/bin/zsh -lc 'git status --short
+cat knowledge/silent-no-op-hazards.md knowledge/test-helper-contract.md
+cat scripts/export-template.sh tests/test-export.sh
+cat scripts/archi-fresh.sh scripts/gate.d/test-scripts.sh
+cat README.md ARCHI.md knowledge/release-script-binding.md' in /Users/cboyfly/Documents/repos/agentic-coding-worktrees/harness-split
+ succeeded in 250ms:
+# Silent no-ops: cwd- and checkout-dependence
+
+Cited when writing or reviewing a script that resolves paths, or when mutation-testing a guard.
+Not hot context.
+
+Written after `work-artifact-capture` (v2026.8.11) hit the same failure family **four times in one
+unit** — three in the code under review, one in the orchestrator's own dispatch. Six review rounds;
+the suite was green through all of them.
+
+## The family
+
+A command runs, does nothing or does less than intended, and **exits 0**. Nothing fails, so nothing
+alerts. This is worse than a crash in exactly the places the loop trusts an exit code.
+
+The four instances, all from one unit:
+
+| Instance | Symptom |
+|---|---|
+| `sync-artifacts` run from inside the worktree | `ROOT` resolved to the worktree, copied nothing, exit 0 |
+| `codex-review.sh` diff pathspec `--  .` | From a subdirectory, reviewer's diff silently truncated |
+| Same pathspec missing `,top` on the exclude | Exclusion stopped matching; eight artifact files leaked back in |
+| `scripts/agent-exec.sh` with a stale shell cwd | Dispatch never ran; outer command still reported exit 0 |
+
+The third one is the sharpest: a reviewer receives a diff missing most of the change, finds nothing
+objectionable, exits 0, and the loop **mechanically records an APPROVE over a diff that was never
+shown**. An empty or short diff is not a git error, so `die`-style handling never fires.
+
+## The idioms that fix them
+
+- **Anchor pathspecs to the repo root, not the cwd.** `git diff … -- ':/' ':(exclude,top)work/<slug>'`.
+  `:/` includes from the root; **`,top` is required** on the exclude or it gets the cwd prefix applied
+  and quietly stops matching. Verify by comparing output from the root and from a subdirectory —
+  identical, or the anchor is wrong.
+- **Ask "am I in the primary checkout", not "where is `main`".**
+  `[[ "$(git rev-parse --git-dir)" == "$(git rev-parse --git-common-dir)" ]]` is true only in the
+  primary checkout, and is immune to whichever branch happens to be checked out. Resolving by branch
+  name instead gives both false refusals (a small fix left on a branch blocks a release) and false
+  acceptances (`main` checked out in a linked worktree).
+- **`cd "$ROOT"` early**, as `worktree.sh` does, or accept that every relative path in the script is
+  caller-dependent. Do not do half of this.
+- **Dispatch with absolute paths.** Shell cwd persists across an orchestrator's commands; a relative
+  `scripts/…` resolves against wherever the last probe left it.
+- **Filenames are not text.** `git diff --cached --name-only` C-quotes non-ASCII paths, and feeding
+  those back as pathspecs fails (`pathspec '"work/…/r\303\251sum\303\251.md"' did not match`) —
+  after `git add` has already run, so the tree is left dirty. Use a pathspec on both the guard and
+  the commit instead of round-tripping through filenames.
+
+- **Give temp dirs an explicit template when a test redirects them.** On macOS, `mktemp -d` with no
+  template did not land under the test's `TMPDIR`. A "TMPDIR stays empty" cleanup pin passed with
+  the cleanup deleted, and a mutation run recorded in the Linux-like codex sandbox claimed it failed.
+  Use `mktemp -d "${TMPDIR:-/tmp}/name.XXXXXX"`, and re-run cleanup mutations on the platform the
+  local gate runs on (`template-sync`).
+
+## Assert your mutation actually landed
+
+Mutation testing is the only thing that has caught vacuous tests in this repo — but a mutation that
+*fails to apply* produces a false green indistinguishable from a passing guard. This happened
+**twice** in one unit, nearly letting both a vacuous test and an unpinned guard ship.
+
+Before trusting red-or-green, prove the edit is in the file:
+
+    # after editing, assert the old text is gone and the new text is present
+    grep -c 'exclude,top' scripts/codex-review.sh   # expect 0 after mutating it out
+    git diff --stat                                  # expect a non-empty diff
+
+A reviewer's `sed`/`python3` replace that silently matched nothing looks exactly like a well-pinned
+guard. The check costs one line.
+
+## Two vacuity shapes seen here
+
+Both are in `knowledge/test-helper-contract.md` too; repeated because this unit produced one of each.
+
+1. **A fixture too impoverished to exhibit the behaviour.** A case asserted the gate aborts *before*
+   running checks, by grepping for the absence of a run marker — in a fixture with no runnable tool,
+   where no implementation could ever print one.
+2. **An assertion the environment satisfies regardless.** A `.DS_Store` placed in the *worktree* was
+   asserted absent from the tree — but gitignore excludes it under every implementation, so the
+   staging strategy it was meant to pin had no test behind it at all. The fix was a *non-dot*
+   gitignored stray in the *primary* directory.
+
+## An empty "nothing differs" check
+
+Seen in `docs-stage` (v2026.10.0). To decide whether a squash-merged `wt/<slug>` branch had
+landed, the orchestrator ran `files=$(git diff --name-only <base> <branch>)` and then
+`git diff --stat origin/main <branch> -- $files`. The Bash tool's shell is **zsh**, which does not
+word-split an unquoted `$files`. The whole newline-joined list became one pathspec that matched
+nothing, the diff printed nothing, and "no output" was read as "fully landed". A worktree holding
+unlanded review fixes was then removed.
+
+- When empty output means "safe to delete", make the check able to print something: run
+  `git diff --stat origin/main <branch>` over the whole tree first, and only then narrow it.
+- Do not rely on unquoted word-splitting in tool-run shell snippets. Use `${=files}` in zsh, an
+  array, or pipe the list through `xargs`.
+# tests/test-scripts.sh — helper contract
+
+Cited when writing or reviewing cases in `tests/test-scripts.sh`. Not hot context.
+
+Written after `ds-hygiene-hook` (v2026.8.9) re-derived this three times — once while
+planning, twice under code review — at roughly a review round each.
+
+## What each helper actually asserts
+
+| Helper | Exit code | stdout | stderr |
+|---|---|---|---|
+| `check` | must be 0 | discarded | discarded |
+| `check_fails` | must be non-zero | discarded | discarded |
+| `check_exit <desc> <code> <substr>` | must equal `<code>` | discarded | grepped for `<substr>` |
+
+Three consequences that have each cost a round:
+
+1. **A script under test must write diagnostics to stderr** if a case wants to assert the
+   message. `check_exit` greps stderr only. `gate.sh` captures both streams, so writing to
+   stderr costs nothing in implementer feedback.
+2. **There is no absence assertion.** `check_exit` proves a substring is present, never that
+   one is missing. Asserting "X is not flagged" needs an inline `bash -c`:
+
+       check "desc" bash -c 'out=$(bash hook 2>&1); ! grep -q needle <<<"$out"'
+
+3. **There is no emptiness assertion, and `$(...)` discards exit status.** This shape is a
+   trap — it passes for a command that exits 1 silently:
+
+       check "desc" bash -c '[ -z "$(cmd 2>&1 >/dev/null)" ]'          # status ignored
+
+   Capture both when the criterion names both:
+
+       check "desc" bash -c 'err=$(cmd 2>&1 >/dev/null); s=$?; [[ $s -eq 0 && -z "$err" ]]'
+
+## A green suite is not a real suite
+
+Every vacuous test found in this repo has passed the gate. The gate cannot distinguish a
+test that proves something from one that cannot fail.
+
+Before trusting a case that asserts a guard exists, delete the guard and re-run. If the
+suite stays green, the case is decoration. Three cases in `ds-hygiene-hook` failed this and
+were caught only by reviewers doing it by hand.
+
+Common vacuity: a fixture that violates two checks at once, asserted with a single non-zero
+exit. The assertion cannot tell which check fired, so it survives the deletion of either.
+Give each guard a fixture that violates **only** the thing that guard controls.
+
+A second vacuity shape, from `gate-tool-preflight` (v2026.8.10): a fixture too impoverished to
+exhibit the behaviour at all. The case asserted the gate's preflight aborts *before* running
+checks, by grepping for absence of the `▶` run marker — but the fixture had no runnable tool,
+so no implementation could ever print one. Deleting the abort left the suite green. When
+asserting that something does **not** appear, first confirm the fixture can produce it.
+
+## The suite runs *inside* the gate, so environment hermeticity is bidirectional
+
+`scripts/gate.d/test-scripts.sh` runs this suite as a gate hook, so `bash scripts/gate.sh`
+executes the suite, which executes fixture gates. Any variable `gate.sh` reads therefore
+flows in both directions, and both cost a review round in `gate-tool-preflight`:
+
+- **Outbound:** a case that `export`s such a variable leaks it into the nested gate run and
+  into every later case. Set it per-command instead — `VAR=x bash -c '…'`.
+- **Inbound:** a value already in the environment reaches the hook and then every fixture.
+  `GATE_REQUIRED_TOOLS=shellcheck bash scripts/gate.sh` failed 8 of 15 new cases this way —
+  nothing was broken; the inherited requirement aborted each fixture gate before it could
+  run, because fixtures deliberately use a restricted `PATH`.
+
+Neutralise the inbound direction once, structurally, next to the suite's `cd "$ROOT"` rather
+than immediately above the affected block — a guard that works only because of where it sits
+is silently lost by the next case added above it:
+
+    unset GATE_REQUIRED_TOOLS   # the suite runs nested inside gate.sh; see above
+
+Check both directions when adding a variable `gate.sh` reads: `grep -n export tests/test-scripts.sh`
+for outbound, and one full-suite run with the variable set for inbound.
+
+## Proving cross-platform behaviour on one platform
+
+The gate runs on whichever platform invoked it, so a portability bug can sit behind a fully
+green suite. `ds-hygiene-hook` shipped a `stat` probe to review that worked on macOS and
+silently disabled its check on every Linux box.
+
+Where behaviour branches on a tool's platform variant, stub the other variant on `PATH` and
+run against it, rather than reasoning about the flags:
+
+    # GNU-shaped stat: -c succeeds, -f fails
+    printf '#!/bin/sh\ncase "$1" in -c) echo 21;; *) exit 1;; esac\n' >"$stub/stat"
+    chmod +x "$stub/stat"
+    PATH="$stub:$PATH" bash scripts/gate.d/the-hook.sh
+
+Note the failure that made this necessary: GNU `stat -f %z` does **not** fail. `-f` is
+`--file-system` there, an unrecognised directive prints `?` and exits 0. Probes of the form
+"try the BSD flag, fall back if it fails" are therefore inverted; order the GNU form first
+and fall back to the BSD one, which does exit non-zero on an unknown flag.
+#!/usr/bin/env bash
+# Export committed capabilities, replacing instance state with committed skeletons.
+set -uo pipefail
+
+usage() { echo 'Usage: scripts/export-template.sh <dest>' >&2; }
+error() { echo "export: $*" >&2; exit 2; }
+if [[ $# -ne 1 ]]; then
+  usage
+  exit 1
+fi
+dest=$1
+if [[ -d "$dest" ]]; then
+  entries=$(ls -A -- "$dest") || error "cannot inspect $dest"
+  if [[ -n "$entries" ]]; then
+    echo "export: destination is non-empty: $dest" >&2
+    exit 1
+  fi
+elif [[ -e "$dest" || -L "$dest" ]]; then
+  echo "export: destination is not a directory: $dest" >&2
+  exit 1
+fi
+if [[ -n "$dest" && "$dest" != /* ]]; then
+  dest="$PWD/$dest"
+fi
+root=$(git rev-parse --show-toplevel) || error 'cannot resolve repository root'
+cd "$root" || error 'cannot enter repository root'
+mkdir -p -- "$dest" || error "cannot create $dest"
+git archive HEAD | tar -x -C "$dest" || error 'cannot extract HEAD'
+paths=$(git ls-tree -r --name-only HEAD -- template/) || error 'cannot list overlay'
+while IFS= read -r path; do
+  [[ -n "$path" ]] || continue
+  target="$dest/${path#template/}"
+  mkdir -p -- "$(dirname "$target")" || error "cannot create overlay directory"
+  git show "HEAD:$path" >"$target" || error "cannot overlay $path"
+done <<<"$paths"
+printf '%s\n' "$dest"
+#!/usr/bin/env bash
+# Export tests use committed copies of working-tree files, never the live HEAD.
+# Test functions are invoked indirectly by check.
+# shellcheck disable=SC2317,SC2329 # SC2317 on shellcheck <0.10 (CI), SC2329 on >=0.10
+set -uo pipefail
+
+pass=0; fail=0
+check() {
+  local desc="$1"; shift
+  if "$@" >/dev/null 2>&1; then
+    echo "ok: $desc"; pass=$((pass+1))
+  else
+    echo "FAIL: $desc"; fail=$((fail+1))
+  fi
+}
+ROOT=$(git rev-parse --show-toplevel) || exit 2
+cd "$ROOT" || exit 2
+unset GATE_REQUIRED_TOOLS
+TMP=$(mktemp -d) || exit 2
+trap 'rm -rf "$TMP"' EXIT
+
+fixture() {
+  repo="$TMP/$1/repo"
+  dest="$TMP/$1/out"
+  mkdir -p "$repo" || return 2
+  local path
+  local files
+  files=$(mktemp "$TMP/files.XXXXXX") || return 2
+  git ls-files -z --cached --others --exclude-standard >"$files" || return 2
+  while IFS= read -r -d '' path; do
+    mkdir -p "$repo/$(dirname "$path")" || return 2
+    cp -P "$ROOT/$path" "$repo/$path" || return 2
+  done <"$files"
+  git init -q -b main "$repo" &&
+    git -C "$repo" add -A &&
+    git -C "$repo" -c user.email=t@t -c user.name=t commit -qm init
+}
+export_tree() { (cd "$repo" && bash scripts/export-template.sh "$@"); }
+
+success() {
+  fixture success && export_tree "$dest" || return 1
+  local path
+  for path in work template .gitattributes scripts/export-template.sh scripts/sync-template.sh tests/test-export.sh scripts/gate.d/test-scripts.sh; do
+    [[ ! -e "$dest/$path" ]] || return 1
+  done
+  [[ -f "$dest/tests/test-scripts.sh" && -d "$dest/knowledge" ]] &&
+    [[ $(cat "$dest/VERSION") == 1970.1.0 ]] &&
+    cmp "$repo/template/CHANGELOG.md" "$dest/CHANGELOG.md" &&
+    ! grep -q '^## ' "$dest/CHANGELOG.md" &&
+    cmp "$repo/template/PLAN.md" "$dest/PLAN.md" &&
+    cmp "$repo/template/ARCHI.md" "$dest/ARCHI.md" || return 1
+  if grep -rn 'agentic-coding-worktrees\|promoted 2026\|Confirm-delta releases\|export-template' "$dest"; then return 1; fi
+  git init -q -b main "$dest" && git -C "$dest" add -A &&
+    git -C "$dest" -c user.email=t@t -c user.name=t commit -qm init &&
+    (cd "$dest" && bash scripts/gate.sh && bash scripts/archi-fresh.sh)
+}
+arguments() {
+  fixture "$1" || return 1
+  shift
+  export_tree "$@" >"$TMP/stdout" 2>"$TMP/stderr"
+  local status=$?
+  [[ $status == 1 ]] && grep -Fq 'Usage:' "$TMP/stderr" &&
+    [[ ! -s "$TMP/stdout" && ! -e "$dest" ]]
+}
+nonempty() {
+  fixture nonempty && mkdir -p "$dest" || return 1
+  printf 'keep\n' >"$dest/.sentinel"
+  export_tree "$dest" >"$TMP/stdout" 2>"$TMP/stderr"
+  local status=$?
+  [[ $status == 1 && $(ls -A "$dest") == .sentinel ]] &&
+    [[ $(cat "$dest/.sentinel") == keep && ! -s "$TMP/stdout" ]]
+}
+file_destination() {
+  fixture file || return 1
+  printf 'keep\n' >"$dest"
+  export_tree "$dest" >/dev/null 2>&1
+  local status=$?
+  [[ $status == 1 && $(cat "$dest") == keep ]]
+}
+head_content() {
+  fixture head || return 1
+  printf 'uncommitted\n' >"$repo/CLAUDE.md"
+  printf '2099.1.0\n' >"$repo/template/VERSION"
+  export_tree "$dest" &&
+    git -C "$repo" show HEAD:CLAUDE.md >"$TMP/committed" &&
+    cmp "$TMP/committed" "$dest/CLAUDE.md" &&
+    [[ $(cat "$dest/VERSION") == 1970.1.0 ]]
+}
+empty_destination() {
+  fixture empty && mkdir -p "$dest" && export_tree "$dest" &&
+    [[ -f "$dest/CLAUDE.md" ]]
+}
+subdirectory_destination() {
+  fixture subdirectory || return 1
+  dest="$repo/scripts/out"
+  (cd "$repo/scripts" && bash ./export-template.sh out) &&
+    [[ -f "$dest/CLAUDE.md" ]] &&
+    [[ $(cat "$dest/VERSION") == 1970.1.0 ]] &&
+    [[ ! -e "$repo/out" ]]
+}
+sync_fixture() {
+  fixture "$1" || return 1
+  version=$(cat "$repo/VERSION") || return 1
+  git -C "$repo" tag "v$version" || return 1
+  template="$TMP/$1/template.git"
+  local seed="$TMP/$1/seed"
+  mkdir -p "$seed/conventions" || return 1
+  printf 'stale\n' >"$seed/conventions/x"
+  printf 'old README\n' >"$seed/README.md"
+  git init -q -b main "$seed" && git -C "$seed" add -A &&
+    git -C "$seed" -c user.email=t@t -c user.name=t commit -qm old &&
+    git clone -q --bare "$seed" "$template" || return 1
+  original=$(git -C "$template" rev-parse main) || return 1
+  refs=$(git -C "$template" for-each-ref) || return 1
+  tempdir="$TMP/$1/temps"
+  mkdir -p "$tempdir"
+}
+sync_tree() {
+  (cd "$repo" && TMPDIR="$tempdir" TEMPLATE_REPO="$template" \
+    GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \
+    bash scripts/sync-template.sh "$@")
+}
+sync_first() {
+  sync_fixture sync-first || return 1
+  local out clone branch sha
+  out=$(sync_tree) || return 1
+  clone=$(head -1 <<<"$out")
+  branch=$(tail -1 <<<"$out")
+  sha=$(git -C "$repo" rev-parse --short HEAD) || return 1
+  [[ -d "$clone" && "$branch" == "template-sync/v$version" ]] &&
+    [[ $(git -C "$clone" branch --show-current) == "$branch" ]] &&
+    [[ $(git -C "$clone" log -1 --format=%s) == "Sync from agentic-coding v$version ($sha)" ]] &&
+    [[ $(git -C "$clone" rev-parse HEAD~1) == "$original" ]] &&
+    [[ $(git -C "$template" for-each-ref) == "$refs" ]] || return 1
+  export_tree "$dest" && git -C "$dest" init -q && git -C "$dest" add -Af &&
+    git -C "$dest" -c user.email=t@t -c user.name=t commit -qm export || return 1
+  [[ $(git -C "$clone" rev-parse 'HEAD^{tree}') == $(git -C "$dest" rev-parse 'HEAD^{tree}') ]]
+}
+sync_noop() {
+  sync_fixture sync-noop || return 1
+  local out clone
+  out=$(sync_tree) || return 1
+  clone=$(head -1 <<<"$out")
+  git -C "$clone" push -q origin HEAD:main || return 1
+  rm -rf "$clone" || return 1
+  refs=$(git -C "$template" for-each-ref) || return 1
+  [[ -z $(ls -A "$tempdir") ]] || return 1
+  out=$(sync_tree) || return 1
+  [[ "$out" == 'up to date' && -z $(ls -A "$tempdir") ]] &&
+    [[ $(git -C "$template" for-each-ref) == "$refs" ]]
+}
+sync_tags() {
+  sync_fixture sync-tags || return 1
+  git -C "$repo" tag -d "v$version" || return 1
+  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
+  local status=$?
+  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
+  git -C "$repo" tag "v${version//./x}" || return 1
+  sync_tree >"$TMP/stdout" 2>"$TMP/stderr"
+  status=$?
+  [[ $status == 1 && ! -s "$TMP/stdout" ]] &&
+    grep -Fq "HEAD must carry v$version" "$TMP/stderr" || return 1
+  git -C "$repo" tag -d "v${version//./x}" || return 1
+  git -C "$repo" tag "v$version" && git -C "$repo" tag other-tag || return 1
+  local out
+  out=$(sync_tree) || return 1
+  [[ -d $(head -1 <<<"$out") && $(tail -1 <<<"$out") == "template-sync/v$version" ]]
+}
+sync_arguments() {
+  sync_fixture sync-arguments || return 1
+  sync_tree extra >"$TMP/stdout" 2>"$TMP/stderr"
+  local status=$?
+  [[ $status == 1 && ! -s "$TMP/stdout" && -z $(ls -A "$tempdir") ]] &&
+    grep -Fq 'Usage:' "$TMP/stderr"
+}
+check 'sync (a): exact export tree, preserved parent and clone, no push' sync_first
+check 'sync (b): up to date leaves TMPDIR empty and refs unchanged' sync_noop
+check 'sync (c): missing and near-match release tags refuse; two lightweight tags succeed' sync_tags
+check 'sync (d): arguments refuse without writes' sync_arguments
+
+check 'clean export and consumer gate/freshness' success
+check 'no arguments refuses with usage' arguments noargs
+check 'extra arguments refuses with usage and writes nothing' arguments extra "$TMP/extra/out" extra
+check 'non-empty destination refuses without writes' nonempty
+check 'file destination refuses without writes' file_destination
+check 'base and overlay both reflect HEAD' head_content
+check 'existing empty destination succeeds' empty_destination
+check 'subdirectory export resolves relative destination against caller cwd' subdirectory_destination
+
+echo
+echo "passed: $pass, failed: $fail"
+exit "$((fail > 0 ? 1 : 0))"
+#!/usr/bin/env bash
+# Check whether ARCHI.md is at least as fresh as architecture-relevant source paths.
+set -uo pipefail
+
+cd "$(git rev-parse --show-toplevel)" || exit 2
+
+SOURCE_PATHS=(scripts/ skills/ profiles/ config.yaml CLAUDE.md)
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/archi-fresh.sh [<ref>]
+
+Checks ARCHI.md freshness against source paths at <ref>. Defaults to HEAD.
+EOF
+}
+
+if [[ "${1:-}" == --help || "${1:-}" == -h ]]; then
+  usage
+  exit 0
+fi
+
+if [[ $# -gt 1 ]]; then
+  usage >&2
+  exit 2
+fi
+
+ref="${1:-HEAD}"
+
+archi_epoch=$(git log -1 --format=%ct "$ref" -- ARCHI.md)
+source_epoch=$(git log -1 --format=%ct "$ref" -- "${SOURCE_PATHS[@]}")
+
+if [[ -z "$archi_epoch" ]]; then
+  echo "ARCHI.md has no git history at $ref" >&2
+  exit 2
+fi
+
+if [[ -z "$source_epoch" ]]; then
+  echo "source paths have no git history at $ref" >&2
+  exit 2
+fi
+
+if (( archi_epoch < source_epoch )); then
+  newer_paths=()
+  for path in "${SOURCE_PATHS[@]}"; do
+    path_epoch=$(git log -1 --format=%ct "$ref" -- "$path")
+    if [[ -n "$path_epoch" && "$path_epoch" -gt "$archi_epoch" ]]; then
+      newer_paths+=("$path")
+    fi
+  done
+  printf 'ARCHI.md is stale at %s; newer source path(s): %s; refresh ARCHI on the branch\n' \
+    "$ref" "${newer_paths[*]}" >&2
+  exit 1
+fi
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+if [[ "${TEST_SCRIPTS_RUNNING:-}" == 1 ]]; then
+  exit 0
+fi
+
+TEST_SCRIPTS_RUNNING=1 bash tests/test-scripts.sh
+bash tests/test-export.sh
+# agentic-coding
+
+A small, opinionated framework for building software with AI agents — where **no agent is ever trusted to check its own work.**
+
+One Claude Code session acts as the **Orchestrator**: it plans, dispatches, and drives the loop. Every stage that could go wrong is checked by a *different* agent — a fresh thread, cold context, often a different model — and by a deterministic shell gate that no agent can talk its way past. The human is the **Owner**: they set direction and merge.
+
+No custom runtime. No ceremony that doesn't catch a defect.
+
+---
+
+## The loop
+
+```
+/1-plan  →  /2-implement  →  /3-review  →  /4-release  →  /5-retro
+```
+
+Each stage produces an **artifact** (a plan, a diff, a release commit), and each artifact is handed to an independent checker before it advances. Feedback flows *backward* until the checker is satisfied; work only moves *forward* on an explicit verdict.
+
+```mermaid
+flowchart TD
+    Owner([Owner: what to build]):::human --> Draft
+
+    Draft["<b>/1-plan</b><br/>Orchestrator drafts work/slug/plan.md"] --> PRev{{"plan-reviewer<br/>fresh · cold · read-only"}}:::grill
+    PRev -- "REVISE" --> Draft
+    PRev -- "Plan verdict: APPROVE" --> Impl
+
+    Impl["<b>/2-implement</b><br/>implementer writes code in isolated worktree wt/slug<br/>configurable · default Codex"] --> Gate{"scripts/gate.sh<br/>exit 0 or not"}
+    Gate -- "fail — output IS the retry prompt" --> Impl
+    Gate -- "pass" --> CRev
+
+    CRev{{"<b>/3-review</b><br/>code-reviewer · NEW fresh thread · different model<br/>sees diff + plan only"}}:::grill
+    CRev -- "REVISE — back to the implementer" --> Impl
+    CRev -- "Code-review verdict: APPROVE<br/>Codex-review verdict: APPROVE" --> Rel
+
+    Rel["<b>/4-release</b><br/>release.sh re-runs gate + preconditions<br/>bumps version on branch"] --> Merge["Owner merges PR<br/>rebase / fast-forward"]:::human
+    Merge --> Tag["tag-after-merge<br/>verify origin/main, then tag"]
+    Tag --> Retro["<b>/5-retro</b><br/>lessons routed: knowledge / PLAN.md / new unit<br/>next release blocked until retro exists"] --> Done([tagged release]):::human
+
+    classDef grill fill:#f9e6f2,stroke:#b34a8c,stroke-width:2px,color:#000;
+    classDef human fill:#e8f0ff,stroke:#3a6ea5,stroke-width:2px,color:#000;
+```
+
+The five **`/slash`-command stages** are the loop. `{{Hexagons}}` are the **adversarial checkpoints** — an agent whose only job is to try to break the previous agent's work. Blue nodes are the **Owner**. Everything else is the Orchestrator driving deterministic machinery.
+
+Trivial fixes (typos, one-liners, config tweaks) skip the loop — you just do them on a branch. The loop is for work with enough surface area to get wrong.
+
+---
+
+## Why the agents grill each other
+
+The core bet of this framework: **a single agent grading its own output is the weakest link in the pipeline.** It has already committed to an approach, it has the same blind spots on review as it had on write, and it is motivated to declare victory. So the framework never lets that happen. Three independent forces have to agree before anything ships:
+
+**1. Writer ≠ reviewer, mechanically.** Reviews come only from subagents defined in `.claude/agents/` — with **read-only tools**, so a reviewer *cannot* quietly fix what it finds; it can only report. The Orchestrator that dispatched the work never reviews that work. This isn't a guideline in a prompt; it's enforced by which tools each agent is handed.
+
+**2. Fresh, cold context defeats anchoring.** Every review runs in a brand-new thread that has never seen the implementation conversation — it gets *only* the diff and the plan. A reviewer that watched the code being written is already anchored to its reasoning; one that sees just the result asks "does this actually match the plan?" from scratch. Re-reviews after a fix get *another* new thread, because a reviewer that already approved a direction is compromised on the next pass.
+
+**3. A different model breaks correlated blind spots.** The implementer, the reviewers, and the selector can each run a different model (set per role in `config.yaml`). A bug the writer's model can't see is often obvious to a different one. Same-vendor agreement is corroboration, not proof — so the deterministic gate carries the real weight, and agent agreement backs it up.
+
+**And above all of them sits a script.** `scripts/gate.sh` exits `0` or it doesn't. No agent — Orchestrator or reviewer — can overrule it, reinterpret it, or call work "done" while it's red. When it fails, its output *is* the prompt fed back to the implementer. Judgment lives in the agents; the pass/fail decision lives in code.
+
+> **Why this pays off:** the gate and the reviewers catch *different classes* of defect. The gate catches what's mechanically checkable — a lint error, a broken test, a shellcheck warning. The adversarial reviewer catches what a passing gate can hide: an edge case with no test, a plan requirement quietly unmet, a shell idiom that works on the author's machine and breaks on bash 3.2. Neither alone is enough. Rounds of an independent agent *trying to break* green code routinely surface real bugs the gate signed off on — which is exactly the point of making them argue.
+
+---
+
+## Best-of-N implement (opt-in)
+
+For high-value work units, `/2-implement` can run **N implementer samples, each in its own isolated worktree**, drop the ones that fail the gate, and have a fresh `fan-selector` agent pick the winner by plan-fit — another instance of the same principle: generate diversity, then filter it through an independent judge. (Dispatch is sequential, so N > 1 costs N× wall-clock, not just N× tokens.)
+
+```mermaid
+flowchart LR
+    H[handoff] --> A1[sample 1] & A2[sample 2] & A3[sample N]
+    A1 & A2 & A3 --> G{gate each}
+    G -- "gate-passers only" --> Sel{{fan-selector<br/>ranks vs plan}}:::grill
+    Sel --> W["adopt winner<br/>as wt/slug"] --> R["/3-review"]
+    classDef grill fill:#f9e6f2,stroke:#b34a8c,stroke-width:2px,color:#000;
+```
+
+It's off by default (`implementer.fan: 1` — byte-for-byte the single-agent path). Set N > 1 only when the extra implementer tokens are worth it. It reduces per-run *variance*; it does **not** replace cross-model review.
+
+---
+
+## Design rules
+
+1. **Writer never reviews** — enforced by fresh subagent threads with read-only tools, not by prose.
+2. **The gate is deterministic** — agents don't argue with exit codes; failure output *is* the retry prompt.
+3. **Implementation happens in worktrees** — never in the main checkout; `scripts/worktree.sh` manages them.
+4. **Artifacts flow, not transcripts** — reviewers see the diff and plan, never the implementation conversation.
+5. **Release is a script** — `scripts/release.sh` owns every precondition as an exit code; it never pushes and never touches `main`. Tagging happens only after the PR merges, and only if the merged commit *is* the release commit.
+6. **Context is tiered** — hot (`CLAUDE.md` + `ARCHI.md` + `PLAN.md`, ~300 lines total), warm (active skill + profile), cold (`knowledge/`, loaded on citation, starts empty).
+7. **Vendor names live in `config.yaml` only** — swap the implementer or any reviewer model by editing one line.
+
+---
+
+## Layout
+
+```
+CLAUDE.md            orchestrator constitution — the rules above, authoritative (hot)
+ARCHI.md             architecture snapshot, regenerated by /compact, never groomed (hot)
+PLAN.md              one screen: objective, now, decisions, risks (hot)
+AGENTS.md            the implementer's contract
+
+config.yaml          the one knob: profile, model per role, implementer command, gate + worktree settings
+
+skills/              the loop as skills:
+                       1-plan · 2-implement · 3-review · 4-release · 5-retro · init · compact · docs
+                       (1-plan, 2-implement & docs carry prompts/*.tpl)
+.claude/agents/      the checkers (read-only, own models, cold context):
+                       plan-reviewer · code-reviewer · fan-selector
+scripts/             the deterministic layer:
+                       gate.sh        stack-detecting pass/fail
+                       worktree.sh    isolated-checkout lifecycle
+                       agent-exec.sh  dispatch the implementer into a worktree
+                       fan-exec.sh    best-of-N dispatch + winner adoption
+                       codex-review.sh second-vendor (codex) code reviewer
+                       demo.sh        run a plan's ## Demonstration block
+                       archi-fresh.sh ARCHI.md freshness check
+                       state.sh       derive a work unit's stage and next action
+                       release.sh     preconditions, version/changelog, tag-after-merge
+                       gate.d/*.sh    project-specific gate extensions
+profiles/            software · machine-learning · database · work — add slots, never override
+work/<slug>/         one directory per work unit: plan.md, handoff.md, notes.md
+VERSION / CHANGELOG  CalVer + Keep-a-Changelog, written only by release.sh
+knowledge/           cold-tier reference docs — earned, not designed (starts empty)
+```
+
+---
+
+## Getting started
+
+1. Use this repo as a template, or copy it into an existing project.
+2. Open it in Claude Code and run `/init` — it scans the codebase, generates `ARCHI.md`, sets the profile, and verifies the gate runs.
+3. Start work: `/1-plan <what you want>`, then follow the loop.
+
+## Requirements
+
+- **Claude Code** — the Orchestrator and the reviewer subagents.
+- **An implementer CLI** — default `codex`; set `implementer.command` in `config.yaml` to use anything else (including Claude Code itself).
+- **`git`, `bash`**, and whatever your project's gate needs (`shellcheck`, `ruff`, `pytest`, `cargo`, `go`, …); declare hard prerequisites with `gate.required_tools`. The gate auto-detects the stacks present.
+# Architecture
+
+_A snapshot of what the codebase IS — regenerated by `/init` and `/compact`, never hand-groomed._
+
+## Stack
+
+Bash (`set -uo pipefail`, macOS/Linux) and Markdown. No compiled language, no package manager. The "runtime" is Claude Code itself: skills orchestrate, agents review, shell scripts do the deterministic work. The implementer runtime is a one-line `config.yaml` swap (`codex` here; `claude` under the `work` profile). The gate declares `shellcheck` as a required tool.
+
+## Layout
+
+- `CLAUDE.md` / `ARCHI.md` / `PLAN.md` — the hot context tier (loaded every session, ~300-line budget).
+- `config.yaml` — the single knob: profile, per-role models (incl. `fan_selector`), implementer runtime, `implementer.fan` (best-of-N sample count; default 1 = single-agent), `reviewer.command` (the codex second reviewer, read from `main:config.yaml` at review time — branch config cannot choose the reviewer binary), gate command and required tools, optional `worktrees.dir` (defaults to `../<checkout-basename>-worktrees`).
+- `skills/` — the loop stages (`1-plan`…`5-retro`) plus `init`, `compact`, and `docs`. Each is a `SKILL.md`; `1-plan`, `2-implement`, and `docs` carry `prompts/*.tpl` (plan, handoff, followup; docs handoff). `5-retro` closes each unit: four questions, each lesson routed to exactly one of `mechanical`/`contextual`/`process`/`not worth keeping`, applied on a `wt/retro-<slug>` worktree (reused if it already exists; removed after the PR merges) that may touch only `knowledge/`, `PLAN.md`, and the retro file. `2-implement` also documents Fan Mode (N>1): dispatch N samples, gate-filter, adopt a winner. `skills/docs` is the `/docs` documentation-writing stage: it dispatches codex/GPT through the two-arg `agent-exec.sh` to author/rewrite prose, ships by the small-fix path, and runs no gate/no self-review (its handoff fills the footprint from the plan and switches off the AGENTS.md gate rule; the writer summary lands in `work/<slug>/notes.md`). Exposed to Claude Code via the `.claude/skills → ../skills` symlink.
+- `.claude/agents/` — fresh-subagent definitions (`plan-reviewer.md`, `code-reviewer.md`, `fan-selector.md`): read-only tools, separate model, cold context.
+- `scripts/` — the deterministic layer: `gate.sh` (stack-detecting check runner), `demo.sh` (runs the first sh/bash fence in a plan's `## Demonstration`, respecting headings only outside fences; plain bash from the requested git worktree, streaming output; exit 0 pass or `None:`, 1 block failure or porcelain-status delta, 2 plan/tooling error), `worktree.sh` (isolated-checkout lifecycle: `add` best-effort-fetches and branches new `wt/<slug>` from `origin/main` — HEAD only when no `origin/main` ref exists — then idempotently commits `work/<slug>/plan.md` onto the branch so the plan flows to release; `sync-artifacts` copies top-level regular non-dot primary `work/<slug>/` files, explicitly not symlinks, except `plan.md` into the worktree, then stages the whole `work/<slug>` directory minus `plan.md` so pre-existing worktree-side unit files are also captured, and commits only when staged unit changes exist; the resume path skips the fetch/base change), `agent-exec.sh` (dispatches the implementer into a worktree; normalizes the worktree path to absolute and fails `no new commit` only when the tree was clean before dispatch and a zero-exit dispatch leaves HEAD unchanged *and* the tree still clean — the produced-literally-nothing case), `codex-review.sh` (second-vendor code reviewer: pure reader run from the primary checkout, reads the plan body from the branch via `git show wt/<slug>:…` but `reviewer.command` from `main:config.yaml`, best-effort-fetches then diffs the branch against `origin/main` (falling back to local `main` only when no `refs/remotes/origin/main` ref exists) so a stale local `main` can't pollute the review, pipes plan+diff excluding `work/<slug>` artifacts to the read-only reviewer, captures stdout to a temp file and moves it to `work/<slug>/codex-review.md` only on reviewer exit 0; verdict contract exit 0 = APPROVE / 1 = REQUEST CHANGES / 2 = tooling error, never a verdict), `fan-exec.sh` (best-of-N: `dispatch` spawns N sample worktrees, seeds `work/<slug>/` uncommitted, auto-commits each sample before the gate, prints a manifest of gate-passers; `adopt` retargets `wt/<slug>` to a chosen sample and force-cleans all `<slug>-fan-*` worktrees/branches), `release.sh` (release preconditions incl. the previous unit's non-empty `retro.md` + version/changelog/commit + `work/.last-released` marker on the release branch — the marker must be a regular file byte-identical to `origin/main`'s copy (`cmp`, symlinks refused; on bootstrap with no origin marker, a local marker must be non-empty single-line); never tags, never touches `main`, never pushes; `tag-after-merge` tags post-merge; rollback resets and cleans the marker), `state.sh` (read-only per-work-unit execution-state deriver: given a slug, prints flat `slug`/`stage`/`review`/`next_action` lines derived purely from observable facts — artifact presence under `work/<slug>/`, the whole-line verdict sentinels read from the branch plan via `git show wt/<slug>:…` when the branch exists else the primary plan, the `wt/<slug>` ref, and the `work/.last-released` marker; `review` is `approve` only when both `Code-review verdict: APPROVE` and `Codex-review verdict: APPROVE` are present; seven first-match-wins stage rules `plan→implement→review→release→done`; gate result is deliberately not derived, so `next_action` names `run scripts/gate.sh` live; writes nothing), `archi-fresh.sh` (ref-aware ARCHI freshness check extracted from `release.sh`: `archi-fresh.sh [<ref>]` compares the last-commit epoch of `ARCHI.md` vs `scripts/ skills/ profiles/ config.yaml CLAUDE.md` at `<ref>`, default `HEAD`; strict `<` = stale so equal epochs pass; exit 0 fresh / 1 stale naming the newer paths / 2 missing history; `--help` prints usage. `release.sh check_archi_fresh` delegates to it and `/3-review` runs it against `wt/<slug>` to catch staleness before release). `sync-template.sh` (no args; refuses unless HEAD carries the literal tag `v<VERSION>`) clones `TEMPLATE_REPO` into `${TMPDIR:-/tmp}`, commits the export over it on `template-sync/v<version>` keeping prior history, prints clone path + branch (or `up to date`, removing the clone), and never pushes; exit 0 success/up-to-date / 1 refusal / 2 tooling error. `export-template.sh <dest>` resolves `<dest>` against the caller's cwd, `cd`s to the repo root, exports HEAD via `git archive` and overlays committed skeletons via `git ls-tree`/`git show`; exit 0 success / 1 refusal / 2 tooling error. `gate.d/*.sh` are auto-run hooks (`test-scripts.sh` wires the smoke and export suites in); `gate.d/examples/` contains opt-in hygiene hooks for notebook outputs (`nb-clean.sh`) and data-science artifacts/local paths (`ds-hygiene.sh`).
+- `VERSION` / `CHANGELOG.md` — CalVer (`YYYY.M.MICRO`) + Keep-a-Changelog; written only by `release.sh`.
+- `profiles/` — `software` (base), `machine-learning` (eval-defines-done + notebook strategy + opt-in repo hygiene hook declaration for data/model artifacts and hardcoded local paths), `database`, `work` (Atlassian/Bitbucket: Claude implementer, Bitbucket CI, Jira reference-only, pointer to ML notebook/repo hygiene because profiles do not merge); selected by `config.yaml`'s `profile:`.
+- `tests/test-scripts.sh` — smoke tests for the shell layer: release refusals + a rollback test (pre-commit-hook forced failure; the marker `git clean` insurance path itself is untestable at pre-commit granularity) + the PR-merge flow (bump-on-branch, `origin/main` collision guard, mid-gate re-check, `tag-after-merge` happy + wrong-commit refusal, refusal without either verdict sentinel, the retro refusal matrix + marker integrity cases (deleted/mutated/trailing-newline/symlinked/re-run markers, malformed bootstrap markers) + rollback cases), hermetic fan-exec cases (canned implementer over a real worktree + bare-remote topology), hermetic agent-exec cases (commit / uncommitted / produced-nothing / relative-path / cd-elsewhere / dirty-redispatch dispatches), `worktree.sh add` base/seed cases, `worktree.sh sync-artifacts` artifact-capture/refusal cases, `nb-clean.sh` and `ds-hygiene.sh` example-hook cases, hermetic demo cases (first-block/section scoping, headings inside fences, bash fences, cwd/default dir, plain bash, failure code, dirty-tree refusal, None, missing/empty plan sections, non-git directory, help/arguments), and hermetic codex-review cases (canned reviewer: exit-code matrix with stderr substrings, main-sourced config + ignored branch override, parser termination + commented-command anchor, artifact-only write, worktree stays clean, failed reviewer preserves the prior artifact, missing-plan and wrong-checkout refusals).
+- `template/` — ARCHI/PLAN skeletons, header-only CHANGELOG, and bootstrap VERSION overlay; `.gitattributes` excludes instance paths and export tooling from archives. `tests/test-export.sh` builds committed fixtures from working-tree files, tests refusals and HEAD isolation, and runs exported gate/freshness checks.
+- CI: `.github/workflows/ci.yml` (GitHub) and `bitbucket-pipelines.yml` (Bitbucket) both run the smoke suite + gate; the `work` profile keeps the Bitbucket one.
+- `knowledge/` — cold-tier docs, loaded only on citation (empty but for a README); `work/<slug>/` — one directory per work unit (`plan.md` etc.).
+- `AGENTS.md` — the contract the implementer subagent reads; carries a build-discipline ladder (lazy/YAGNI: reuse → stdlib → native → installed dep → one line → minimum code, run after understanding the problem) so the implementer builds the leanest working diff within scope, with explicit validation/security/error-handling boundaries never simplified away.
+
+## Entry points
+
+- **The loop:** `/1-plan` → `/2-implement` → `/3-review` → `/4-release` → `/5-retro`. Invoked as skills from the orchestrator session; full TRIP — release, push, PR, and tag run without an in-session Owner confirm; `/4-release` checks README drift before pushing (README ships in exported templates, so it never names dogfood-only scripts). `/3-review` is dual-vendor: fresh Claude `code-reviewer` subagent + `scripts/codex-review.sh <slug>`, both APPROVE required, both sentinels recorded in one in-place commit on the worktree plan. Both review paths fetch and base the diff on `origin/main` (local-`main` fallback only when no `origin/main` ref exists), so a lagging local `main` cannot pollute the review diff. Both reviewers gate the verdict on severity: only CRITICAL/HIGH findings force `REQUEST CHANGES` (in any round); MEDIUM and LOW never set the verdict — MEDIUM is orchestrator-routed (fix / send back if load-bearing / defer), so a criteria-meeting diff approves without burning the 3-round cap.
+- **`scripts/gate.sh`** — run from anywhere in the tree; `cd`s to repo root, auto-detects stacks (Node/Python/Shell/Rust/Go), runs applicable checks + `gate.d/*.sh` hooks. Exit 0 = pass.
+- **`scripts/export-template.sh <dest>`** — produce a clean template from HEAD with full TRIP, no instance history, and a fast consumer gate; consumer CI retains the smoke suite.
+- **`scripts/demo.sh <slug> [<dir>]`** — runs the plan demonstration after the implementer gates and commits; the cold code-reviewer re-runs the branch copy and judges whether its output shows the goal. Plans require real inputs and writes only under `mktemp -d`; units with no runnable behavior may use `None: <reason>`.
+- **`scripts/release.sh <slug> [--confirm-delta <text>]`** — the release driver; also `check-version` / `next-version` / `tag-after-merge` subcommands. One universal PR-merge topology: fetch-guards `origin/main` (before and after the gate), commits the bump on the release branch, never merges/tags/pushes `main`. After the PR merges, `tag-after-merge <slug>` fetches, verifies `origin/main`'s tip is this release (its `VERSION` and `Release v<version>` subject), and creates the tag locally — the tag push is `/4-release`'s final autonomous step. A release also writes the slug to `work/.last-released` (in the release commit), and `check_previous_retro` refuses the *next* release while `work/<that-slug>/retro.md` is missing or empty, or while the branch's marker is a symlink, deleted, or not byte-identical to `origin/main`'s.
+- **`scripts/worktree.sh add|remove|sync-artifacts|list <slug>`** — manages worktrees under `worktrees.dir`, defaulting to `../<checkout-basename>-worktrees` (invoke add/remove from the primary checkout); `add` bases new branches on `origin/main` and records the unit's `plan.md` onto the branch; `sync-artifacts` records primary-checkout work artifacts on the unit branch without overwriting the worktree plan; **`scripts/agent-exec.sh <worktree> <handoff>`** — feeds a handoff to the implementer runtime inside one.
+- **`scripts/state.sh <slug>`** — prints the work unit's derived execution state (`stage`/`review`/`next_action`) so a cold session learns where a unit stands and what comes next without the prior conversation; read-only, gate result out of scope by design.
+- **`scripts/fan-exec.sh dispatch <slug> <handoff> <N>` / `adopt <slug> <sample-branch>`** — the best-of-N primitive behind `2-implement`'s Fan Mode; sequential (N× wall-clock), activated only when `implementer.fan > 1`.
+
+## Key flows
+
+After the release tag push, `/4-release` cleans matching untracked unit copies and pulls with `--ff-only`. When `scripts/sync-template.sh` exists, it prepares the template sync commit; the skill pushes from the printed clone, opens a PR, closes superseded sync PRs, and merges on green CI.
+
+## Conventions
+
+- **Writer never reviews.** Reviews come only from fresh `.claude/agents/` subagents (read-only, separate model). Never review a diff produced in your own thread.
+- **The gate and release are scripts, and authoritative.** Never overrule `gate.sh` or `release.sh`; enforcement never lives in skill prose.
+- **Implementation happens in worktrees, never in this checkout.** Use `worktree.sh`.
+- **Verdict sentinels are distinct by stage and vendor:** `Plan verdict:`, `Code-review verdict:`, `Codex-review verdict:`; `release.sh` releases only on exact `Code-review verdict: APPROVE` **and** `Codex-review verdict: APPROVE` lines in the branch's plan. Exit ≥2 from `codex-review.sh` is a tooling error, never a verdict — no sentinel may be recorded from artifact prose after a non-zero exit.
+- **Release preconditions** (all before anything irreversible; trap rollback after): APPROVE sentinel, gate green, `ARCHI.md` fresher than the last commit touching `scripts/ skills/ profiles/ config.yaml CLAUDE.md` (via `scripts/archi-fresh.sh`; `/3-review` runs the same check earlier and heals staleness with a targeted branch edit, so release rarely trips it), version strictly increasing, and `origin/main` an ancestor of the release branch — re-checked after the gate to close the cross-release version collision.
+- **`worktree.sh` only asks git** (`git worktree`, `git rev-parse`), never inspects `.git` directly — works from inside a worktree where `.git` is a file. Preserve this. **YAML parsing is naive awk** in `gate.sh`/`worktree.sh`/`agent-exec.sh`/`release.sh`; `gate.sh` is section-scoped, not depth-aware; replace with `yq` only if it bites.
+- All shell scripts must pass `shellcheck` (enforced by the gate). Use `set -uo pipefail`.
+- Vendor/model names live only in `config.yaml`. Reviewer models are additionally in agent frontmatter, which is authoritative; config.yaml documents intent.
+
+## Verification
+
+`bash scripts/gate.sh` — required-tool preflight, shellcheck over all tracked `*.sh`, plus the `gate.d/` hook running `tests/test-export.sh` and `tests/test-scripts.sh` (including the worktree-dir basename fallback, the gate tool-preflight cases, the PR-merge release flow + `tag-after-merge`, the marker-integrity matrix, the dual-sentinel refusals, the hermetic fan-exec, agent-exec, codex-review, and demo suites (section/fence scoping, cwd, plain bash, exit-code matrix and dirty-tree refusal), the `worktree.sh add` base/seed cases, the `worktree.sh sync-artifacts` artifact-capture cases, and the `nb-clean.sh` / `ds-hygiene.sh` example-hook cases). CI runs the gate on push. Currently green.
+# Which copy of release.sh runs — and when new release machinery binds
+
+`/4-release` runs `bash scripts/release.sh <slug>` **from the primary checkout**, so the *primary's* (= last released) script executes, even though it `cd`s into the release worktree to read the branch's plan, VERSION, and tree.
+
+Consequence: any release-machinery change shipping in unit N (a new precondition, a marker write, a sentinel requirement) does **not** govern unit N's own release. It first *runs* during unit N+1's release, and a precondition that depends on state the script itself writes (e.g. `check_previous_retro` reading `work/.last-released`) first *refuses* anything at unit N+2's release.
+
+Observed twice on 2026-08-26: the dual-sentinel `check_verdict` (v2026.8.6) could not bind its own release, and v2026.8.7's release wrote no `.last-released` marker because the pre-marker script ran. Neither is a bug — write the honesty note in the plan's Release section instead of re-deriving this.
+
+## The codex reviewer has the same shape (v2026.8.8)
+
+`scripts/codex-review.sh` reads `reviewer.command` from **`main:config.yaml`** (`git show main:config.yaml`), not the branch's. Two consequences of the same family: a unit that changes the `reviewer:` block does not govern its own review — the change binds at the next unit's review; and because the ref is the *local* `main`, a stale primary checkout silently runs an older reviewer binary. Keep `main` current before `/3-review`. (Branch-sourcing was the pre-v2026.8.8 behavior and was the vulnerability: branch content could choose the reviewer binary.)
+
+hook: PostToolUse
+hook: PostToolUse Completed
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/bin/zsh -lc "cat scripts/{fan-exec,release,archi-fresh}.sh
+sed -n '1,225p' tests/test-scripts.sh
+sed -n '720,890p' tests/test-scripts.sh
+rg -n 'scripts/|skills/|profiles/' scripts/*.sh
+cat .github/workflows/ci.yml bitbucket-pipelines.yml README.md" in /Users/cboyfly/Documents/repos/agentic-coding-worktrees/harness-split
+ succeeded in 317ms:
+#!/usr/bin/env bash
+# Deterministic best-of-N implementer fan-out.
+# Usage:
+#   scripts/fan-exec.sh dispatch <slug> <handoff> <N>
+#   scripts/fan-exec.sh adopt <slug> <sample-branch>
+set -uo pipefail
+
+ROOT=$(git rev-parse --show-toplevel) || exit 1
+cd "$ROOT" || exit 1
+
+usage() {
+  echo "usage: fan-exec.sh {dispatch <slug> <handoff> <N>|adopt <slug> <sample-branch>}" >&2
+  exit 1
+}
+
+worktree_dir() {
+  # Keep this naive config parse in sync with scripts/worktree.sh.
+  awk '/^worktrees:/{f=1;next} f&&/dir:/{print $2; exit}' config.yaml
+}
+
+sample_ref() {
+  local sample="$1"
+  if [[ "$sample" == wt/* ]]; then
+    printf '%s\n' "$sample"
+  else
+    printf 'wt/%s\n' "$sample"
+  fi
+}
+
+seed_work_dir() {
+  local slug="$1"
+  local wt="$2"
+
+  if [[ -d "$ROOT/work/$slug" ]]; then
+    mkdir -p "$wt/work"
+    rm -rf "$wt/work/$slug"
+    cp -R "$ROOT/work/$slug" "$wt/work/" || {
+      echo "Error: failed to seed work/$slug into $wt" >&2
+      exit 1
+    }
+  fi
+}
+
+commit_sample_changes() {
+  local wt="$1"
+  local branch="$2"
+  local slug="$3"
+
+  if [[ -n "$(git -C "$wt" status --porcelain)" ]]; then
+    git -C "$wt" add -A -- . ":(exclude)work/$slug" || exit 1
+    if ! git -C "$wt" diff --cached --quiet; then
+      git -C "$wt" commit -qm "Fan sample implementation for $branch" || exit 1
+    fi
+  fi
+}
+
+dispatch() {
+  local slug="${1:-}"
+  local handoff="${2:-}"
+  local n="${3:-}"
+  local k wt branch agent_status gate_status
+  local passers=()
+
+  [[ -n "$slug" && -n "$handoff" && -n "$n" ]] || usage
+  [[ "$n" =~ ^[1-9][0-9]*$ ]] || { echo "Error: N must be a positive integer" >&2; exit 1; }
+  [[ -s "$handoff" ]] || { echo "Error: handoff missing or empty: $handoff" >&2; exit 1; }
+
+  for ((k = 1; k <= n; k++)); do
+    branch="wt/$slug-fan-$k"
+    wt=$(scripts/worktree.sh add "$slug-fan-$k") || exit 1
+    seed_work_dir "$slug" "$wt"
+
+    scripts/agent-exec.sh "$wt" "$handoff"
+    agent_status=$?
+    commit_sample_changes "$wt" "$branch" "$slug"
+    if [[ $agent_status -eq 0 ]]; then
+      (
+        cd "$wt" || exit 1
+        bash scripts/gate.sh
+      )
+      gate_status=$?
+    else
+      gate_status=$agent_status
+    fi
+
+    if [[ $gate_status -eq 0 ]]; then
+      passers+=("$branch")
+    else
+      echo "fan sample failed gate: $branch" >&2
+    fi
+  done
+
+  if [[ ${#passers[@]} -gt 0 ]]; then
+    printf '%s\n' "${passers[@]}"
+  fi
+}
+
+adopt() {
+  local slug="${1:-}"
+  local sample="${2:-}"
+  local sample_branch wt_dir wt_path ref branch
+  local cleanup_failed=0
+  local branches=()
+
+  [[ -n "$slug" && -n "$sample" ]] || usage
+  sample_branch=$(sample_ref "$sample")
+  git show-ref --verify --quiet "refs/heads/$sample_branch" || {
+    echo "Error: sample branch not found: $sample_branch" >&2
+    exit 1
+  }
+
+  git branch -f "wt/$slug" "$sample_branch" || exit 1
+  scripts/worktree.sh add "$slug" >/dev/null || exit 1
+
+  wt_dir=${WORKTREES_DIR:-$(worktree_dir)}
+  wt_dir=${wt_dir:-../$(basename "$ROOT")-worktrees}
+  for wt_path in "$wt_dir"/"$slug"-fan-*; do
+    [[ -e "$wt_path" ]] || continue
+    if ! git worktree remove --force "$wt_path"; then
+      echo "Error: failed to remove fan worktree: $wt_path" >&2
+      cleanup_failed=1
+    fi
+  done
+
+  while IFS= read -r ref; do
+    branch=${ref#refs/heads/}
+    branches+=("$branch")
+  done < <(git for-each-ref --format='%(refname)' "refs/heads/wt/$slug-fan-*")
+
+  for branch in "${branches[@]}"; do
+    if ! git branch -D "$branch"; then
+      echo "Error: failed to delete fan branch: $branch" >&2
+      cleanup_failed=1
+    fi
+  done
+
+  [[ $cleanup_failed -eq 0 ]] || exit 1
+}
+
+cmd="${1:-}"
+case "$cmd" in
+  dispatch)
+    shift
+    dispatch "$@"
+    ;;
+  adopt)
+    shift
+    adopt "$@"
+    ;;
+  *)
+    usage
+    ;;
+esac
+#!/usr/bin/env bash
+# Release driver. Exit 0 = release staged locally. Non-zero = stop and report.
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  scripts/release.sh <slug> [--confirm-delta <text>]
+  scripts/release.sh tag-after-merge <slug>
+  scripts/release.sh check-version <new-version> [current-version]
+  scripts/release.sh next-version [current-version]
+
+The release path never pushes, never tags, and never touches main. It commits
+the version bump on the release branch for PR review.
+
+After the PR merges, tag-after-merge verifies origin/main is the release commit
+and creates the local version tag. The tag push is a separate confirmed step.
+EOF
+}
+
+die() {
+  echo "release: $*" >&2
+  exit 1
+}
+
+valid_version() {
+  [[ "$1" =~ ^([1-9][0-9]{3})\.([1-9]|1[0-2])\.(0|[1-9][0-9]*)$ ]]
+}
+
+version_gt() {
+  local new="$1"
+  local old="$2"
+  local new_year new_month new_micro old_year old_month old_micro
+
+  valid_version "$new" || die "invalid new version '$new' (expected YYYY.M.MICRO)"
+  valid_version "$old" || die "invalid current version '$old' (expected YYYY.M.MICRO)"
+
+  IFS=. read -r new_year new_month new_micro <<<"$new"
+  IFS=. read -r old_year old_month old_micro <<<"$old"
+
+  if (( new_year > old_year )); then return 0; fi
+  if (( new_year < old_year )); then return 1; fi
+  if (( new_month > old_month )); then return 0; fi
+  if (( new_month < old_month )); then return 1; fi
+  (( new_micro > old_micro ))
+}
+
+next_version() {
+  local current="$1"
+  local today year month current_year current_month current_micro
+
+  valid_version "$current" || die "invalid current version '$current' (expected YYYY.M.MICRO)"
+  today=$(date +%Y.%-m)
+  IFS=. read -r year month <<<"$today"
+  IFS=. read -r current_year current_month current_micro <<<"$current"
+
+  if (( year == current_year && month == current_month )); then
+    printf '%s.%s.%s\n' "$current_year" "$current_month" "$((current_micro + 1))"
+  else
+    printf '%s.%s.0\n' "$year" "$month"
+  fi
+}
+
+extract_release_note() {
+  local plan_path="$1"
+  local note
+
+  # Release notes are intentionally one line so changelog assembly stays deterministic.
+  note=$(
+    sed -n -E 's/^\**Release note:\**[[:space:]]*//p' "$plan_path" | head -n 1
+  )
+  [[ -n "$note" ]] || die "$plan_path is missing a Release note: line"
+  printf '%s\n' "$note"
+}
+
+prepend_changelog() {
+  local version="$1"
+  local release_note="$2"
+  local confirm_delta="$3"
+  local date_stamp
+  local tmp
+
+  date_stamp=$(date +%F)
+  tmp=$(mktemp)
+
+  {
+    if [[ -f CHANGELOG.md ]]; then
+      sed -n '1,/^## /{ /^## /q; p; }' CHANGELOG.md
+    else
+      printf '# Changelog\n\n'
+      printf 'All notable changes to this project are documented in this file.\n\n'
+    fi
+    printf '## [%s] - %s\n\n' "$version" "$date_stamp"
+    printf '%s\n' "- $release_note"
+    printf '%s\n\n' "- Confirm-delta: $confirm_delta"
+    if [[ -f CHANGELOG.md ]]; then
+      sed -n '/^## /,$p' CHANGELOG.md
+    fi
+  } >"$tmp"
+
+  mv "$tmp" CHANGELOG.md
+}
+
+check_verdict() {
+  local plan_path="$1"
+  grep -qx 'Code-review verdict: APPROVE' "$plan_path" \
+    || die "$plan_path must contain exact line: Code-review verdict: APPROVE"
+  grep -qx 'Codex-review verdict: APPROVE' "$plan_path" \
+    || die "$plan_path must contain exact line: Codex-review verdict: APPROVE"
+}
+
+check_gate() {
+  bash scripts/gate.sh || die "scripts/gate.sh failed"
+}
+
+check_archi_fresh() {
+  scripts/archi-fresh.sh || die "ARCHI.md is stale; refresh it on the branch"
+}
+
+check_version_exceeds() {
+  local new_version="$1"
+  local current_version="$2"
+
+  version_gt "$new_version" "$current_version" \
+    || die "new version $new_version must exceed VERSION $current_version"
+}
+
+worktree_for_branch() {
+  local branch="$1"
+
+  git worktree list --porcelain | awk -v branch="refs/heads/$branch" '
+    $1 == "worktree" {
+      path = substr($0, 10)
+      next
+    }
+    $1 == "branch" && $2 == branch {
+      print path
+      found = 1
+      exit
+    }
+    END {
+      if (!found) exit 1
+    }
+  '
+}
+
+check_clean_worktree() {
+  local checkout="$1"
+  local label="$2"
+
+  git -C "$checkout" diff --quiet || die "$label has unstaged changes"
+  git -C "$checkout" diff --cached --quiet || die "$label has staged changes"
+  [[ -z "$(git -C "$checkout" ls-files --others --exclude-standard)" ]] \
+    || die "$label has untracked files"
+}
+
+check_origin_main_ancestor() {
+  local release_branch="$1"
+
+  git fetch origin main
+  git rev-parse --verify --quiet origin/main >/dev/null \
+    || die "missing origin/main after fetch"
+  git merge-base --is-ancestor origin/main "$release_branch" \
+    || die "$release_branch is stale; rebase/sync your branch onto origin/main"
+}
+
+check_previous_retro() {
+  local marker="work/.last-released"
+  local previous_slug
+  local previous_retro
+
+  if git show origin/main:"$marker" >/dev/null 2>&1; then
+    [[ ! -L "$marker" ]] || die "previous release marker is a symlink"
+    [[ -f "$marker" ]] || die "previous release marker deleted; restore $marker from origin/main"
+    git show origin/main:"$marker" | cmp -s - "$marker" \
+      || die "previous release marker differs from origin/main; if this branch already carries its release commit, merge its PR instead of re-running release"
+  else
+    [[ ! -L "$marker" ]] || die "previous release marker is a symlink"
+    if [[ -f "$marker" ]]; then
+      [[ -s "$marker" ]] || die "previous release marker malformed"
+      [[ "$(awk 'END { print NR }' "$marker")" -eq 1 ]] \
+        || die "previous release marker malformed"
+    fi
+  fi
+
+  [[ -f "$marker" ]] || return 0
+
+  previous_slug=$(<"$marker")
+  previous_retro="work/$previous_slug/retro.md"
+  [[ -s "$previous_retro" ]] \
+    || die "$previous_slug has no retro.md; run /5-retro for $previous_slug, or sync onto origin/main"
+}
+
+rollback_release() {
+  local status=$?
+  local pre_release_head="$1"
+
+  trap - ERR
+  set +e
+  git reset --hard "$pre_release_head" >/dev/null 2>&1
+  git clean -f work/.last-released >/dev/null 2>&1
+  echo "release: irreversible step failed; release commit was rolled back" >&2
+  exit "$status"
+}
+
+release() {
+  local slug="$1"
+  local confirm_delta="$2"
+  local plan_path="work/$slug/plan.md"
+  local release_branch="wt/$slug"
+  local release_checkout
+  local current_version
+  local new_version
+  local release_note
+  local pre_release_head
+
+  worktree_for_branch main >/dev/null \
+    || die "main must be checked out in the primary worktree"
+  release_checkout=$(worktree_for_branch "$release_branch") \
+    || die "$release_branch must be checked out in a linked worktree"
+
+  [[ -f "$release_checkout/$plan_path" ]] || die "missing work unit plan: $plan_path"
+  [[ -f "$release_checkout/VERSION" ]] || die "missing VERSION"
+
+  cd "$release_checkout"
+  current_version=$(<VERSION)
+  new_version=$(next_version "$current_version")
+
+  check_verdict "$plan_path"
+  check_clean_worktree "$release_checkout" "$release_branch"
+  check_origin_main_ancestor "$release_branch"
+  check_previous_retro
+  check_gate
+  check_clean_worktree "$release_checkout" "$release_branch"
+  check_archi_fresh
+  check_version_exceeds "$new_version" "$current_version"
+  check_origin_main_ancestor "$release_branch"
+
+  release_note=$(extract_release_note "$plan_path")
+  pre_release_head=$(git rev-parse HEAD)
+  trap 'rollback_release "$pre_release_head"' ERR
+
+  printf '%s\n' "$new_version" >VERSION
+  prepend_changelog "$new_version" "$release_note" "$confirm_delta"
+  printf '%s\n' "$slug" >work/.last-released
+
+  git add VERSION CHANGELOG.md work/.last-released
+  git commit -m "Release v$new_version"
+  trap - ERR
+
+  cat <<EOF
+release: prepared v$new_version on $release_branch
+release: no tag created; local main untouched
+release: push $release_branch, open a PR, and merge it after review
+EOF
+}
+
+tag_after_merge() {
+  local slug="$1"
+  local release_branch="wt/$slug"
+  local release_checkout
+  local version
+  local origin_version
+  local origin_subject
+
+  release_checkout=$(worktree_for_branch "$release_branch") \
+    || die "$release_branch must be checked out in a linked worktree"
+  [[ -f "$release_checkout/VERSION" ]] || die "missing VERSION in $release_branch"
+
+  git fetch origin main
+  git rev-parse --verify --quiet origin/main >/dev/null \
+    || die "missing origin/main after fetch"
+
+  version=$(<"$release_checkout/VERSION")
+  origin_version=$(git show origin/main:VERSION) \
+    || die "origin/main does not contain VERSION"
+  origin_subject=$(git log -1 --format=%s origin/main)
+
+  [[ "$origin_version" == "$version" && "$origin_subject" == "Release v$version" ]] \
+    || die "origin/main is not Release v$version (VERSION is $origin_version; subject is '$origin_subject')"
+
+  git rev-parse --verify --quiet "refs/tags/v$version" >/dev/null \
+    && die "tag v$version already exists"
+
+  git tag "v$version" origin/main
+  printf 'release: created local tag v%s on origin/main\n' "$version"
+}
+
+if [[ $# -eq 0 ]]; then
+  usage
+  exit 2
+fi
+
+case "$1" in
+  tag-after-merge)
+    [[ $# -eq 2 ]] || { usage; exit 2; }
+    tag_after_merge "$2"
+    ;;
+  check-version)
+    [[ $# -eq 2 || $# -eq 3 ]] || { usage; exit 2; }
+    current=${3:-$(<VERSION)}
+    check_version_exceeds "$2" "$current"
+    ;;
+  next-version)
+    [[ $# -le 2 ]] || { usage; exit 2; }
+    next_version "${2:-$(<VERSION)}"
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    slug="$1"
+    confirm_delta="none"
+    shift
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --confirm-delta)
+          [[ $# -ge 2 ]] || die "--confirm-delta requires a value"
+          confirm_delta="$2"
+          shift 2
+          ;;
+        *)
+          usage
+          exit 2
+          ;;
+      esac
+    done
+    release "$slug" "$confirm_delta"
+    ;;
+esac
+#!/usr/bin/env bash
+# Check whether ARCHI.md is at least as fresh as architecture-relevant source paths.
+set -uo pipefail
+
+cd "$(git rev-parse --show-toplevel)" || exit 2
+
+SOURCE_PATHS=(scripts/ skills/ profiles/ config.yaml CLAUDE.md)
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/archi-fresh.sh [<ref>]
+
+Checks ARCHI.md freshness against source paths at <ref>. Defaults to HEAD.
+EOF
+}
+
+if [[ "${1:-}" == --help || "${1:-}" == -h ]]; then
+  usage
+  exit 0
+fi
+
+if [[ $# -gt 1 ]]; then
+  usage >&2
+  exit 2
+fi
+
+ref="${1:-HEAD}"
+
+archi_epoch=$(git log -1 --format=%ct "$ref" -- ARCHI.md)
+source_epoch=$(git log -1 --format=%ct "$ref" -- "${SOURCE_PATHS[@]}")
+
+if [[ -z "$archi_epoch" ]]; then
+  echo "ARCHI.md has no git history at $ref" >&2
+  exit 2
+fi
+
+if [[ -z "$source_epoch" ]]; then
+  echo "source paths have no git history at $ref" >&2
+  exit 2
+fi
+
+if (( archi_epoch < source_epoch )); then
+  newer_paths=()
+  for path in "${SOURCE_PATHS[@]}"; do
+    path_epoch=$(git log -1 --format=%ct "$ref" -- "$path")
+    if [[ -n "$path_epoch" && "$path_epoch" -gt "$archi_epoch" ]]; then
+      newer_paths+=("$path")
+    fi
+  done
+  printf 'ARCHI.md is stale at %s; newer source path(s): %s; refresh ARCHI on the branch\n' \
+    "$ref" "${newer_paths[*]}" >&2
+  exit 1
+fi
+#!/usr/bin/env bash
+# Smoke tests for the deterministic layer. Run from repo root: bash tests/test-scripts.sh
+set -uo pipefail
+
+pass=0; fail=0
+check() {
+  local desc="$1"; shift
+  if "$@" >/dev/null 2>&1; then
+    echo "ok: $desc"; pass=$((pass+1))
+  else
+    echo "FAIL: $desc"; fail=$((fail+1))
+  fi
+}
+check_fails() {
+  local desc="$1"; shift
+  if "$@" >/dev/null 2>&1; then
+    echo "FAIL: $desc (expected non-zero exit)"; fail=$((fail+1))
+  else
+    echo "ok: $desc"; pass=$((pass+1))
+  fi
+}
+check_exit() {
+  local desc="$1"
+  local expected="$2"
+  local stderr_substring="$3"
+  shift 3
+  local err
+  local status
+
+  err=$(mktemp)
+  if "$@" >/dev/null 2>"$err"; then
+    status=0
+  else
+    status=$?
+  fi
+
+  if [[ "$status" -eq "$expected" ]] \
+    && { [[ -z "$stderr_substring" ]] || grep -Fq -- "$stderr_substring" "$err"; }; then
+    echo "ok: $desc"; pass=$((pass+1))
+  else
+    echo "FAIL: $desc (exit $status, expected $expected; stderr: $(tr '\n' ' ' <"$err"))"
+    fail=$((fail+1))
+  fi
+  rm -f "$err"
+}
+
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT" || exit 1
+
+# This suite runs nested inside scripts/gate.sh (via the gate.d/ hook), so an inherited
+# value would reach every fixture gate and abort it. Keep this here, not beside the gate
+# cases — a guard that works only because of where it sits is lost by the next case
+# added above it. See knowledge/test-helper-contract.md.
+unset GATE_REQUIRED_TOOLS
+
+commit_fixture() {
+  local repo="$1"
+  local stamp="$2"
+  local msg="$3"
+
+  (
+    cd "$repo" || exit 1
+    git add -A
+    GIT_AUTHOR_DATE="$stamp" GIT_COMMITTER_DATE="$stamp" git commit -qm "$msg"
+  )
+}
+
+write_release_fixture_date() {
+  local bin_dir="$1"
+  local ym="$2"
+  local ymd="$3"
+
+  mkdir -p "$bin_dir"
+  cat >"$bin_dir/date" <<EOF
+#!/usr/bin/env bash
+case "\${1:-}" in
+  +%Y.%-m) printf '%s\n' "$ym" ;;
+  +%F) printf '%s\n' "$ymd" ;;
+  *) /bin/date "\$@" ;;
+esac
+EOF
+  chmod +x "$bin_dir/date"
+}
+
+setup_release_fixture() {
+  local name="$1"
+  local version="$2"
+  local verdict_line="$3"
+  local gate_mode="$4"
+  local archi_mode="$5"
+  local codex_verdict_line="${6-Codex-review verdict: APPROVE}"
+  local marker_slug="${7-}"
+  local retro_content="${8-__missing__}"
+  local tmp_root="$TMP/$name"
+
+  REL_PRIMARY="$tmp_root/primary"
+  REL_WORKTREE="$tmp_root/demo-wt"
+  REL_REMOTE="$tmp_root/remote.git"
+  REL_FAKEBIN="$tmp_root/bin"
+
+  mkdir -p "$tmp_root"
+  git init -q -b main "$REL_PRIMARY"
+  git init -q --bare "$REL_REMOTE"
+  (
+    cd "$REL_PRIMARY" || exit 1
+    git config user.email tester@example.com
+    git config user.name Tester
+    git remote add origin "$REL_REMOTE"
+
+    mkdir -p scripts skills/3-review skills/1-plan/prompts work/demo
+    cp "$ROOT/scripts/release.sh" scripts/release.sh
+    cp "$ROOT/scripts/archi-fresh.sh" scripts/archi-fresh.sh
+    cat >scripts/gate.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+if [[ -f GATE_FAIL ]]; then
+  echo "GATE: FAIL"
+  exit 1
+fi
+if compgen -G "scripts/gate.d/*.sh" >/dev/null; then
+  for hook in scripts/gate.d/*.sh; do
+    bash "$hook"
+  done
+fi
+echo "GATE: PASS"
+EOF
+    chmod +x scripts/release.sh scripts/archi-fresh.sh scripts/gate.sh
+    printf 'name: fixture\n' >config.yaml
+    printf 'merge rules\n' >CLAUDE.md
+    printf '%s\n' "$version" >VERSION
+    printf '# Changelog\n\nAll notable changes to this project are documented in this file.\n\n' >CHANGELOG.md
+    {
+      printf '# Demo\n\n'
+      printf '## Release\n\n'
+      printf 'Release note: Demo release note.\n\n'
+      printf '## Review\n\n'
+      printf '%s\n' "$verdict_line"
+      if [[ -n "$codex_verdict_line" ]]; then
+        printf '%s\n' "$codex_verdict_line"
+      fi
+    } >work/demo/plan.md
+    [[ "$gate_mode" == fail ]] && printf 'fail\n' >GATE_FAIL
+    if [[ -n "$marker_slug" ]]; then
+      printf '%s\n' "$marker_slug" >work/.last-released
+      if [[ "$retro_content" != __missing__ ]]; then
+        mkdir -p "work/$marker_slug"
+        printf '%s' "$retro_content" >"work/$marker_slug/retro.md"
+      fi
+    fi
+  )
+  commit_fixture "$REL_PRIMARY" "2026-08-16T10:00:00Z" source
+  printf 'architecture\n' >"$REL_PRIMARY/ARCHI.md"
+  commit_fixture "$REL_PRIMARY" "2026-08-16T10:01:00Z" archi
+  if [[ "$archi_mode" == stale ]]; then
+    printf 'merge rules updated\n' >>"$REL_PRIMARY/CLAUDE.md"
+    commit_fixture "$REL_PRIMARY" "2026-08-16T10:02:00Z" stale-source
+  fi
+  (
+    cd "$REL_PRIMARY" || exit 1
+    git push -q -u origin main
+    git branch wt/demo
+    git worktree add -q "$REL_WORKTREE" wt/demo
+    git -C "$REL_WORKTREE" config user.email tester@example.com
+    git -C "$REL_WORKTREE" config user.name Tester
+  )
+  write_release_fixture_date "$REL_FAKEBIN" "2026.8" "2026-08-16"
+}
+
+setup_archi_fresh_fixture() {
+  local name="$1"
+  local mode="$2"
+  local tmp_root="$TMP/$name"
+
+  ARCHI_REPO="$tmp_root/repo"
+
+  mkdir -p "$ARCHI_REPO"
+  git init -q -b main "$ARCHI_REPO"
+  (
+    cd "$ARCHI_REPO" || exit 1
+    git config user.email tester@example.com
+    git config user.name Tester
+    mkdir -p scripts skills profiles
+    cp "$ROOT/scripts/archi-fresh.sh" scripts/archi-fresh.sh
+    chmod +x scripts/archi-fresh.sh
+    printf 'name: fixture\n' >config.yaml
+    printf 'merge rules\n' >CLAUDE.md
+    printf 'profile\n' >profiles/default.md
+    printf 'skill\n' >skills/fixture.md
+    git add -A
+    GIT_AUTHOR_DATE="2026-08-16T10:00:00Z" GIT_COMMITTER_DATE="2026-08-16T10:00:00Z" git commit -qm source
+
+    if [[ "$mode" == missing-archi ]]; then
+      return 0
+    fi
+
+    printf 'architecture\n' >ARCHI.md
+    if [[ "$mode" == equal ]]; then
+      printf 'merge rules updated\n' >>CLAUDE.md
+    fi
+    git add -A
+    GIT_AUTHOR_DATE="2026-08-16T10:01:00Z" GIT_COMMITTER_DATE="2026-08-16T10:01:00Z" git commit -qm archi
+
+    case "$mode" in
+      stale)
+        printf 'skill updated\n' >>skills/fixture.md
+        git add skills/fixture.md
+        GIT_AUTHOR_DATE="2026-08-16T10:02:00Z" GIT_COMMITTER_DATE="2026-08-16T10:02:00Z" git commit -qm stale-source
+        ;;
+      branch-ref)
+        git branch wt/demo
+        printf 'branch-only skill update\n' >>skills/fixture.md
+        git add skills/fixture.md
+        GIT_AUTHOR_DATE="2026-08-16T10:02:00Z" GIT_COMMITTER_DATE="2026-08-16T10:02:00Z" git commit -qm branch-source
+        git branch -f wt/demo HEAD
+        git reset -q --hard HEAD~1
+        ;;
+    esac
+  )
+}
+
+setup_codex_review_fixture() {
+  local name="$1"
+  local command_mode="$2"
+  local tmp_root="$TMP/$name"
+  pkg=$(<package.json)
+  [[ "$pkg" == *"\"$key\""* ]] && exit 0 || exit 1
+fi
+exit 0
+EOF
+  chmod +x "$path"
+}
+
+# --- shellcheck the scripts themselves (gate.sh covers this too; belt+braces)
+if command -v shellcheck >/dev/null; then
+  check "shellcheck scripts" shellcheck scripts/*.sh tests/*.sh
+fi
+
+# --- worktree.sh lifecycle in a throwaway repo
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+# --- worktree-dir default without a worktrees config block
+FALLBACK_REPO="$TMP/fallback"
+mkdir -p "$FALLBACK_REPO/scripts"
+cp "$ROOT/scripts/worktree.sh" "$FALLBACK_REPO/scripts/"
+printf 'profile: software\n' >"$FALLBACK_REPO/config.yaml"
+git init -q -b main "$FALLBACK_REPO"
+git -C "$FALLBACK_REPO" add -A
+git -C "$FALLBACK_REPO" -c user.email=t@t -c user.name=t commit -qm init
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check "worktree add defaults to checkout basename without worktrees config" bash -c '
+  unset WORKTREES_DIR
+  cd "$1" && bash scripts/worktree.sh add x &&
+  [[ -d "$1/../fallback-worktrees/x" ]] &&
+  [[ $(git -C "$1/../fallback-worktrees/x" branch --show-current) == wt/x ]]
+' _ "$FALLBACK_REPO"
+
+# --- demo.sh section scoping and exit contract in a hermetic git repo
+DEMO_REPO="$TMP/demo"
+mkdir -p "$DEMO_REPO/work/x"
+git init -q "$DEMO_REPO"
+cat >"$DEMO_REPO/work/x/plan.md" <<'EOF'
+## Earlier
+```sh
+echo earlier > earlier-ran
+```
+## Demonstration
+```sh
+pwd
+false
+## This is a shell comment, not a section boundary
+echo demo-complete
+```
+```sh
+echo second > second-ran
+```
+EOF
+check_exit "demo passes with plain bash despite an intermediate failure" 0 "" "$ROOT/scripts/demo.sh" x "$DEMO_REPO"
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check "demo runs the full first block in the requested cwd" bash -c '
+  out=$("$1/scripts/demo.sh" x "$2") &&
+  [[ "$out" == "$2"$'"'"'\n'"'"'demo-complete ]]
+' _ "$ROOT" "$DEMO_REPO"
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check "demo never runs earlier or second blocks" bash -c '[[ ! -e "$1/earlier-ran" && ! -e "$1/second-ran" ]]' _ "$DEMO_REPO"
+cat >"$DEMO_REPO/work/x/plan.md" <<'EOF'
+## Demonstration
+
+## Review
+```sh
+echo later > later-ran
+```
+EOF
+check_exit "demo refuses an empty section before a later shell block" 2 "no shell block" "$ROOT/scripts/demo.sh" x "$DEMO_REPO"
+check "demo never runs a later section block" test ! -e "$DEMO_REPO/later-ran"
+cat >"$DEMO_REPO/work/x/plan.md" <<'EOF'
+## Demonstration
+```bash
+echo bash-ran
+```
+EOF
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check "demo accepts bash fences and defaults cwd to dot" bash -c '
+  cd "$2" && [[ $("$1/scripts/demo.sh" x) == bash-ran ]]
+' _ "$ROOT" "$DEMO_REPO"
+cat >"$DEMO_REPO/work/x/plan.md" <<'EOF'
+## Demonstration
+```sh
+exit 7
+```
+EOF
+check_exit "demo maps a failing block to 1 and names its real code" 1 "code 7" "$ROOT/scripts/demo.sh" x "$DEMO_REPO"
+cat >"$DEMO_REPO/work/x/plan.md" <<'EOF'
+## Demonstration
+```sh
+touch untracked
+```
+EOF
+check_exit "demo refuses an untracked worktree write" 1 "demo dirtied the worktree" "$ROOT/scripts/demo.sh" x "$DEMO_REPO"
+printf '## Demonstration\n\nNone: documentation only\n' >"$DEMO_REPO/work/x/plan.md"
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check "demo None prints the reason and passes" bash -c '
+  out=$("$1/scripts/demo.sh" x "$2") && [[ "$out" == "demo: none — documentation only" ]]
+' _ "$ROOT" "$DEMO_REPO"
+check_exit "demo missing plan is a tooling error" 2 "no plan" "$ROOT/scripts/demo.sh" missing "$DEMO_REPO"
+printf '## Goal\nNo demo\n' >"$DEMO_REPO/work/x/plan.md"
+check_exit "demo missing section is a tooling error" 2 "no ## Demonstration" "$ROOT/scripts/demo.sh" x "$DEMO_REPO"
+printf '## Demonstration\n' >"$DEMO_REPO/work/x/plan.md"
+check_exit "demo empty section is a tooling error" 2 "no shell block" "$ROOT/scripts/demo.sh" x "$DEMO_REPO"
+mkdir -p "$TMP/demo-not-git"
+check_exit "demo non-git directory is a tooling error" 2 "not a git work tree" "$ROOT/scripts/demo.sh" x "$TMP/demo-not-git"
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check "demo help documents its arguments" bash -c '
+  out=$("$1/scripts/demo.sh" --help) && [[ "$out" == *"Usage: scripts/demo.sh <slug> [<dir>]"* ]]
+' _ "$ROOT"
+check_exit "demo refuses missing arguments" 2 "Usage:" "$ROOT/scripts/demo.sh"
+
+# --- archi-fresh.sh freshness checks in hermetic git repos
+setup_archi_fresh_fixture archi-fresh fresh
+check_exit "archi-fresh passes when ARCHI is newer than source paths" 0 "" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
+
+setup_archi_fresh_fixture archi-stale stale
+check_exit "archi-fresh reports stale source paths" 1 "skills/" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
+check_exit "archi-fresh stale message says to refresh branch ARCHI" 1 "refresh ARCHI on the branch" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
+
+setup_archi_fresh_fixture archi-equal equal
+check_exit "archi-fresh treats equal epochs as fresh" 0 "" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
+
+setup_archi_fresh_fixture archi-ref branch-ref
+check_exit "archi-fresh default ref checks current branch history" 0 "" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
+check_exit "archi-fresh explicit ref selects branch history" 1 "skills/" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh wt/demo"
+
+setup_archi_fresh_fixture archi-missing missing-archi
+check_exit "archi-fresh exits 2 when one side has no history" 2 "ARCHI.md has no git history" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
+
+check "archi-fresh help documents optional ref" bash -c "
+  out=\$(bash scripts/archi-fresh.sh --help) &&
+  grep -Fq 'Usage: scripts/archi-fresh.sh [<ref>]' <<<\"\$out\" &&
+  grep -Fq 'Defaults to HEAD' <<<\"\$out\"
+"
+
+# --- state.sh derives cold-session work-unit state without writes
+setup_state_fixture state-missing missing-plan
+check_exit "state missing plan exits non-zero" 1 "not a work unit" bash -c "cd '$STATE_REPO' && bash scripts/state.sh demo"
+
+setup_state_fixture state-plan plan
+check "state derives plan stage" bash -c "
+  cd '$STATE_REPO' &&
+  out=\$(bash scripts/state.sh demo) &&
+  grep -qx 'stage: plan' <<<\"\$out\" &&
+  grep -qx 'next_action: finish /1-plan' <<<\"\$out\"
+"
+
+setup_state_fixture state-implement implement
+check "state derives implement stage" bash -c "
+  cd '$STATE_REPO' &&
+  out=\$(bash scripts/state.sh demo) &&
+  grep -qx 'stage: implement' <<<\"\$out\" &&
+  grep -qx 'next_action: /2-implement' <<<\"\$out\"
+"
+
+setup_state_fixture state-review-gate review-gate
+check "state derives review stage before codex review" bash -c "
+  cd '$STATE_REPO' &&
+  out=\$(bash scripts/state.sh demo) &&
+  grep -qx 'stage: review' <<<\"\$out\" &&
+  grep -qx 'review: pending' <<<\"\$out\" &&
+  grep -qx 'next_action: run scripts/gate.sh' <<<\"\$out\"
+"
+
+setup_state_fixture state-release release
+check "state derives release stage before marker" bash -c "
+  cd '$STATE_REPO' &&
+  out=\$(bash scripts/state.sh demo) &&
+  grep -qx 'stage: release' <<<\"\$out\" &&
+scripts/archi-fresh.sh:7:SOURCE_PATHS=(scripts/ skills/ profiles/ config.yaml CLAUDE.md)
+scripts/archi-fresh.sh:11:Usage: scripts/archi-fresh.sh [<ref>]
+scripts/agent-exec.sh:3:# Usage: scripts/agent-exec.sh <worktree-path> <handoff-file>
+scripts/codex-review.sh:7:  echo "Usage: scripts/codex-review.sh <slug>" >&2
+scripts/demo.sh:7:Usage: scripts/demo.sh <slug> [<dir>]
+scripts/gate.sh:6:# Profile- or project-specific checks go in scripts/gate.d/*.sh (run last).
+scripts/gate.sh:140:for hook in scripts/gate.d/*.sh; do
+scripts/fan-exec.sh:4:#   scripts/fan-exec.sh dispatch <slug> <handoff> <N>
+scripts/fan-exec.sh:5:#   scripts/fan-exec.sh adopt <slug> <sample-branch>
+scripts/fan-exec.sh:17:  # Keep this naive config parse in sync with scripts/worktree.sh.
+scripts/fan-exec.sh:70:    wt=$(scripts/worktree.sh add "$slug-fan-$k") || exit 1
+scripts/fan-exec.sh:73:    scripts/agent-exec.sh "$wt" "$handoff"
+scripts/fan-exec.sh:79:        bash scripts/gate.sh
+scripts/fan-exec.sh:113:  scripts/worktree.sh add "$slug" >/dev/null || exit 1
+scripts/release.sh:10:  scripts/release.sh <slug> [--confirm-delta <text>]
+scripts/release.sh:11:  scripts/release.sh tag-after-merge <slug>
+scripts/release.sh:12:  scripts/release.sh check-version <new-version> [current-version]
+scripts/release.sh:13:  scripts/release.sh next-version [current-version]
+scripts/release.sh:115:  bash scripts/gate.sh || die "scripts/gate.sh failed"
+scripts/release.sh:119:  scripts/archi-fresh.sh || die "ARCHI.md is stale; refresh it on the branch"
+scripts/export-template.sh:5:usage() { echo 'Usage: scripts/export-template.sh <dest>' >&2; }
+scripts/state.sh:6:  echo "Usage: scripts/state.sh <slug>" >&2
+scripts/state.sh:74:    next_action='run scripts/gate.sh'
+scripts/sync-template.sh:7:  echo 'Usage: scripts/sync-template.sh' >&2
+scripts/sync-template.sh:24:bash scripts/export-template.sh "$exp" >/dev/null || error 'cannot export template'
+scripts/worktree.sh:4:#   scripts/worktree.sh add <slug>      # create worktree + branch wt/<slug>, print its path
+scripts/worktree.sh:5:#   scripts/worktree.sh remove <slug>   # remove worktree, keep the branch
+scripts/worktree.sh:6:#   scripts/worktree.sh sync-artifacts <slug>  # copy primary work artifacts into worktree + commit
+scripts/worktree.sh:7:#   scripts/worktree.sh list
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  deterministic-layer:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure shellcheck is available
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Set git identity
+        run: git config --global user.email "ci@example.com" && git config --global user.name "CI"
+
+      - name: Run smoke suite
+        run: bash tests/test-scripts.sh
+
+      - name: Run gate
+        run: bash scripts/gate.sh
+image: ubuntu:latest
+
+pipelines:
+  branches:
+    main:
+      - step:
+          name: Deterministic layer
+          script:
+            - apt-get update && apt-get install -y shellcheck git
+            - git config --global user.email "ci@example.com" && git config --global user.name "CI"
+            - bash tests/test-scripts.sh
+            - bash scripts/gate.sh
+  pull-requests:
+    "**":
+      - step:
+          name: Deterministic layer
+          script:
+            - apt-get update && apt-get install -y shellcheck git
+            - git config --global user.email "ci@example.com" && git config --global user.name "CI"
+            - bash tests/test-scripts.sh
+            - bash scripts/gate.sh
+# agentic-coding
+
+A small, opinionated framework for building software with AI agents — where **no agent is ever trusted to check its own work.**
+
+One Claude Code session acts as the **Orchestrator**: it plans, dispatches, and drives the loop. Every stage that could go wrong is checked by a *different* agent — a fresh thread, cold context, often a different model — and by a deterministic shell gate that no agent can talk its way past. The human is the **Owner**: they set direction and merge.
+
+No custom runtime. No ceremony that doesn't catch a defect.
+
+---
+
+## The loop
+
+```
+/1-plan  →  /2-implement  →  /3-review  →  /4-release  →  /5-retro
+```
+
+Each stage produces an **artifact** (a plan, a diff, a release commit), and each artifact is handed to an independent checker before it advances. Feedback flows *backward* until the checker is satisfied; work only moves *forward* on an explicit verdict.
+
+```mermaid
+flowchart TD
+    Owner([Owner: what to build]):::human --> Draft
+
+    Draft["<b>/1-plan</b><br/>Orchestrator drafts work/slug/plan.md"] --> PRev{{"plan-reviewer<br/>fresh · cold · read-only"}}:::grill
+    PRev -- "REVISE" --> Draft
+    PRev -- "Plan verdict: APPROVE" --> Impl
+
+    Impl["<b>/2-implement</b><br/>implementer writes code in isolated worktree wt/slug<br/>configurable · default Codex"] --> Gate{"scripts/gate.sh<br/>exit 0 or not"}
+    Gate -- "fail — output IS the retry prompt" --> Impl
+    Gate -- "pass" --> CRev
+
+    CRev{{"<b>/3-review</b><br/>code-reviewer · NEW fresh thread · different model<br/>sees diff + plan only"}}:::grill
+    CRev -- "REVISE — back to the implementer" --> Impl
+    CRev -- "Code-review verdict: APPROVE<br/>Codex-review verdict: APPROVE" --> Rel
+
+    Rel["<b>/4-release</b><br/>release.sh re-runs gate + preconditions<br/>bumps version on branch"] --> Merge["Owner merges PR<br/>rebase / fast-forward"]:::human
+    Merge --> Tag["tag-after-merge<br/>verify origin/main, then tag"]
+    Tag --> Retro["<b>/5-retro</b><br/>lessons routed: knowledge / PLAN.md / new unit<br/>next release blocked until retro exists"] --> Done([tagged release]):::human
+
+    classDef grill fill:#f9e6f2,stroke:#b34a8c,stroke-width:2px,color:#000;
+    classDef human fill:#e8f0ff,stroke:#3a6ea5,stroke-width:2px,color:#000;
+```
+
+The five **`/slash`-command stages** are the loop. `{{Hexagons}}` are the **adversarial checkpoints** — an agent whose only job is to try to break the previous agent's work. Blue nodes are the **Owner**. Everything else is the Orchestrator driving deterministic machinery.
+
+Trivial fixes (typos, one-liners, config tweaks) skip the loop — you just do them on a branch. The loop is for work with enough surface area to get wrong.
+
+---
+
+## Why the agents grill each other
+
+The core bet of this framework: **a single agent grading its own output is the weakest link in the pipeline.** It has already committed to an approach, it has the same blind spots on review as it had on write, and it is motivated to declare victory. So the framework never lets that happen. Three independent forces have to agree before anything ships:
+
+**1. Writer ≠ reviewer, mechanically.** Reviews come only from subagents defined in `.claude/agents/` — with **read-only tools**, so a reviewer *cannot* quietly fix what it finds; it can only report. The Orchestrator that dispatched the work never reviews that work. This isn't a guideline in a prompt; it's enforced by which tools each agent is handed.
+
+**2. Fresh, cold context defeats anchoring.** Every review runs in a brand-new thread that has never seen the implementation conversation — it gets *only* the diff and the plan. A reviewer that watched the code being written is already anchored to its reasoning; one that sees just the result asks "does this actually match the plan?" from scratch. Re-reviews after a fix get *another* new thread, because a reviewer that already approved a direction is compromised on the next pass.
+
+**3. A different model breaks correlated blind spots.** The implementer, the reviewers, and the selector can each run a different model (set per role in `config.yaml`). A bug the writer's model can't see is often obvious to a different one. Same-vendor agreement is corroboration, not proof — so the deterministic gate carries the real weight, and agent agreement backs it up.
+
+**And above all of them sits a script.** `scripts/gate.sh` exits `0` or it doesn't. No agent — Orchestrator or reviewer — can overrule it, reinterpret it, or call work "done" while it's red. When it fails, its output *is* the prompt fed back to the implementer. Judgment lives in the agents; the pass/fail decision lives in code.
+
+> **Why this pays off:** the gate and the reviewers catch *different classes* of defect. The gate catches what's mechanically checkable — a lint error, a broken test, a shellcheck warning. The adversarial reviewer catches what a passing gate can hide: an edge case with no test, a plan requirement quietly unmet, a shell idiom that works on the author's machine and breaks on bash 3.2. Neither alone is enough. Rounds of an independent agent *trying to break* green code routinely surface real bugs the gate signed off on — which is exactly the point of making them argue.
+
+---
+
+## Best-of-N implement (opt-in)
+
+For high-value work units, `/2-implement` can run **N implementer samples, each in its own isolated worktree**, drop the ones that fail the gate, and have a fresh `fan-selector` agent pick the winner by plan-fit — another instance of the same principle: generate diversity, then filter it through an independent judge. (Dispatch is sequential, so N > 1 costs N× wall-clock, not just N× tokens.)
+
+```mermaid
+flowchart LR
+    H[handoff] --> A1[sample 1] & A2[sample 2] & A3[sample N]
+    A1 & A2 & A3 --> G{gate each}
+    G -- "gate-passers only" --> Sel{{fan-selector<br/>ranks vs plan}}:::grill
+    Sel --> W["adopt winner<br/>as wt/slug"] --> R["/3-review"]
+    classDef grill fill:#f9e6f2,stroke:#b34a8c,stroke-width:2px,color:#000;
+```
+
+It's off by default (`implementer.fan: 1` — byte-for-byte the single-agent path). Set N > 1 only when the extra implementer tokens are worth it. It reduces per-run *variance*; it does **not** replace cross-model review.
+
+---
+
+## Design rules
+
+1. **Writer never reviews** — enforced by fresh subagent threads with read-only tools, not by prose.
+2. **The gate is deterministic** — agents don't argue with exit codes; failure output *is* the retry prompt.
+3. **Implementation happens in worktrees** — never in the main checkout; `scripts/worktree.sh` manages them.
+4. **Artifacts flow, not transcripts** — reviewers see the diff and plan, never the implementation conversation.
+5. **Release is a script** — `scripts/release.sh` owns every precondition as an exit code; it never pushes and never touches `main`. Tagging happens only after the PR merges, and only if the merged commit *is* the release commit.
+6. **Context is tiered** — hot (`CLAUDE.md` + `ARCHI.md` + `PLAN.md`, ~300 lines total), warm (active skill + profile), cold (`knowledge/`, loaded on citation, starts empty).
+7. **Vendor names live in `config.yaml` only** — swap the implementer or any reviewer model by editing one line.
+
+---
+
+## Layout
+
+```
+CLAUDE.md            orchestrator constitution — the rules above, authoritative (hot)
+ARCHI.md             architecture snapshot, regenerated by /compact, never groomed (hot)
+PLAN.md              one screen: objective, now, decisions, risks (hot)
+AGENTS.md            the implementer's contract
+
+config.yaml          the one knob: profile, model per role, implementer command, gate + worktree settings
+
+skills/              the loop as skills:
+                       1-plan · 2-implement · 3-review · 4-release · 5-retro · init · compact · docs
+                       (1-plan, 2-implement & docs carry prompts/*.tpl)
+.claude/agents/      the checkers (read-only, own models, cold context):
+                       plan-reviewer · code-reviewer · fan-selector
+scripts/             the deterministic layer:
+                       gate.sh        stack-detecting pass/fail
+                       worktree.sh    isolated-checkout lifecycle
+                       agent-exec.sh  dispatch the implementer into a worktree
+                       fan-exec.sh    best-of-N dispatch + winner adoption
+                       codex-review.sh second-vendor (codex) code reviewer
+                       demo.sh        run a plan's ## Demonstration block
+                       archi-fresh.sh ARCHI.md freshness check
+                       state.sh       derive a work unit's stage and next action
+                       release.sh     preconditions, version/changelog, tag-after-merge
+                       gate.d/*.sh    project-specific gate extensions
+profiles/            software · machine-learning · database · work — add slots, never override
+work/<slug>/         one directory per work unit: plan.md, handoff.md, notes.md
+VERSION / CHANGELOG  CalVer + Keep-a-Changelog, written only by release.sh
+knowledge/           cold-tier reference docs — earned, not designed (starts empty)
+```
+
+---
+
+## Getting started
+
+1. Use this repo as a template, or copy it into an existing project.
+2. Open it in Claude Code and run `/init` — it scans the codebase, generates `ARCHI.md`, sets the profile, and verifies the gate runs.
+3. Start work: `/1-plan <what you want>`, then follow the loop.
+
+## Requirements
+
+- **Claude Code** — the Orchestrator and the reviewer subagents.
+- **An implementer CLI** — default `codex`; set `implementer.command` in `config.yaml` to use anything else (including Claude Code itself).
+- **`git`, `bash`**, and whatever your project's gate needs (`shellcheck`, `ruff`, `pytest`, `cargo`, `go`, …); declare hard prerequisites with `gate.required_tools`. The gate auto-detects the stacks present.
+
+hook: PostToolUse
+hook: PostToolUse Completed
+codex
+The branch matches and the tree is clean. The existing scripts and test fixtures support the planned relocation; I’ll reuse them and add the dispatcher with standard Bash and `readlink`. No dependency is needed.
+
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/bin/zsh -lc "mkdir -p harness/scripts harness/examples/gate.d harness/agents harness/tests harness/bin
+git mv scripts/{gate,worktree,agent-exec,fan-exec,codex-review,demo,release,state,archi-fresh}.sh harness/scripts/
+git mv scripts/gate.d/examples/*.sh harness/examples/gate.d/
+git mv skills profiles harness/
+git mv .claude/agents/*.md harness/agents/
+git mv tests/test-scripts.sh harness/tests/
+git mv CLAUDE.md harness/CONSTITUTION.md
+rmdir .claude/agents
+ln -s ../harness/agents .claude/agents
+ln -sfn ../harness/skills .claude/skills
+python3 - <<'PY'
+from pathlib import Path
+import re
+names='gate|worktree|agent-exec|fan-exec|codex-review|demo|release|state|archi-fresh'
+for p in [*Path('harness').rglob('*'),Path('README.md')]:
+ if not p.is_file() or p.parts[:2]==('harness','tests'): continue
+ s=p.read_text()
+ if p.parent==Path('harness/scripts') and p.stem in ('release','fan-exec'):
+  s=s.replace('\\ncd ', '\\nHERE="'$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)'"\\n\\ncd ',1) if p.stem=='release' else s.replace('\\nROOT=', '\\nHERE="'$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)'"\\n\\nROOT=',1)
+  s=re.sub(r'scripts/('+names+r')\\.sh',lambda m:'\""'$HERE/'"'+m[1]+'.sh\"',s)
+  # Restore prose and usage strings to command forms below.
+  s=re.sub(r'(?m)"'^(#.*|  #.*|  "'"\\"'$HERE/release.sh".*)$'"',lambda m:re.sub(r'\"\\"'$HERE/([a-z-]+)'"\\.sh\"',r'harness \\1',m[0]),s)
+  s=s.replace('die \"\""'$HERE/gate.sh" failed"'"','die \"harness gate failed\"')
+ else: s=re.sub(r'scripts/('+names+r')\\.sh',r'harness \\1',s)
+ s=s.replace('tests/test-scripts.sh','harness/tests/test-scripts.sh')
+ s=s.replace('scripts/gate.d/examples/','"'$(harness root)/examples/gate.d/'"')
+ s=re.sub(r'(?<"'![/a-z)])profiles/'"', '"'$(harness root)/profiles/'"',s)
+ if p.name=='archi-fresh.sh': s=s.replace('SOURCE_PATHS=(scripts/ skills/ profiles/ config.yaml CLAUDE.md)','SOURCE_PATHS=(harness/ scripts/ config.yaml CLAUDE.md)')
+ if p.name=='fan-exec.sh': s=s.replace('usage: fan-exec.sh','usage: harness fan-exec')
+ p.write_text(s)
+Path('CLAUDE.md').write_text('@harness/CONSTITUTION.md\\n')
+for name in ('gate','archi-fresh','demo'):
+ p=Path('scripts/'+name+'.sh')
+ p.write_text('#"'!/usr/bin/env bash'"\\nexec bash \""'$(dirname "$0")/../harness/scripts/'"'+name+'.sh\" \""'$@"'"\\n')
+ p.chmod(0o755)
+p=Path('config.yaml');p.write_text(p.read_text().replace('command: scripts/gate.sh','command: harness gate'))
+for f in ['scripts/gate.d/test-scripts.sh','.github/workflows/ci.yml','bitbucket-pipelines.yml','tests/test-export.sh']:
+ p=Path(f);s=p.read_text().replace('tests/test-scripts.sh','harness/tests/test-scripts.sh')
+ if f=='tests/test-export.sh': s=s.replace('bash scripts/gate.sh && bash scripts/archi-fresh.sh','bash \""'$dest/harness/bin/harness" gate && bash "$dest/harness/bin/harness" archi-fresh'"')
+ else: s=s.replace('bash scripts/gate.sh','bash harness/bin/harness gate')
+ p.write_text(s)
+p=Path('harness/tests/test-scripts.sh');s=p.read_text()
+# Source references anchored to the real repository, not fixture destinations.
+for prefix in ('"'$ROOT/'"','"'$1/'"'):
+ for directory in ('scripts/','skills/'):
+  s=s.replace(prefix+directory,prefix+'harness/'+directory)
+s=s.replace('"'$ROOT/harness/scripts/gate.d/examples/'"','"'$ROOT/harness/examples/gate.d/'"')
+s=s.replace('shellcheck scripts/*.sh tests/*.sh','shellcheck harness/scripts/*.sh harness/tests/*.sh harness/bin/harness')
+s=s.replace('Usage: scripts/demo.sh','Usage: harness demo').replace('Usage: scripts/archi-fresh.sh','Usage: harness archi-fresh').replace('next_action: run scripts/gate.sh','next_action: run harness gate')
+s=s.replace('1 \"skills/\"','1 \"harness/\"')
+# Only bare checks outside fixture commands.
+lines=s.splitlines(True)
+for i,line in enumerate(lines):
+ if 941 <= i <= 958 or i in (1458,1737,1738):
+  line=line.replace('scripts/codex-review.sh','harness/scripts/codex-review.sh').replace('skills/3-review/','harness/skills/3-review/').replace('bash scripts/agent-exec.sh','bash harness/scripts/agent-exec.sh').replace('bash scripts/release.sh','bash harness/scripts/release.sh')
+ lines[i]=line
+s=''.join(lines)
+s=s.replace('bash \""'$ROOT/harness/scripts/gate.sh"'"','bash \""'$ROOT/harness/bin/harness" gate'"')
+# Fixture source edit, limited to its setup function.
+a=s.index('setup_archi_fresh_fixture()');b=s.index('\\n}',a)+2
+block=s[a:b].replace('skills/','harness/skills/')
+s=s[:a]+block+s[b:]
+p.write_text(s)
+PY
+cat > harness/bin/harness <<'EOF'
+#"'!/usr/bin/env bash
+set -uo pipefail
+
+source_path=${BASH_SOURCE[0]}
+while [[ -L "$source_path" ]]; do
+  link_dir=$(cd -P "$(dirname "$source_path")" && pwd) || exit 2
+  source_path=$(readlink "$source_path") || exit 2
+  [[ "$source_path" == /* ]] || source_path="$link_dir/$source_path"
+done
+root=$(cd -P "$(dirname "$source_path")/.." && pwd) || exit 2
+
+usage() {
+  echo '"'Usage: harness <command> [args]' >&2
+  printf 'Available commands: root' >&2
+  for script in \""'$root"/scripts/*.sh; do
+    name=${script##*/}
+    printf '"' %s' \""'${name%.sh}" >&2
+  done
+  printf '"'\\n' >&2
+  exit 2
+}
+
+[[ "'$# -gt 0 ]] || usage
+name=$1
+shift
+[[ "$name" =~ ''^[a-z-]+$ ]] || usage
+if [[ "$name" == root ]]; then
+  printf '"'%s\\n' \""'$root"
+  exit 0
+fi
+[[ -f "$root/scripts/$name.sh" ]] || usage
+exec bash "$root/scripts/$name.sh" "$@"
+EOF
+chmod +x harness/bin/harness
+rg -n '"'HERE|SOURCE_PATHS' harness/scripts/{release,fan-exec,archi-fresh}.sh
+rg -n 'scripts/|skills/' harness/tests/test-scripts.sh | tail -12" in /Users/cboyfly/Documents/repos/agentic-coding-worktrees/harness-split
+ succeeded in 398ms:
+fatal: Unable to create '/Users/cboyfly/Documents/repos/agentic-coding/.git/worktrees/harness-split/index.lock': Operation not permitted
+fatal: Unable to create '/Users/cboyfly/Documents/repos/agentic-coding/.git/worktrees/harness-split/index.lock': Operation not permitted
+fatal: Unable to create '/Users/cboyfly/Documents/repos/agentic-coding/.git/worktrees/harness-split/index.lock': Operation not permitted
+fatal: Unable to create '/Users/cboyfly/Documents/repos/agentic-coding/.git/worktrees/harness-split/index.lock': Operation not permitted
+fatal: Unable to create '/Users/cboyfly/Documents/repos/agentic-coding/.git/worktrees/harness-split/index.lock': Operation not permitted
+fatal: Unable to create '/Users/cboyfly/Documents/repos/agentic-coding/.git/worktrees/harness-split/index.lock': Operation not permitted
+rmdir: .claude/agents: Directory not empty
+Traceback (most recent call last):
+  File "<stdin>", line 31, in <module>
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.py", line 1256, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.py", line 1242, in open
+    return io.open(self, mode, buffering, encoding, errors, newline,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.py", line 1110, in _opener
+    return self._accessor.open(self, flags, mode)
+FileNotFoundError: [Errno 2] No such file or directory: 'harness/tests/test-scripts.sh'
+rg: harness/scripts/release.sh: No such file or directory (os error 2)
+rg: harness/scripts/fan-exec.sh: No such file or directory (os error 2)
+rg: harness/scripts/archi-fresh.sh: No such file or directory (os error 2)
+rg: harness/tests/test-scripts.sh: IO error for operation on harness/tests/test-scripts.sh: No such file or directory (os error 2)
+
+hook: PostToolUse
+hook: PostToolUse Completed
+codex
+The sandbox blocked `git mv`: this worktree’s Git index is outside the writable roots. The batch continued after that failure and made some partial edits; I’ll restore those now. I can’t satisfy the required `git mv` relocation in this sandbox.
+
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/bin/zsh -lc "python3 - <<'PY'
+from pathlib import Path
+import subprocess, shutil
+for f in ['README.md','CLAUDE.md','config.yaml','scripts/gate.sh','scripts/archi-fresh.sh','scripts/demo.sh','scripts/gate.d/test-scripts.sh','.github/workflows/ci.yml','bitbucket-pipelines.yml','tests/test-export.sh']:
+ p=Path(f)
+ p.write_bytes(subprocess.check_output(['git','show','HEAD:'+f]))
+p=Path('.claude/skills')
+p.unlink()
+p.symlink_to('../skills')
+p=Path('.claude/agents/agents')
+if p.is_symlink(): p.unlink()
+shutil.rmtree('harness')
+PY
+git status --short" in /Users/cboyfly/Documents/repos/agentic-coding-worktrees/harness-split
+ succeeded in 389ms:
+hook: PostToolUse
+hook: PostToolUse Completed
+codex
+Blocked by sandbox permissions. Branch `wt/harness-split` is verified, but `git mv` cannot create the worktree’s index lock outside the writable roots.
+
+I restored all partial edits; `git status --short` is clean. No implementation, commit, gate run, or demo was completed.
+
+The orchestrator needs to provide write access to this worktree’s Git metadata so the required relocation can proceed.
+hook: Stop
+hook: Stop Completed
+tokens used
+37,010
+Blocked by sandbox permissions. Branch `wt/harness-split` is verified, but `git mv` cannot create the worktree’s index lock outside the writable roots.
+
+I restored all partial edits; `git status --short` is clean. No implementation, commit, gate run, or demo was completed.
+
+The orchestrator needs to provide write access to this worktree’s Git metadata so the required relocation can proceed.
+Error: implementer produced no new commit and left no worktree changes
+dispatch_exit=1
