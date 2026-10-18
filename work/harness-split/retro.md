@@ -1,0 +1,10 @@
+# Retro — harness-split (v2026.10.4)
+
+1. **What did the gate miss that a reviewer caught?**
+   - **`bash harness <cmd>` exits 126 from the repo root.** bash resolves the `harness/` directory before it looks on PATH. The rewrite left the `bash ` prefix in 4-release, 5-retro, the work profile and ARCHI. The plan's acceptance greps only matched `scripts/<name>.sh`, and both reviewers caught it independently. → **not worth keeping**: the follow-up added a smoke check, pinned by a verified mutation, so the mechanical fix already shipped in the unit.
+2. **What did every check miss?**
+   - **`sync (b)` failed once on the GitHub runner.** It passed when CI re-ran, and it passed in a local Ubuntu container both as root and as a non-root user. The cause isn't known. → **not worth keeping**: `harness-publish` deletes `tests/test-export.sh`. If it flakes again before then, re-run it once and note it here.
+3. **What got re-derived that a doc would have prevented?**
+   - **Recovering when the implementer can't touch the git index.** The orchestrator worked out the fix on the spot: plain `mv` instead of `git mv`, the orchestrator stages and commits, and the implementer pre-checks with direct `shellcheck` plus both suites, because the gate's `git ls-files` reads the stale index. → **process**: it is folded into the existing `codex-worktree-commit` candidate (see 4) rather than given a separate Decision, so the lesson lives in one place.
+4. **What friction repeated from a prior retro?**
+   - **The codex sandbox can't write git metadata, for the sixth unit in a row.** This time it blocked `git mv` and `git add` as well as commits, so the first dispatch produced nothing. → **process**: `PLAN.md`'s `codex-worktree-commit` candidate is extended with the index-write case and the recovery recipe. Two candidate fixes are named: let `/2-implement` stage and commit for the implementer as a rule, or add the worktree's git dir as a writable root in `implementer.command`, which is a `config.yaml`/`/1-plan` change.
