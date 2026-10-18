@@ -17,7 +17,7 @@ Input: the Owner's request (argument or conversation context).
 
 ## Rules
 
-- Footprints name canonical tracked paths, never `.claude/` symlink aliases.
+- Footprints name canonical tracked paths (`harness/…`), never installed `~/.claude/` aliases.
 
 - A plan without checkable acceptance criteria is not done.
 - If the honest answer is "this is trivial, skip the loop" — say that instead of planning it.

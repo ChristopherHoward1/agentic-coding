@@ -58,10 +58,6 @@ Queries run from a notebook using the company's custom SageMaker module — not 
 
 ## Gate
 
-Replace GitHub Actions with Bitbucket Pipelines during /init:
-
-- Add `bitbucket-pipelines.yml`.
-- Delete `.github/workflows/ci.yml`.
-- Keep the deterministic commands equivalent: install `shellcheck`, set a git identity, run `bash harness/tests/test-scripts.sh`, then run `bash harness/bin/harness gate`.
+Work repos commit no CI file. During `/init`, delete `.github/workflows/ci.yml` and run `harness gate` locally.
 
 Declare durable gate tool prerequisites under `gate.required_tools` in `config.yaml` as a colon-separated scalar, for example `shellcheck:ruff`. `GATE_REQUIRED_TOOLS` may override it for one command, but do not export it across a larger test or gate run.

@@ -15,7 +15,7 @@ Input: a work unit slug.
    - Non-zero → report the script output and stop.
 3. **Check README drift:** confirm README's loop, skills and Layout sections still match the shipped skills and scripts; fix drift via the small-fix path, never mentioning dogfood-only scripts (README ships in exported templates).
 4. **Push the release branch and open the PR** against `main` autonomously; never push `main` directly. `main` stays protected, so a PR + merge is still required. After the PR merges, run `harness release tag-after-merge <slug>`. If it exits non-zero, report the output and stop. If it succeeds, run `git push origin v<version>`.
-5. **Refresh after the release:** check each primary-checkout untracked `work/<slug>/` copy against `origin/main`, delete matching copies, then run `git pull --ff-only`.
+5. **Refresh after the release:** check each primary-checkout untracked `work/<slug>/` copy against `origin/main`, delete matching copies, then run `git pull --ff-only`, followed by `harness install`.
    If `scripts/sync-template.sh` exists, confirm `HEAD` carries `v<version>`, then run `bash scripts/sync-template.sh`.
    - `up to date` → nothing to do.
    - A printed branch → work from the printed clone so `gh` resolves the template repo. Push the printed branch with `--force-with-lease` so a retry replaces an earlier failed attempt, then run `gh pr create` against `main`. Use `gh pr list` / `gh pr close` to close any older open `template-sync/*` PR as superseded. Merge once CI is green (full TRIP, as with the release PR).

@@ -53,14 +53,14 @@ asserting that something does **not** appear, first confirm the fixture can prod
 
 ## The suite runs *inside* the gate, so environment hermeticity is bidirectional
 
-`scripts/gate.d/test-scripts.sh` runs this suite as a gate hook, so `bash scripts/gate.sh`
+`scripts/gate.d/test-scripts.sh` runs this suite as a gate hook, so `harness gate`
 executes the suite, which executes fixture gates. Any variable `gate.sh` reads therefore
 flows in both directions, and both cost a review round in `gate-tool-preflight`:
 
 - **Outbound:** a case that `export`s such a variable leaks it into the nested gate run and
   into every later case. Set it per-command instead — `VAR=x bash -c '…'`.
 - **Inbound:** a value already in the environment reaches the hook and then every fixture.
-  `GATE_REQUIRED_TOOLS=shellcheck bash scripts/gate.sh` failed 8 of 15 new cases this way —
+  `GATE_REQUIRED_TOOLS=shellcheck harness gate` failed 8 of 15 new cases this way —
   nothing was broken; the inherited requirement aborted each fixture gate before it could
   run, because fixtures deliberately use a restricted `PATH`.
 
