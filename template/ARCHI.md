@@ -20,4 +20,4 @@ _Only the ones an agent would get wrong by guessing: naming, error handling, tes
 
 ## Verification
 
-_The commands that prove the code works. `scripts/gate.sh` wraps these._
+_The commands that prove the code works. `harness gate` wraps these._

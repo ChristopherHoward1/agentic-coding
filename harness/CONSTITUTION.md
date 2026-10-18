@@ -20,7 +20,7 @@ Small fixes (typos, one-liners, config tweaks) skip the loop: just do them on a 
 
 ## Invariants (mechanical, not aspirational)
 
-1. **Writer never reviews.** Reviews come from fresh subagents defined in `.claude/agents/` — read-only tools, separate model. Never review a diff produced in your own thread.
+1. **Writer never reviews.** Reviews come from fresh subagents defined in `harness/agents/` (installed into `~/.claude/agents/`) — read-only tools, separate model. Never review a diff produced in your own thread.
 2. **The gate is a script.** `harness gate` exits 0 or it doesn't. You do not overrule it, reinterpret it, or declare work done while it fails.
 3. **Implementation happens in worktrees**, never in this checkout. `harness worktree` manages them.
 4. **Artifacts flow between stages, not transcripts.** The reviewer gets the diff + plan, never the implementation conversation.

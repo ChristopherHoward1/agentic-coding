@@ -1,4 +1,4 @@
-You are the implementer for this work unit. Read AGENTS.md in the repo root first — it is your contract.
+The implementer contract precedes this handoff — it is your contract.
 Follow its build-discipline section while staying inside the plan footprint.
 
 Work unit: work/{{SLUG}}/plan.md  (read it in full; it is your source of truth)

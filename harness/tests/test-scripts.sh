@@ -47,7 +47,7 @@ check_exit() {
 ROOT=$(git rev-parse --show-toplevel)
 cd "$ROOT" || exit 1
 
-# This suite runs nested inside scripts/gate.sh (via the gate.d/ hook), so an inherited
+# This suite runs nested inside harness gate (via the gate.d/ hook), so an inherited
 # value would reach every fixture gate and abort it. Keep this here, not beside the gate
 # cases — a guard that works only because of where it sits is lost by the next case
 # added above it. See knowledge/test-helper-contract.md.
@@ -404,6 +404,7 @@ setup_agent_exec_fixture() {
     git config user.name Tester
     mkdir -p scripts
     cp "$ROOT/harness/scripts/agent-exec.sh" scripts/agent-exec.sh
+    printf "fixture contract\n" >AGENTS.md
     chmod +x scripts/agent-exec.sh
     cat >"$AGENT_IMPL" <<'EOF'
 #!/usr/bin/env bash
@@ -521,6 +522,7 @@ setup_fan_fixture() {
     mkdir -p scripts work/demo
     cp "$ROOT/harness/scripts/worktree.sh" scripts/worktree.sh
     cp "$ROOT/harness/scripts/agent-exec.sh" scripts/agent-exec.sh
+    printf "fixture contract\n" >AGENTS.md
     cp "$ROOT/harness/scripts/fan-exec.sh" scripts/fan-exec.sh
     cat >scripts/gate.sh <<'EOF'
 #!/usr/bin/env bash
@@ -567,7 +569,7 @@ implementer:
 worktrees:
   dir: $FAN_WTS
 EOF
-    git add config.yaml scripts
+    git add config.yaml scripts AGENTS.md
     git commit -qm init
     git push -q -u origin main
     printf '# Demo plan\n' >work/demo/plan.md
@@ -882,7 +884,7 @@ setup_archi_fresh_fixture archi-missing missing-archi
 check_exit "archi-fresh exits 2 when one side has no history" 2 "ARCHI.md has no git history" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
 
 check "archi-fresh help documents optional ref" bash -c "
-  out=\$(bash scripts/archi-fresh.sh --help) &&
+  out=\$(bash harness/scripts/archi-fresh.sh --help) &&
   grep -Fq 'Usage: harness archi-fresh [<ref>]' <<<\"\$out\" &&
   grep -Fq 'Defaults to HEAD' <<<\"\$out\"
 "
@@ -979,10 +981,10 @@ check "codex-review emits verdict instruction after diff" awk '/--- DIFF/ {d=1} 
 check "codex-review reads deferrals from branch" grep -F "git show \"\$branch:\$deferrals_path\"" harness/scripts/codex-review.sh
 check "codex-review emits deferrals before the diff" awk '/--- ACCEPTED DEFERRALS/ {f=1} /--- DIFF/ {exit !f}' harness/scripts/codex-review.sh
 check "3-review skill routes deferrals to the ledger" grep -F 'work/<slug>/deferrals.md' harness/skills/3-review/SKILL.md
-check "code-reviewer agent is told deferrals are settled scope" grep -F 'work/<slug>/deferrals.md' .claude/agents/code-reviewer.md
-check "code-reviewer agent defines severity taxonomy" grep -F "CRITICAL" .claude/agents/code-reviewer.md
-check "code-reviewer agent has calibration section" grep -F "Calibration" .claude/agents/code-reviewer.md
-check "code-reviewer agent requires concrete failure for blocking" grep -F "finding without a concrete failure scenario is LOW" .claude/agents/code-reviewer.md
+check "code-reviewer agent is told deferrals are settled scope" grep -F 'work/<slug>/deferrals.md' harness/agents/code-reviewer.md
+check "code-reviewer agent defines severity taxonomy" grep -F "CRITICAL" harness/agents/code-reviewer.md
+check "code-reviewer agent has calibration section" grep -F "Calibration" harness/agents/code-reviewer.md
+check "code-reviewer agent requires concrete failure for blocking" grep -F "finding without a concrete failure scenario is LOW" harness/agents/code-reviewer.md
 check "codex-review prompt includes severity taxonomy" grep -F "CRITICAL" harness/scripts/codex-review.sh
 check "codex-review prompt includes calibration guidance" grep -F "Calibration" harness/scripts/codex-review.sh
 check "codex-review prompt passes round number" grep -F "REVIEW_ROUND" harness/scripts/codex-review.sh
@@ -2051,6 +2053,133 @@ check "tag-after-merge refuses when origin/main advanced past the release" bash 
   grep -q 'origin/main is not Release v2026.8.10' \"\$wrong_out\" &&
   ! git rev-parse --verify --quiet refs/tags/v2026.8.10
 "
+
+# --- install.sh uses only disposable home directories, never the real Claude config.
+# shellcheck disable=SC2317,SC2329 # Invoked indirectly by check.
+test_install() (
+  local mode="$1" home_dir cfg entry target before valid=1 original_root=$ROOT
+  local install_root
+  HOME=$(mktemp -d)
+  export HOME
+  home_dir=$HOME
+  trap 'rm -rf "$home_dir"' EXIT
+  install_root="$HOME/clone"
+  mkdir -p "$install_root"
+  install_root=$(cd -P "$install_root" && pwd)
+  cp -R "$original_root/harness" "$install_root/harness"
+  case "$mode" in
+    fresh|rerun)
+      env -u CLAUDE_CONFIG_DIR "$install_root/harness/bin/harness" install || exit 1
+      for entry in "$install_root"/harness/skills/*/ "$install_root"/harness/agents/*.md; do
+        entry=${entry%/}
+        if [[ -d "$entry" ]]; then
+          target="$HOME/.claude/skills/${entry##*/}"
+          [[ $(cd -P "$target" && pwd) == "$entry" ]] || exit 1
+        else
+          target="$HOME/.claude/agents/${entry##*/}"
+        fi
+        [[ -L "$target" && $(readlink "$target") == "$entry" ]] || exit 1
+      done
+      [[ $(find "$HOME" -type l | wc -l) -eq $(find "$install_root/harness/skills" -mindepth 1 -maxdepth 1 -type d | wc -l)+$(find "$install_root/harness/agents" -name '*.md' | wc -l)+1 ]] || exit 1
+      [[ $("$HOME/.local/bin/harness" root) == "$install_root/harness" ]] || exit 1
+      if [[ "$mode" == rerun ]]; then
+        before=$(find "$HOME" -type l -exec readlink {} \;)
+        env -u CLAUDE_CONFIG_DIR "$install_root/harness/bin/harness" install || exit 1
+        [[ $(find "$HOME" -type l -exec readlink {} \;) == "$before" ]] || exit 1
+      fi
+      ;;
+    replace)
+      mkdir -p "$HOME/other" "$HOME/.claude/skills"
+      ln -s "$HOME/other" "$HOME/.claude/skills/1-plan"
+      env -u CLAUDE_CONFIG_DIR "$install_root/harness/bin/harness" install || exit 1
+      [[ -z $(ls -A "$HOME/other") && $(readlink "$HOME/.claude/skills/1-plan") == "$install_root/harness/skills/1-plan" ]]
+      ;;
+    conflict)
+      mkdir -p "$HOME/.claude/agents"
+      printf 'mine\n' >"$HOME/.claude/agents/plan-reviewer.md"
+      printf 'also mine\n' >"$HOME/.claude/agents/code-reviewer.md"
+      env -u CLAUDE_CONFIG_DIR "$install_root/harness/bin/harness" install 2>"$HOME/err"
+      [[ $? -eq 1 ]] || valid=0
+      for target in plan-reviewer.md code-reviewer.md; do
+        grep -Fq "$HOME/.claude/agents/$target" "$HOME/err" || valid=0
+      done
+      [[ -z $(find "$HOME" -type l -print) && $valid -eq 1 ]]
+      ;;
+    override)
+      cfg="$HOME/cfg"
+      CLAUDE_CONFIG_DIR="$cfg" "$install_root/harness/bin/harness" install || exit 1
+      [[ ! -e "$HOME/.claude" ]] || exit 1
+      for entry in "$install_root"/harness/skills/*/ "$install_root"/harness/agents/*.md; do
+        entry=${entry%/}
+        if [[ -d "$entry" ]]; then target="$cfg/skills/${entry##*/}"; else target="$cfg/agents/${entry##*/}"; fi
+        [[ -L "$target" && $(readlink "$target") == "$entry" ]] || exit 1
+      done
+      ;;
+    arguments)
+      env -u CLAUDE_CONFIG_DIR "$install_root/harness/bin/harness" install extra 2>"$HOME/err"
+      [[ $? -eq 2 ]] && grep -Fq 'Usage:' "$HOME/err" || exit 1
+      env -u CLAUDE_CONFIG_DIR "$install_root/harness/bin/harness" install --help >"$HOME/help" || exit 1
+      grep -Fq 'Usage:' "$HOME/help" || exit 1
+      env -u CLAUDE_CONFIG_DIR "$install_root/harness/bin/harness" install -h
+      ;;
+  esac
+)
+check "install fresh links resolve every skill, agent and dispatcher" test_install fresh
+check "install rerun preserves identical targets" test_install rerun
+check "install replaces directory symlink without writing into old directory" test_install replace
+check "install conflicts name every path and create no links" test_install conflict
+check "install respects CLAUDE_CONFIG_DIR without creating default config" test_install override
+check "install help and extra arguments have documented exit codes" test_install arguments
+
+# A successful dispatch proves the missing-contract marker assertion can fail.
+setup_agent_exec_fixture agent-contract dirty
+printf '#!/usr/bin/env bash\ncat >received.txt\ntouch invoked\n' >"$AGENT_IMPL"
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check "agent-exec prepends contract then separator then handoff" bash -c '
+  cd "$1" && bash scripts/agent-exec.sh "$2" "$3" &&
+  { cat AGENTS.md; printf "%s\n" ---; cat "$3"; } >"$4" &&
+  diff -u "$4" "$2/received.txt" && test -f "$2/invoked"
+' _ "$AGENT_PRIMARY" "$AGENT_WORKTREE" "$AGENT_HANDOFF" "$TMP/expected-contract"
+rm "$AGENT_PRIMARY/AGENTS.md" "$AGENT_WORKTREE/invoked" "$AGENT_WORKTREE/received.txt"
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check_exit "agent-exec missing contract names AGENTS.md" 1 AGENTS.md bash -c 'cd "$1" && bash scripts/agent-exec.sh "$2" "$3"' _ "$AGENT_PRIMARY" "$AGENT_WORKTREE" "$AGENT_HANDOFF"
+check "agent-exec missing contract never invokes implementer" test ! -e "$AGENT_WORKTREE/invoked"
+: >"$AGENT_PRIMARY/AGENTS.md"
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check_exit "agent-exec empty contract names AGENTS.md" 1 AGENTS.md bash -c 'cd "$1" && bash scripts/agent-exec.sh "$2" "$3"' _ "$AGENT_PRIMARY" "$AGENT_WORKTREE" "$AGENT_HANDOFF"
+check "agent-exec empty contract never invokes implementer" test ! -e "$AGENT_WORKTREE/invoked"
+
+setup_archi_fresh_fixture archi-config fresh
+mkdir -p "$ARCHI_REPO/src"
+printf 'source\n' >"$ARCHI_REPO/src/x"
+printf 'archi:\n  sources: "src/" # relevant paths\n' >"$ARCHI_REPO/config.yaml"
+commit_fixture "$ARCHI_REPO" 2026-08-16T10:02:00Z configured-source
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check_exit "archi.sources reports newer configured src" 1 src/ bash -c 'cd "$1" && bash scripts/archi-fresh.sh' _ "$ARCHI_REPO"
+printf 'fresh architecture\n' >>"$ARCHI_REPO/ARCHI.md"
+commit_fixture "$ARCHI_REPO" 2026-08-16T10:03:00Z refreshed
+printf 'new skill\n' >>"$ARCHI_REPO/harness/skills/fixture.md"
+commit_fixture "$ARCHI_REPO" 2026-08-16T10:04:00Z irrelevant-source
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check_exit "archi.sources ignores newer harness alone" 0 '' bash -c 'cd "$1" && bash scripts/archi-fresh.sh' _ "$ARCHI_REPO"
+for config_mode in commented other empty missing; do
+  case "$config_mode" in
+    commented) printf 'archi:\n  # sources: src/\n' >"$ARCHI_REPO/config.yaml" ;;
+    other) printf 'archi:\n  note: ignored\nother:\n  sources: src/\n' >"$ARCHI_REPO/config.yaml" ;;
+    empty) printf 'archi:\n  sources: ""\n' >"$ARCHI_REPO/config.yaml" ;;
+    missing) rm "$ARCHI_REPO/config.yaml" ;;
+  esac
+  commit_fixture "$ARCHI_REPO" 2026-08-16T10:05:00Z "$config_mode-config"
+  # shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+  check_exit "archi.sources $config_mode config falls back" 1 harness/ bash -c 'cd "$1" && bash scripts/archi-fresh.sh' _ "$ARCHI_REPO"
+done
+# HEAD retains the fallback, while the named ref ignores the newer harness commit.
+git -C "$ARCHI_REPO" checkout -qb wt/demo
+printf "archi:\n  sources: 'src/'\n" >"$ARCHI_REPO/config.yaml"
+commit_fixture "$ARCHI_REPO" 2026-08-16T10:06:00Z branch-config
+git -C "$ARCHI_REPO" checkout -q main
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check_exit "archi.sources reads named ref config rather than HEAD" 0 '' bash -c 'cd "$1" && bash scripts/archi-fresh.sh wt/demo' _ "$ARCHI_REPO"
 
 # --- gate.sh runs and exits cleanly on this repo
 check "gate.sh runs on this repo" bash "$ROOT/harness/bin/harness" gate

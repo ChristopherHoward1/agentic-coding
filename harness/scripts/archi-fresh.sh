@@ -26,6 +26,28 @@ fi
 
 ref="${1:-HEAD}"
 
+config=$(git show "$ref:config.yaml" 2>/dev/null) || config=
+sources=$(awk '
+    /^[^[:space:]#][^:]*:/ {
+      f = ($0 ~ /^archi:[[:space:]]*($|#)/)
+      next
+    }
+    f && /^[[:space:]]*sources:/ {
+      sub(/^[[:space:]]*sources:[[:space:]]*/, "")
+      sub(/[[:space:]]+#.*$/, "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+      if (($0 ~ /^".*"$/) || ($0 ~ /^'\''.*'\''$/)) {
+        sub(/^["'\'']/, "")
+        sub(/["'\'']$/, "")
+      }
+      print
+      exit
+    }
+  ' <<<"$config")
+if [[ -n "$sources" ]]; then
+  IFS=: read -r -a SOURCE_PATHS <<<"$sources"
+fi
+
 archi_epoch=$(git log -1 --format=%ct "$ref" -- ARCHI.md)
 source_epoch=$(git log -1 --format=%ct "$ref" -- "${SOURCE_PATHS[@]}")
 

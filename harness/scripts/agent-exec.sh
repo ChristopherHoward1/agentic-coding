@@ -7,6 +7,10 @@
 # vendors is a one-line config change, not a script rewrite.
 set -euo pipefail
 
+HERE=$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+CONTRACT="$HERE/../AGENTS.md"
+[[ -s "$CONTRACT" ]] || { echo "Error: contract missing or empty: $CONTRACT" >&2; exit 1; }
+
 ROOT=$(git rev-parse --show-toplevel)
 WORKTREE=${1:?usage: harness agent-exec <worktree-path> <handoff-file>}
 HANDOFF=${2:?usage: harness agent-exec <worktree-path> <handoff-file>}
@@ -22,11 +26,15 @@ HANDOFF_ABS=$(cd "$(dirname "$HANDOFF")" && pwd -P)/$(basename "$HANDOFF")
 HEAD_BEFORE=$(git -C "$WORKTREE" rev-parse HEAD)
 STATUS_BEFORE=$(git -C "$WORKTREE" status --porcelain)
 
+INPUT=$(mktemp)
+trap 'rm -f "$INPUT"' EXIT
+{ cat "$CONTRACT"; printf '%s\n' '---'; cat "$HANDOFF_ABS"; } >"$INPUT"
+
 echo "Dispatching implementer in $WORKTREE" >&2
-echo "  $CMD < $HANDOFF_ABS" >&2
+echo "  $CMD < $CONTRACT + $HANDOFF_ABS" >&2
 cd "$WORKTREE"
 set +e
-eval "$CMD" < "$HANDOFF_ABS"
+eval "$CMD" < "$INPUT"
 status=$?
 set -e
 if [[ "$status" -ne 0 ]]; then

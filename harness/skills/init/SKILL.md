@@ -9,8 +9,8 @@ description: Bootstrap this framework onto a project — scan the codebase, gene
 
 1. **Scan the codebase** (or note that it's greenfield): languages, frameworks, layout, entry points, existing test/lint commands.
 2. **Classify** the project and set `profile:` in `config.yaml` (`software` | `machine-learning` | `database` | `work`). Read the chosen profile and ask the Owner for any declaration it requires (e.g. ML's eval slots).
-   A profile's one-time infra swaps, such as Bitbucket CI or implementer runtime changes, happen by the orchestrator following the chosen `$(harness root)/profiles/*.md` prose.
-3. **Generate `ARCHI.md`** from the scan — replace every placeholder. Conventions section: only what an agent would get wrong by guessing.
+   A profile's one-time infra swaps, such as implementer runtime changes, happen by the orchestrator following the chosen `$(harness root)/profiles/*.md` prose.
+3. Set `archi.sources` in `config.yaml` to the project’s architecture-relevant paths (colon-separated). **Generate `ARCHI.md`** from the scan — replace every placeholder. Conventions section: only what an agent would get wrong by guessing.
 4. **Wire the gate:** confirm `harness gate` detects the project's stacks; add anything project-specific as a `scripts/gate.d/*.sh` hook. Run it and show the Owner the output.
 5. **Confirm the implementer:** check the configured runtime exists (`command -v codex` or equivalent); if not, ask the Owner what to set in `config.yaml`.
 6. **Seed `PLAN.md`:** fill Objective with the Owner, leave the rest empty.
