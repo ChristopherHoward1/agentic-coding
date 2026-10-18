@@ -1,5 +1,7 @@
-1. **HIGH — `bash harness …` breaks release, retro, and generated Bitbucket gate commands.** [4-release/SKILL.md:12](/Users/cboyfly/Documents/repos/agentic-coding-worktrees/harness-split/harness/skills/4-release/SKILL.md:12) invokes `bash harness release …`. Bash treats `harness` as a script filename; from this repo’s root it encounters the `harness/` directory and exits 126. Reproduced with `bash harness release next-version`: `harness: harness: is a directory`. The same error affects release tagging, retro creation/removal, and the work profile’s CI instructions. Replace these invocations with `harness <command>`; correct the matching ARCHI verification command too.
+No substantive findings.
 
-Dispatcher shellcheck passes. Full gate and demo were not run because this review environment permits only filesystem reads, while their fixtures require writes.
+Shellcheck passes, and inspection confirms the expected root files, executable modes, symlinks, and dispatcher validation.
 
-Codex verdict: REQUEST CHANGES
+Independent gate and demo verification was blocked by the read-only sandbox denying Bash temporary files. The recorded evidence reports a green gate and demo; I could not reproduce those runs here.
+
+Codex verdict: APPROVE
