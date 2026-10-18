@@ -25,3 +25,7 @@ Details are in [mutations.md](work/harness-split/mutations.md).
 - After staging, `bash harness/bin/harness gate` passes from the worktree root and from `harness/scripts/` (205/0 scripts, 12/0 export). The forwarders work when run directly: `scripts/gate.sh` exits 0, `scripts/demo.sh --help` prints the `harness demo` usage, and `scripts/archi-fresh.sh HEAD` and `harness archi-fresh HEAD` both exit 0. All four files are mode 100755.
 - Demo: `harness demo harness-split` exits 0, and its output matches the plan's Expected (`demo.log`).
 - Agent discovery, from a fresh `claude -p` run in `$WT`, through the `.claude/agents → ../harness/agents` symlink: it lists `code-reviewer`, `fan-selector` and `plan-reviewer`, so the per-file fallback isn't needed.
+
+## Round-1 follow-up (dispatch 3)
+
+The implementer reported: it fixed all six `bash harness` invocations, corrected the test header, and reworded the demo-copy text. It added a regression check, showed with a verified-landed mutation that the check fails when an occurrence is reintroduced, and recorded that mutation. After staging, the orchestrator ran the gate (exit 0, export 12/0) and the demo (exit 0).
