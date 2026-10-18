@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.10.4] - 2026-10-18
+
+- The framework moves under `harness/`, and skills and agents reach its scripts through the `harness` command.
+- Confirm-delta: none
+
 ## [2026.10.3] - 2026-10-09
 
 - `scripts/sync-template.sh` keeps the GitHub template repo in step with the export. Each release opens a sync PR, which merges once its CI is green.
