@@ -1,6 +1,6 @@
 # Harness split — move the framework under `harness/`, reached through one location-independent command
 
-**Slug:** harness-split · **Date:** 2026-10-18 · **Status:** approved
+**Slug:** harness-split · **Date:** 2026-10-18 · **Status:** implemented
 
 ## Goal
 
@@ -242,3 +242,14 @@ No disagreements. Round 3 is the cap; this goes to the Owner.
 Owner approval: 2026-10-18, approved as-is with the round-3 fixes applied. The Owner made no separate call on skipping the sync, so this release's template sync runs as normal.
 
 Plan verdict: APPROVE
+
+Code review:
+- **Round 1.** Both reviewers requested changes, each raising the same HIGH independently: `bash harness <cmd>` from the repo root resolves the `harness/` directory and exits 126. It appeared in 4-release, 5-retro, `profiles/work.md` and ARCHI. Fixed in the follow-up, which also added a smoke check pinned by a verified mutation. Two stale-wording LOWs were fixed alongside.
+- **Round 2.** Both reviewers approved. The Claude reviewer re-ran the gate (206/0, export 12/0), the demo, all acceptance criteria and the three mutation pins. Codex couldn't run the gate or the demo in its read-only sandbox (the known residual risk). LOWs recorded and not acted on:
+  - ARCHI's demo line still says "branch copy"
+  - the `fan-exec.sh:19` comment names `harness worktree` instead of `worktree.sh`
+  - a dead `profiles/default.md` in the archi-fresh fixture
+  - two items deferred to `harness-install` (`deferrals.md`)
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
