@@ -20,6 +20,6 @@ reviewer:
   command: 'codex exec --sandbox read-only -'
 
 gate:
-  command: scripts/gate.sh
+  command: harness gate
   required_tools: shellcheck
   max_retries: 2             # failed-gate feedback loops before escalating to the Owner

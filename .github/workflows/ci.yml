@@ -21,7 +21,7 @@ jobs:
         run: git config --global user.email "ci@example.com" && git config --global user.name "CI"
 
       - name: Run smoke suite
-        run: bash tests/test-scripts.sh
+        run: bash harness/tests/test-scripts.sh
 
       - name: Run gate
-        run: bash scripts/gate.sh
+        run: bash harness/bin/harness gate

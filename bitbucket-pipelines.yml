@@ -8,8 +8,8 @@ pipelines:
           script:
             - apt-get update && apt-get install -y shellcheck git
             - git config --global user.email "ci@example.com" && git config --global user.name "CI"
-            - bash tests/test-scripts.sh
-            - bash scripts/gate.sh
+            - bash harness/tests/test-scripts.sh
+            - bash harness/bin/harness gate
   pull-requests:
     "**":
       - step:
@@ -17,5 +17,5 @@ pipelines:
           script:
             - apt-get update && apt-get install -y shellcheck git
             - git config --global user.email "ci@example.com" && git config --global user.name "CI"
-            - bash tests/test-scripts.sh
-            - bash scripts/gate.sh
+            - bash harness/tests/test-scripts.sh
+            - bash harness/bin/harness gate

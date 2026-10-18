@@ -9,3 +9,7 @@ Observed twice on 2026-08-26: the dual-sentinel `check_verdict` (v2026.8.6) coul
 ## The codex reviewer has the same shape (v2026.8.8)
 
 `scripts/codex-review.sh` reads `reviewer.command` from **`main:config.yaml`** (`git show main:config.yaml`), not the branch's. Two consequences of the same family: a unit that changes the `reviewer:` block does not govern its own review — the change binds at the next unit's review; and because the ref is the *local* `main`, a stale primary checkout silently runs an older reviewer binary. Keep `main` current before `/3-review`. (Branch-sourcing was the pre-v2026.8.8 behavior and was the vulnerability: branch content could choose the reviewer binary.)
+
+## Harness split binding
+
+This unit releases through main's pre-move release script and the branch's bootstrap forwarders. After this unit, global `harness` and script-local `$HERE` resolve the installed main copies against the target branch tree. This is the intended standalone harness model. Coverage remains branch-local: the project gate hook runs `harness/tests/test-scripts.sh`, whose `$ROOT` paths exercise the branch's own script copies.

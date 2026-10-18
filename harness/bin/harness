@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source_path=${BASH_SOURCE[0]}
+while [[ -L "$source_path" ]]; do
+  link_dir=$(cd -P "$(dirname "$source_path")" && pwd)
+  source_path=$(readlink "$source_path")
+  [[ "$source_path" == /* ]] || source_path="$link_dir/$source_path"
+done
+root=$(cd -P "$(dirname "$source_path")/.." && pwd)
+
+usage() {
+  echo 'Usage: harness <command> [args]' >&2
+  printf 'Commands: root' >&2
+  for script in "$root"/scripts/*.sh; do
+    name=${script##*/}
+    printf ' %s' "${name%.sh}" >&2
+  done
+  printf '\n' >&2
+  exit 2
+}
+
+[[ $# -gt 0 ]] || usage
+name=$1
+shift
+[[ "$name" =~ ^[a-z-]+$ ]] || usage
+if [[ "$name" == root ]]; then
+  printf '%s\n' "$root"
+  exit 0
+fi
+[[ -f "$root/scripts/$name.sh" ]] || usage
+exec bash "$root/scripts/$name.sh" "$@"
