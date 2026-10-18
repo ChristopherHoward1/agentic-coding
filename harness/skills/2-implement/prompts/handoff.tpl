@@ -13,5 +13,5 @@ Key constraints:
 When done:
 1. Run harness gate from the repo root — it must pass.
 2. Commit your work on this branch with a clear message.
-3. Run `harness demo {{SLUG}}` on the now-clean tree. If it fails, fix the problem, re-run the gate, commit, and re-run the demo. Exit 2 is a plan or tooling error, never a demo verdict; stop and surface it if it cannot be fixed within scope.
+3. Run `harness demo {{SLUG}}` using the installed copy against the now-clean branch tree. If it fails, fix the problem, re-run the gate, commit, and re-run the demo. Exit 2 is a plan or tooling error, never a demo verdict; stop and surface it if it cannot be fixed within scope.
 4. Print a final summary: what changed and why, paste the demo output, criteria partially met (if any), out-of-scope observations.

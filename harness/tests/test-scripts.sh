@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke tests for the deterministic layer. Run from repo root: bash tests/test-scripts.sh
+# Smoke tests for the deterministic layer. Run from repo root: bash harness/tests/test-scripts.sh
 set -uo pipefail
 
 pass=0; fail=0
@@ -724,6 +724,11 @@ exit 0
 EOF
   chmod +x "$path"
 }
+
+# --- command references must invoke the dispatcher, not the harness directory
+check_exit "command references avoid bash harness directory invocation" 1 "" grep -rnE 'bash harness( |$)' \
+  "$ROOT/harness/skills" "$ROOT/harness/agents" "$ROOT/harness/profiles" \
+  "$ROOT/harness/CONSTITUTION.md" "$ROOT/ARCHI.md" "$ROOT/README.md"
 
 # --- shellcheck the scripts themselves (gate.sh covers this too; belt+braces)
 if command -v shellcheck >/dev/null; then
