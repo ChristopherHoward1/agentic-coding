@@ -2212,7 +2212,7 @@ git -C "$ARCHI_REPO" checkout -q main
 check_exit "archi.sources reads named ref config rather than HEAD" 0 '' bash -c 'cd "$1" && bash scripts/archi-fresh.sh wt/demo' _ "$ARCHI_REPO"
 
 # --- Registry state stays outside the work repo.
-# shellcheck disable=SC2329,SC2016 # Exported functions run in bash -e; fixture scripts expand later.
+# shellcheck disable=SC2317,SC2329,SC2016 # SC2317 on shellcheck <0.10 (CI), SC2329 on >=0.10; Exported functions run in bash -e; fixture scripts expand later.
 registry_fixture() {
   REG="$(cd -P "$TMP" && pwd)/registry-$1"
   mkdir -p "$REG/repo/app" "$REG/hh"
@@ -2224,9 +2224,9 @@ registry_fixture() {
   export HARNESS_HOME="$REG/hh"
   H="$ROOT/harness/bin/harness"
 }
-# shellcheck disable=SC2329,SC2016 # Exported case runs in a child bash; scripts expand there.
+# shellcheck disable=SC2317,SC2329,SC2016 # SC2317 on shellcheck <0.10 (CI), SC2329 on >=0.10; Exported case runs in a child bash; scripts expand there.
 registry_run() { (cd "$REG/repo" && bash "$H" "$@"); }
-# shellcheck disable=SC2329,SC2016 # Exported case runs in a child bash; scripts expand there.
+# shellcheck disable=SC2317,SC2329,SC2016 # SC2317 on shellcheck <0.10 (CI), SC2329 on >=0.10; Exported case runs in a child bash; scripts expand there.
 registry_lookup() {
   set -e
   registry_fixture lookup
@@ -2250,7 +2250,7 @@ registry_lookup() {
   registry_run project mode && exit 1
   [[ $? == 2 ]] || return 1
 }
-# shellcheck disable=SC2329,SC2016 # Exported case runs in a child bash; scripts expand there.
+# shellcheck disable=SC2317,SC2329,SC2016 # SC2317 on shellcheck <0.10 (CI), SC2329 on >=0.10; Exported case runs in a child bash; scripts expand there.
 registry_register() {
   set -e
   registry_fixture register
@@ -2290,7 +2290,7 @@ registry_register() {
   registry_run register --name repo-app && exit 1
   [[ $(registry_run project root) == "$REG/repo/app" ]] || return 1
 }
-# shellcheck disable=SC2329,SC2016 # Exported case runs in a child bash; scripts expand there.
+# shellcheck disable=SC2317,SC2329,SC2016 # SC2317 on shellcheck <0.10 (CI), SC2329 on >=0.10; Exported case runs in a child bash; scripts expand there.
 registry_subdir() {
   set -e
   local value code before
@@ -2312,7 +2312,7 @@ registry_subdir() {
     [[ $(cat "$REG/repo/.git/info/exclude") == "$before" ]] || return 1
   done
 }
-# shellcheck disable=SC2329,SC2016 # Exported case runs in a child bash; scripts expand there.
+# shellcheck disable=SC2317,SC2329,SC2016 # SC2317 on shellcheck <0.10 (CI), SC2329 on >=0.10; Exported case runs in a child bash; scripts expand there.
 registry_flow() {
   set -e
   registry_fixture flow
