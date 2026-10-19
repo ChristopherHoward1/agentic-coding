@@ -1,7 +1,7 @@
-- **MEDIUM — Subdirectory names containing glob characters break the exclude rule.** In [register.sh:52](/Users/cboyfly/Documents/repos/agentic-coding-worktrees/harness-registry/harness/scripts/register.sh:52), an existing directory such as `app[1]`, registered with `--name app`, produces `/app[1]/CLAUDE.local.md`. Git interprets the brackets as a pattern, so the generated file remains untracked and `git status` is dirty. Escape gitignore metacharacters when generating the rule, and use a literal pathspec for the tracked-file check.
+No new substantive findings. The diff meets the planned registry behavior without introducing an identified CRITICAL or HIGH regression. The accepted gitignore-metacharacter deferral remains settled scope.
 
-- **MEDIUM — The required interactive constitution-loading check remains unverified.** [notes.md](/Users/cboyfly/Documents/repos/agentic-coding-worktrees/harness-registry/work/harness-registry/notes.md) explicitly leaves the `/memory`, external-import approval, and `/add-dir` Edit checks to the orchestrator. Generated-file assertions cannot establish that Claude actually loads the constitution or permits state-directory edits. Complete and record this acceptance check before declaring the unit finished.
+Validation gap: the required manual `/add-dir` followed by an Edit to the state plan remains unverified, as the plan acknowledges.
 
-No CRITICAL or HIGH findings.
+Review was based on the supplied diff and read-only inspection of branch files; tests were not rerun.
 
 Codex verdict: APPROVE
