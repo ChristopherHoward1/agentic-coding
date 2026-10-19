@@ -113,8 +113,6 @@ setup_release_fixture() {
     mkdir -p scripts/lib
     cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/release.sh" scripts/release.sh
-    mkdir -p scripts/lib
-    cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/archi-fresh.sh" scripts/archi-fresh.sh
     cat >scripts/gate.sh <<'EOF'
 #!/usr/bin/env bash
@@ -537,12 +535,8 @@ setup_fan_fixture() {
     mkdir -p scripts/lib
     cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/worktree.sh" scripts/worktree.sh
-    mkdir -p scripts/lib
-    cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/agent-exec.sh" scripts/agent-exec.sh
     printf "fixture contract\n" >AGENTS.md
-    mkdir -p scripts/lib
-    cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/fan-exec.sh" scripts/fan-exec.sh
     cat >scripts/gate.sh <<'EOF'
 #!/usr/bin/env bash
@@ -2297,6 +2291,28 @@ registry_register() {
   [[ $(registry_run project root) == "$REG/repo/app" ]] || return 1
 }
 # shellcheck disable=SC2329,SC2016 # Exported case runs in a child bash; scripts expand there.
+registry_subdir() {
+  set -e
+  local value code before
+  for value in ./app app//; do
+    registry_fixture "subdir-${value//\//-}"
+    S=$(registry_run register --subdir "$value")
+    [[ "$S" == "$HARNESS_HOME/projects/repo-app" ]] || return 1
+    grep -qxF '/app/CLAUDE.local.md' "$REG/repo/.git/info/exclude"
+    [[ -z $(git -C "$REG/repo" status --porcelain) ]] || return 1
+  done
+  for value in '' . app/./x app/../x; do
+    registry_fixture "invalid-${value//\//-}"
+    mkdir -p "$REG/repo/app/x"
+    before=$(cat "$REG/repo/.git/info/exclude")
+    code=0
+    registry_run register --subdir "$value" || code=$?
+    [[ "$code" == 1 && ! -e "$HARNESS_HOME/projects" ]] || return 1
+    [[ -z $(find "$REG/repo" -name CLAUDE.local.md) ]] || return 1
+    [[ $(cat "$REG/repo/.git/info/exclude") == "$before" ]] || return 1
+  done
+}
+# shellcheck disable=SC2329,SC2016 # Exported case runs in a child bash; scripts expand there.
 registry_flow() {
   set -e
   registry_fixture flow
@@ -2308,8 +2324,9 @@ registry_flow() {
   WT=$(registry_run worktree add demo)
   [[ -z $(git -C "$WT" ls-files work) ]] || return 1
   [[ $(registry_run worktree sync-artifacts demo) == 'registry mode:'* ]] || return 1
-  printf '[[ "$PWD" == "%s/app" ]]\n' "$WT" >"$S/scripts/gate.d/cwd.sh"
+  printf 'printf "%%s\\n" "$PWD" > "%s/gate-pwd"\n' "$REG" >"$S/scripts/gate.d/cwd.sh"
   (cd "$WT" && bash "$H" gate)
+  [[ -f "$REG/gate-pwd" && $(cat "$REG/gate-pwd") == "$WT/app" ]] || return 1
   cp "$WT/bad.sh" "$WT/app/bad.sh"
   git -C "$WT" add app/bad.sh
   (cd "$WT" && bash "$H" gate) && exit 1
@@ -2347,8 +2364,9 @@ registry_flow() {
   touch "$S/ARCHI.md"
   registry_run archi-fresh
 }
-export -f registry_fixture registry_run registry_lookup registry_register registry_flow
+export -f registry_subdir registry_fixture registry_run registry_lookup registry_register registry_flow
 export ROOT TMP
+check "registry subdir normalization and validation" bash -e -c registry_subdir
 check 'registry lookup skips unrelated stale and malformed entries under set -e' bash -e -c registry_lookup
 check 'registry register preflight and idempotent excluded imports' bash -e -c registry_register
 check 'registry project subdir gate worktree agent demo state and refusal flow' bash -e -c registry_flow

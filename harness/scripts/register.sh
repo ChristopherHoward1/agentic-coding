@@ -2,12 +2,12 @@
 set -euo pipefail
 usage() { echo 'Usage: harness register [--name <name>] [--subdir <path>]'; }
 die() { echo "register: $*" >&2; exit 1; }
-name='' subdir=''
+name='' subdir='' subdir_given=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --name|--subdir)
       [[ $# -ge 2 ]] || die "$1 requires a value"
-      if [[ "$1" == --name ]]; then name=$2; else subdir=$2; fi
+      if [[ "$1" == --name ]]; then name=$2; else subdir=$2; subdir_given=true; fi
       shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; exit 1 ;;
@@ -19,8 +19,15 @@ source "$HERE/lib/project.sh"
 resolve_project
 cd "$GIT_ROOT"
 [[ "$(git rev-parse --git-dir)" == "$(git rev-parse --git-common-dir)" ]] || die 'must run from the primary checkout'
-case "$subdir" in /*|*..*) die 'subdir must be relative and contain no ..' ;; esac
-subdir=${subdir%/}
+if "$subdir_given"; then
+  while [[ "$subdir" == ./* ]]; do subdir=${subdir#./}; done
+  while [[ "$subdir" == *//* ]]; do subdir=${subdir//\/\//\/}; done
+  subdir=${subdir%/}
+  case "/$subdir/" in
+    //|/./|/../|/*/./*|/*/../*) die 'subdir must be nonempty and contain no . or .. components' ;;
+  esac
+  [[ "$subdir" != /* ]] || die 'subdir must be relative'
+fi
 [[ -d "$GIT_ROOT${subdir:+/$subdir}" ]] || die 'subdir must be an existing directory'
 name=${name:-${PRIMARY_ROOT##*/}${subdir:+-${subdir//\//-}}}
 [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die 'invalid name; use --name'
