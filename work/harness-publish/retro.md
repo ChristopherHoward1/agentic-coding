@@ -1,0 +1,15 @@
+# Retro: harness-publish (v2026.10.7)
+
+Shipped: the public template now holds only `harness/`, README and LICENSE. `scripts/publish.sh` replaces the export and sync scripts, the skeletons moved to `harness/skeleton/`, and `/init` copies them into a project. Code review approved in round 1 (both reviewers, three LOWs), the gate was green, and the demo matched.
+
+1. **What did the gate miss that a reviewer caught?**
+   - The code-reviewer found that README's Layout block omits `harness/CONSTITUTION.md` and `harness/tests/` (LOW). → **not worth keeping** as a check: README Layout is already covered by `/4-release` step 3's drift check. It is fixed by the small-fix path after this release.
+   - The other two LOWs, a clone dir left behind when `git clone` fails and test-function names in `notes.md`, → **not worth keeping**: one is cosmetic, and the other only happens on a tooling error that already exits 2.
+2. **What did every check miss?**
+   - **Four plan-review rounds went on scope the Owner then dropped.** The pre-push denylist came from a requirements list written two days earlier and was carried onto the roadmap as one line. Rounds 1–4 took 21 findings to harden it; round 4 approved it, and codex was dispatched. Then the Owner asked "why do we need the denylist?". Once the threat was spelled out (pushes from work machines), the Owner said they never push from work, and the denylist was dropped mid-dispatch. No reviewer could have caught this, because each one judged the plan as written, not whether its requirement still held. → **process**: before planning a roadmap item inherited from an older requirements list, restate the concrete need it serves and confirm it with the Owner (PLAN.md Decision 2026-10-19).
+3. **What got re-derived that a doc would have prevented?**
+   - Three different reviewers re-checked the template repo's ruleset (no required status checks, rebase merges allowed). → **not worth keeping**: it is a one-off fact about this release, and it changes the next time the template's settings do.
+   - The `knowledge/silent-no-op-hazards.md` macOS `mktemp` hazard was cited, applied and verified. It worked as designed, so nothing new is needed.
+4. **What friction repeated from a prior retro?**
+   - **`codex-worktree-commit`, ninth unit in a row.** The no-staging recipe worked on the first dispatch with zero followups. A new failure mode appeared: with deletions left unstaged, `gate.sh` still lists the deleted scripts through `git ls-files '*.sh'`, so shellcheck fails on missing files. The orchestrator's commit cleared it. → **mechanical**, not applied here because it would touch `harness/`. The `codex-worktree-commit` candidate in `PLAN.md` now records it, and it remains the next `/1-plan` unit for this friction. When `/2-implement` owns staging, this case goes away too.
+   - **`demo-fail-fast` recurred.** Round 1 of plan review had to add `|| exit 1` to every demo check, because `demo.sh` runs without errexit. → **mechanical**, not applied here (`harness/`). The candidate line in `PLAN.md` notes the recurrence.
