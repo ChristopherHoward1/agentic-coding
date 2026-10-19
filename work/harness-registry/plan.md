@@ -1,6 +1,6 @@
 # Harness registry — a work repo's harness state lives in the home directory, and nothing harness-related is committed
 
-**Slug:** harness-registry · **Date:** 2026-10-19 · **Status:** approved
+**Slug:** harness-registry · **Date:** 2026-10-19 · **Status:** implemented
 
 ## Goal
 
@@ -305,3 +305,17 @@ No disagreements.
 Owner approval: 2026-10-19, approved as presented. The `PLAN.md → Now` entry goes on the unit branch.
 
 Plan verdict: APPROVE
+
+Code review:
+- **Round 1.** The Claude reviewer approved; codex requested changes.
+  - Codex HIGH (the Claude reviewer rated the same behavior MEDIUM): `register --subdir ./app` wrote a `/./app/` exclude line that git doesn't match, so `CLAUDE.local.md` showed as untracked. → followup-1 normalizes `--subdir`, with tests and a mutation.
+  - Claude MEDIUM: the state-dir gate hook wasn't proven to run. → followup-1 adds a marker and a mutation.
+  - Two LOW cleanups were also in followup-1. The other LOWs are recorded in `code-review-r1.md`.
+- **Round 2.** Both reviewers approved.
+  - Codex MEDIUM and Claude LOW: gitignore metacharacters in `--subdir`. → `deferrals.md`.
+  - Claude MEDIUM: ARCHI freshness after the followup commit. → healed by step 7.
+  - Remaining LOWs are recorded in `code-review-r2.md`.
+- The manual `/memory` check is pending with the Owner (see `notes.md`).
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
