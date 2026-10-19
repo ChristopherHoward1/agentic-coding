@@ -54,3 +54,14 @@ release_exit=1
 The manual Claude `/memory` and `/add-dir` acceptance check remains with the orchestrator, as recorded above. Example hygiene hooks still scan the git toplevel; left out of scope. Changes remain unstaged for the orchestrator.
 
 Validation: all four required direct commands passed (exit 0): shellcheck; `bash harness/tests/test-scripts.sh` (228 passed, 0 failed); `bash tests/test-export.sh` (12 passed, 0 failed); `bash harness/bin/harness gate` (`GATE: PASS`). `git diff --check` also passed.
+
+## Manual constitution-loading check (Owner, 2026-10-19)
+
+- **Headless (orchestrator):** `claude -p` in the registered temp repo's `app/` did not load the imports. External imports need an interactive approval first.
+- **Interactive (Owner):** after accepting the import prompt, `/memory` showed:
+  - `CLAUDE.local.md`
+  - the state `CLAUDE.md` (@-imported)
+  - nested under it, the three @-imports: the branch `harness/CONSTITUTION.md`, the state `ARCHI.md` and the state `PLAN.md`
+
+  The constitution and hot tier load. Verified.
+- **`/add-dir` edit-without-prompt:** not exercised. The Owner reported only `/memory`. This relies on Claude Code's documented `/add-dir` behavior.
