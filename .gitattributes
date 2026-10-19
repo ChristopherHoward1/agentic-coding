@@ -1,7 +1,0 @@
-work/ export-ignore
-template/ export-ignore
-scripts/export-template.sh export-ignore
-tests/test-export.sh export-ignore
-scripts/gate.d/test-scripts.sh export-ignore
-.gitattributes export-ignore
-scripts/sync-template.sh export-ignore

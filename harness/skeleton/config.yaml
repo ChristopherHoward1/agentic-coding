@@ -1,0 +1,28 @@
+# The one knob. Everything vendor- or project-specific lives here.
+
+profile: software            # software | machine-learning | database | work
+
+models:
+  orchestrator: inherit      # the main Claude Code session
+  plan_reviewer: opus        # fresh subagent, harness/agents/plan-reviewer.md (installed into ~/.claude/agents/)
+  code_reviewer: opus        # fresh subagent, harness/agents/code-reviewer.md (installed into ~/.claude/agents/)
+  fan_selector: opus         # fresh subagent, harness/agents/fan-selector.md (installed into ~/.claude/agents/)
+
+implementer:
+  runtime: codex             # codex | claude | custom
+  fan: 1                     # N samples; default 1 preserves single-agent behavior
+  # Command receives the handoff on stdin, runs inside the worktree.
+  command: 'codex exec --sandbox workspace-write -'
+  # Claude Code implementer alternative:
+  # command: 'claude -p --dangerously-skip-permissions'
+
+reviewer:
+  command: 'codex exec --sandbox read-only -'
+
+gate:
+  command: harness gate
+  required_tools:
+  max_retries: 2             # failed-gate feedback loops before escalating to the Owner
+
+archi:
+  # sources: src/:config.yaml:CLAUDE.md

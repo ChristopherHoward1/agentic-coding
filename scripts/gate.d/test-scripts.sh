@@ -8,4 +8,4 @@ if [[ "${TEST_SCRIPTS_RUNNING:-}" == 1 ]]; then
 fi
 
 TEST_SCRIPTS_RUNNING=1 bash harness/tests/test-scripts.sh
-bash tests/test-export.sh
+bash tests/test-publish.sh
