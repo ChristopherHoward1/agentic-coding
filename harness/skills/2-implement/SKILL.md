@@ -18,7 +18,7 @@ Read `implementer.fan` from `config.yaml`.
 2. **Render the handoff** from `prompts/handoff.tpl` into `$(harness project)/work/<slug>/handoff.md`. Fill `{{PLAN_PATH}}` with the absolute `$(harness project)/work/<slug>/plan.md` path. It must be self-contained — the implementer starts cold.
 3. **Dispatch:** `harness agent-exec "$WT" "$(harness project)/work/<slug>/handoff.md"`. Capture the implementer's final summary into `$(harness project)/work/<slug>/notes.md`, then from the repo root run `harness worktree sync-artifacts <slug>`.
 4. **Run the gate in the worktree:** `cd "$WT" && harness gate`. Trust the exit code, not the implementer's claim.
-5. **On failure:** render `prompts/followup.tpl` with the gate output and re-dispatch, then from the repo root run `harness worktree sync-artifacts <slug>` after each dispatch. Retry dispatch/gate up to `gate.max_retries` from `config.yaml`. After that, stop and escalate to the Owner with the failing output — do not fix it yourself in this stage, and do not lower the bar.
+5. **On failure:** render `prompts/followup.tpl` with the gate output and re-dispatch with `harness agent-exec "$WT" <followup> --allow-noop` (a followup may correctly change nothing; the gate re-run decides), then from the repo root run `harness worktree sync-artifacts <slug>` after each dispatch. Retry dispatch/gate up to `gate.max_retries` from `config.yaml`. After that, stop and escalate to the Owner with the failing output — do not fix it yourself in this stage, and do not lower the bar.
 6. **On pass:** commit in the worktree if the implementer didn't, then proceed to `/3-review`.
 
 ## Rules

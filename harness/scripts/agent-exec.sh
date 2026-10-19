@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Dispatch the implementer agent into a worktree with a handoff on stdin.
-# Usage: harness agent-exec <worktree-path> <handoff-file>
+# Usage: harness agent-exec <worktree-path> <handoff-file> [--allow-noop]
+#
+# A dispatch that leaves a clean tree with no new commit fails, unless
+# --allow-noop is passed: followup re-dispatches may correctly change nothing,
+# and the gate re-run then decides.
 #
 # The implementer command comes from config.yaml (implementer.command) —
 # this script is the ONLY place an external agent is invoked, so swapping
@@ -12,8 +16,16 @@ CONTRACT="$HERE/../AGENTS.md"
 [[ -s "$CONTRACT" ]] || { echo "Error: contract missing or empty: $CONTRACT" >&2; exit 1; }
 
 git rev-parse --show-toplevel >/dev/null
-WORKTREE=${1:?usage: harness agent-exec <worktree-path> <handoff-file>}
-HANDOFF=${2:?usage: harness agent-exec <worktree-path> <handoff-file>}
+USAGE='usage: harness agent-exec <worktree-path> <handoff-file> [--allow-noop]'
+WORKTREE=${1:?$USAGE}
+HANDOFF=${2:?$USAGE}
+ALLOW_NOOP=
+case "${3-}" in
+  '') ;;
+  --allow-noop) ALLOW_NOOP=1 ;;
+  *) echo "Error: $USAGE" >&2; exit 1 ;;
+esac
+[[ $# -le 3 ]] || { echo "Error: $USAGE" >&2; exit 1; }
 
 [[ -d "$WORKTREE" ]] || { echo "Error: worktree not found: $WORKTREE" >&2; exit 1; }
 WORKTREE=$(cd "$WORKTREE" && pwd -P)
@@ -49,6 +61,10 @@ fi
 
 HEAD_AFTER=$(git -C "$WORKTREE" rev-parse HEAD)
 if [[ -z "$STATUS_BEFORE" && "$HEAD_AFTER" == "$HEAD_BEFORE" && -z "$(git -C "$WORKTREE" status --porcelain)" ]]; then
+  if [[ -n "$ALLOW_NOOP" ]]; then
+    echo "Note: implementer made no changes (--allow-noop)" >&2
+    exit 0
+  fi
   echo "Error: implementer produced no new commit and left no worktree changes" >&2
   exit 1
 fi
