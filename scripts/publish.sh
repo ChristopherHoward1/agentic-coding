@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Prepare a template sync commit; publishing belongs to the release skill.
+# Prepare a harness-only sync commit; never push.
 set -uo pipefail
 
-error() { echo "sync: $*" >&2; exit 2; }
+error() { echo "publish: $*" >&2; exit 2; }
 if [[ $# -ne 0 ]]; then
-  echo 'Usage: scripts/sync-template.sh' >&2
+  echo 'Usage: scripts/publish.sh' >&2
   exit 1
 fi
 root=$(git rev-parse --show-toplevel) || error 'cannot resolve repository root'
@@ -12,16 +12,16 @@ cd "$root" || error 'cannot enter repository root'
 version=$(cat VERSION) || error 'cannot read VERSION'
 tags=$(git tag --points-at HEAD) || error 'cannot list HEAD tags'
 if ! grep -Fqx "v$version" <<<"$tags"; then
-  echo "sync: HEAD must carry v$version" >&2
+  echo "publish: HEAD must carry v$version" >&2
   exit 1
 fi
 sha=$(git rev-parse --short HEAD) || error 'cannot resolve HEAD'
-clone=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create clone directory'
-exp=$(mktemp -d "${TMPDIR:-/tmp}/sync.XXXXXX") || error 'cannot create export directory'
+exp=$(mktemp -d "${TMPDIR:-/tmp}/publish.XXXXXX") || error 'cannot create export directory'
 trap 'rm -rf "$exp"' EXIT
+git archive HEAD -- harness README.md LICENSE | tar -x -C "$exp" || error 'cannot extract HEAD'
+clone=$(mktemp -d "${TMPDIR:-/tmp}/publish.XXXXXX") || error 'cannot create clone directory'
 TEMPLATE_REPO=${TEMPLATE_REPO:-https://github.com/ChristopherHoward1/agentic-coding-template.git}
 git clone -q "$TEMPLATE_REPO" "$clone" || error 'cannot clone template repository'
-bash scripts/export-template.sh "$exp" >/dev/null || error 'cannot export template'
 branch="template-sync/v$version"
 cd "$clone" || error 'cannot enter clone'
 git switch -c "$branch" >&2 || error 'cannot create sync branch'
