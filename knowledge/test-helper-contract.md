@@ -91,3 +91,21 @@ Note the failure that made this necessary: GNU `stat -f %z` does **not** fail. `
 `--file-system` there, an unrecognised directive prints `?` and exits 0. Probes of the form
 "try the BSD flag, fall back if it fails" are therefore inverted; order the GNU form first
 and fall back to the BSD one, which does exit non-zero on an unknown flag.
+
+## Adding a script, or a file that scripts source
+
+The suite builds fixtures by copying individual scripts, so a change to how scripts find each
+other breaks fixtures in ways the plan doesn't predict. Plan review for `harness-registry`
+raised all three of these in its first two rounds, at a cost of two of its three rounds:
+
+- **Stripped `PATH`.** Gate fixtures run `gate.sh` with only `bash`, `git` and `awk` on `PATH`.
+  Code that `gate.sh` runs, or sources, cannot use `dirname`, `basename`, `sed`, `head` or
+  `realpath`. Use parameter expansion such as `${BASH_SOURCE[0]%/*}` (with a no-slash fallback)
+  and `cd -P`/`pwd`.
+- **Per-script copies.** Fixtures copy `scripts/<name>.sh` one at a time, and one copies
+  `worktree.sh` to the repo root as `wt.sh`. A new sibling or sourced file must be copied into
+  every such fixture, at the matching relative path, before the fixture's first commit, so
+  porcelain comparisons stay clean.
+- **Literal pins.** Static greps in the suite pin exact strings in skills, agents and scripts,
+  for example `work/<slug>/review-round` and `git show "main:config.yaml"`. Before rewording a
+  path or command in prose or in a script, grep the suite for that literal.
