@@ -9,7 +9,7 @@ Input: a work unit slug.
 
 ## Steps
 
-1. **Create the retro branch:** from the primary checkout, run `harness worktree add retro-<slug>` and work in the returned worktree on branch `wt/retro-<slug>`. If the worktree already exists, reuse it instead of running worktree.sh add again.
+1. In registry mode, write directly under `$(harness project)` with the same file boundary; use no retro worktree or PR and skip steps 7–8. In repo mode, **create the retro branch:** from the primary checkout, run `harness worktree add retro-<slug>` and work in the returned worktree on branch `wt/retro-<slug>`. If the worktree already exists, reuse it instead of running worktree.sh add again.
 2. **Answer the four questions:**
    - What did the gate miss that a reviewer caught?
    - What did every check miss?

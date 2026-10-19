@@ -2,6 +2,8 @@
 # Check whether ARCHI.md is at least as fresh as architecture-relevant source paths.
 set -uo pipefail
 
+HERE=$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 cd "$(git rev-parse --show-toplevel)" || exit 2
 
 SOURCE_PATHS=(harness/ scripts/ config.yaml CLAUDE.md)
@@ -26,7 +28,17 @@ fi
 
 ref="${1:-HEAD}"
 
-config=$(git show "$ref:config.yaml" 2>/dev/null) || config=
+# shellcheck source=/dev/null
+source "$HERE/lib/project.sh"
+resolve_project
+if [[ "$PROJECT_MODE" == registry ]]; then
+  cd "$PROJECT_ROOT" || exit 2
+  SOURCE_PATHS=(.)
+  config=
+  [[ ! -f "$STATE_DIR/config.yaml" ]] || config=$(<"$STATE_DIR/config.yaml")
+else
+  config=$(git show "$ref:config.yaml" 2>/dev/null) || config=
+fi
 sources=$(awk '
     /^[^[:space:]#][^:]*:/ {
       f = ($0 ~ /^archi:[[:space:]]*($|#)/)
@@ -48,7 +60,12 @@ if [[ -n "$sources" ]]; then
   IFS=: read -r -a SOURCE_PATHS <<<"$sources"
 fi
 
-archi_epoch=$(git log -1 --format=%ct "$ref" -- ARCHI.md)
+if [[ "$PROJECT_MODE" == registry ]]; then
+  [[ -f "$STATE_DIR/ARCHI.md" ]] || { echo 'ARCHI.md missing' >&2; exit 2; }
+  archi_epoch=$(date -r "$STATE_DIR/ARCHI.md" +%s) || exit 2
+else
+  archi_epoch=$(git log -1 --format=%ct "$ref" -- ARCHI.md)
+fi
 source_epoch=$(git log -1 --format=%ct "$ref" -- "${SOURCE_PATHS[@]}")
 
 if [[ -z "$archi_epoch" ]]; then

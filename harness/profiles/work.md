@@ -58,6 +58,8 @@ Queries run from a notebook using the company's custom SageMaker module — not 
 
 ## Gate
 
-Work repos commit no CI file. During `/init`, delete `.github/workflows/ci.yml` and run `harness gate` locally.
+Work repos use `harness register [--subdir <path>]` and commit no harness files. Run `harness gate` locally; state and hooks live under `$(harness project)`.
+
+Known limit: the example `nb-clean` and `ds-hygiene` hooks change to the git toplevel and scan the whole repo in subfolder mode. Narrow them when real use asks.
 
 Declare durable gate tool prerequisites under `gate.required_tools` in `config.yaml` as a colon-separated scalar, for example `shellcheck:ruff`. `GATE_REQUIRED_TOOLS` may override it for one command, but do not export it across a larger test or gate run.

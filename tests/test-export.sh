@@ -17,6 +17,7 @@ ROOT=$(git rev-parse --show-toplevel) || exit 2
 cd "$ROOT" || exit 2
 unset GATE_REQUIRED_TOOLS
 TMP=$(mktemp -d) || exit 2
+export HARNESS_HOME="$TMP/harness-home"
 trap 'rm -rf "$TMP"' EXIT
 
 fixture() {

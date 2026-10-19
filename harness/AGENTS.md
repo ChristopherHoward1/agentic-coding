@@ -1,6 +1,6 @@
 # Implementer Contract
 
-You are the implementer. Your source of truth is the handoff you received; it names the work unit (`work/<slug>/plan.md`), the branch, and the file footprint.
+You are the implementer. Your source of truth is the handoff you received; it names the work unit’s plan (the path the handoff or orchestrator names), the branch, and the file footprint.
 
 ## Rules
 

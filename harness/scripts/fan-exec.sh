@@ -15,6 +15,11 @@ usage() {
   exit 1
 }
 
+registry_fan_guard() {
+  resolve_project
+  [[ "$PROJECT_MODE" == repo ]] || { echo 'fan-exec: fan mode is repo-mode only' >&2; exit 1; }
+}
+
 worktree_dir() {
   # Keep this naive config parse in sync with harness worktree.
   awk '/^worktrees:/{f=1;next} f&&/dir:/{print $2; exit}' config.yaml
@@ -67,6 +72,8 @@ dispatch() {
   [[ "$n" =~ ^[1-9][0-9]*$ ]] || { echo "Error: N must be a positive integer" >&2; exit 1; }
   [[ -s "$handoff" ]] || { echo "Error: handoff missing or empty: $handoff" >&2; exit 1; }
 
+  registry_fan_guard
+
   for ((k = 1; k <= n; k++)); do
     branch="wt/$slug-fan-$k"
     wt=$("$HERE/worktree.sh" add "$slug-fan-$k") || exit 1
@@ -105,6 +112,7 @@ adopt() {
   local branches=()
 
   [[ -n "$slug" && -n "$sample" ]] || usage
+  registry_fan_guard
   sample_branch=$(sample_ref "$sample")
   git show-ref --verify --quiet "refs/heads/$sample_branch" || {
     echo "Error: sample branch not found: $sample_branch" >&2
@@ -139,7 +147,11 @@ adopt() {
   [[ $cleanup_failed -eq 0 ]] || exit 1
 }
 
+# shellcheck source=/dev/null
+source "$HERE/lib/project.sh"
 cmd="${1:-}"
+[[ "$cmd" == dispatch || "$cmd" == adopt ]] || usage
+
 case "$cmd" in
   dispatch)
     shift

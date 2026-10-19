@@ -3,6 +3,8 @@
 # reviewer stdout artifact in the primary checkout's work/<slug>/ directory.
 set -uo pipefail
 
+HERE=$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 usage() {
   echo "Usage: harness codex-review <slug>" >&2
 }
@@ -22,6 +24,10 @@ branch="wt/$slug"
 plan_path="work/$slug/plan.md"
 deferrals_path="work/$slug/deferrals.md"
 root=$(git rev-parse --show-toplevel) || die2 "not inside a git checkout"
+# shellcheck source=/dev/null
+source "$HERE/lib/project.sh"
+resolve_project
+[[ "$PROJECT_MODE" == repo ]] || die2 "registry mode has no second reviewer yet (reviewer-set)"
 artifact="$root/work/$slug/codex-review.md"
 current_branch=$(git symbolic-ref --quiet --short HEAD || true)
 

@@ -1,7 +1,7 @@
 The implementer contract precedes this handoff — it is your contract.
 Follow its build-discipline section while staying inside the plan footprint.
 
-Work unit: work/{{SLUG}}/plan.md  (read it in full; it is your source of truth)
+Work unit: {{PLAN_PATH}}  (read it in full; it is your source of truth)
 Branch: wt/{{SLUG}} (already checked out in this worktree — verify with `git branch --show-current` before changing anything)
 
 Footprint (from the plan, repeated here as the hard boundary):

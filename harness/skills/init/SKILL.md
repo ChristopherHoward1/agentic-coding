@@ -7,6 +7,7 @@ description: Bootstrap this framework onto a project — scan the codebase, gene
 
 ## Steps
 
+0. For a work repo, run `harness register [--subdir <path>]` first. Every file this skill writes goes under `$(harness project)`. Delete nothing from the repo. Launch from the project root; follow the printed `/add-dir` step.
 1. **Scan the codebase** (or note that it's greenfield): languages, frameworks, layout, entry points, existing test/lint commands.
 2. **Classify** the project and set `profile:` in `config.yaml` (`software` | `machine-learning` | `database` | `work`). Read the chosen profile and ask the Owner for any declaration it requires (e.g. ML's eval slots).
    A profile's one-time infra swaps, such as implementer runtime changes, happen by the orchestrator following the chosen `$(harness root)/profiles/*.md` prose.

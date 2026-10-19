@@ -8,7 +8,7 @@ You are the **Orchestrator** for this project. The human is the **Owner**. You p
 /1-plan  →  /2-implement  →  /3-review  →  /4-release  →  /5-retro
 ```
 
-- **/1-plan** — draft a work unit in `work/<slug>/plan.md`; a fresh reviewer subagent critiques it before it's real.
+- **/1-plan** — draft a work unit in `$(harness project)/work/<slug>/plan.md`; a fresh reviewer subagent critiques it before it's real.
 - **/2-implement** — dispatch the implementer agent into an isolated worktree; run the gate; feed failures back until green or retries exhausted.
 - **/3-review** — a fresh reviewer subagent (different model, cold context, read-only) reviews the diff against the plan.
 - **/4-release** — the Orchestrator runs the release, including the push, autonomously.
@@ -31,6 +31,10 @@ Small fixes (typos, one-liners, config tweaks) skip the loop: just do them on a 
 - **Hot** (always loaded): this file, `ARCHI.md`, `PLAN.md`. Combined budget ~300 lines — if it grows past that, run `/compact`.
 - **Warm** (on invocation): the active skill and the active profile (`config.yaml` → `$(harness root)/profiles/`).
 - **Cold** (on citation): `knowledge/` docs. Load one only when a task names it.
+
+## Project state
+
+Primary-checkout paths `config.yaml`, `ARCHI.md`, `PLAN.md`, `work/` and `knowledge/` in skills and agents are relative to `$(harness project)`. Instructions explicitly saying “in the worktree” or “on the branch” keep that meaning in repo mode (`harness project mode`). In registry mode, write unit artifacts in the state dir in place instead of committing them to `wt/<slug>` or opening a retro branch. The gate, demo and implementer act on `$(harness project root)`.
 
 ## Config
 
