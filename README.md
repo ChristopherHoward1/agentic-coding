@@ -96,6 +96,7 @@ It's off by default (`implementer.fan: 1` — byte-for-byte the single-agent pat
 **This repo (`harness/`)** — published with README.md and LICENSE.
 
 ```
+harness/CONSTITUTION.md  the orchestrator's rules, imported by each project's CLAUDE.md (hot)
 harness/AGENTS.md    the implementer's contract
 harness/skills/      the loop as skills:
                        1-plan · 2-implement · 3-review · 4-release · 5-retro · init · compact · docs
@@ -120,6 +121,7 @@ harness/scripts/     the deterministic layer:
 harness/examples/    opt-in gate hooks
 harness/profiles/    software · machine-learning · database · work — add slots, never override
 harness/skeleton/    starting config.yaml, ARCHI.md, PLAN.md, VERSION and CHANGELOG.md
+harness/tests/       smoke suite for the shell layer
 ```
 
 **Per-project state** — at the project root in repo mode, or in the registry state dir:
