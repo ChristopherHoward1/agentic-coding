@@ -109,6 +109,9 @@ harness/agents/      the checkers (installed into ~/.claude/agents/) (read-only,
 harness/bin/harness  location-independent command dispatcher
 harness/scripts/     the deterministic layer:
                        install.sh     link dispatcher, skills and agents into the home directory
+                       register.sh    register a work repo: home-directory state, nothing committed
+                       project.sh     print the project's state dir, mode or project root
+                       lib/project.sh shared registry/repo-mode resolution (sourced, not a command)
                        gate.sh        stack-detecting pass/fail
                        worktree.sh    isolated-checkout lifecycle
                        agent-exec.sh  dispatch the implementer into a worktree
