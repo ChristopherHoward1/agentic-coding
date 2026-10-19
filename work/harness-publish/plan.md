@@ -1,6 +1,6 @@
 # Harness publish — publish only `harness/` to the public template
 
-**Slug:** harness-publish · **Date:** 2026-10-19 · **Status:** approved
+**Slug:** harness-publish · **Date:** 2026-10-19 · **Status:** implemented
 
 ## Goal
 
@@ -178,3 +178,13 @@ Round 6 (plan-reviewer): APPROVE. It listed 3 non-blocking findings, all applied
 3. **Constitution import.** Any existing `@…/CONSTITUTION.md` line counts as the import.
 
 Plan verdict: APPROVE
+
+### Code review
+
+Round 1: both reviewers APPROVE. Codex had no findings. The Claude code-reviewer independently re-ran the gate, the demo, the grep criterion, `archi-fresh` and all three guard mutations on Darwin, and raised three LOW findings, recorded here and not fixed:
+1. **Clone-dir leftover.** `publish.sh` leaves an empty clone dir in `TMPDIR` when `git clone` fails (exit 2), the same as `sync-template.sh` did.
+2. **README Layout.** The "This repo (`harness/`)" block doesn't list `harness/CONSTITUTION.md` or `harness/tests/`.
+3. **`notes.md` test names.** The implementer's evidence lines name test functions rather than the check descriptions.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
