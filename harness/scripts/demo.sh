@@ -65,10 +65,10 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 done <"$plan"
 (( section )) || error 'no ## Demonstration section'
 (( found )) || error 'no shell block or None: in ## Demonstration'
-before=$(git -C "$dir" status --porcelain) || error "cannot read worktree status"
+before=$(git -C "$dir" status --porcelain --untracked-files=all) || error "cannot read worktree status"
 (cd "$dir" && bash "$block")
 status=$?
-after=$(git -C "$dir" status --porcelain) || error "cannot read worktree status"
+after=$(git -C "$dir" status --porcelain --untracked-files=all) || error "cannot read worktree status"
 verdict=0
 if (( status != 0 )); then
   echo "demo: block exited with code $status" >&2
