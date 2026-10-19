@@ -315,7 +315,7 @@ Code review:
   - Codex MEDIUM and Claude LOW: gitignore metacharacters in `--subdir`. → `deferrals.md`.
   - Claude MEDIUM: ARCHI freshness after the followup commit. → healed by step 7.
   - Remaining LOWs are recorded in `code-review-r2.md`.
-- The manual `/memory` check is pending with the Owner (see `notes.md`).
+- Manual `/memory` check: the Owner verified the constitution, `ARCHI.md` and `PLAN.md` load through `CLAUDE.local.md` (see `notes.md`). The `/add-dir` edit check was not exercised.
 
 Code-review verdict: APPROVE
 Codex-review verdict: APPROVE
