@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.10.6] - 2026-10-19
+
+- `harness register` gives a work repo a home-directory state dir (`~/.harness/projects/<name>/`), and every script, skill and the constitution load from it, so a registered repo carries no harness files and its project can live in a subfolder.
+- Confirm-delta: none
+
 ## [2026.10.5] - 2026-10-18
 
 - `harness install` links the harness into the home directory; the implementer contract now travels with every handoff, ARCHI sources come from `config.yaml`, and the bootstrap forwarders, repo `.claude/` symlinks and Bitbucket CI file are gone.
