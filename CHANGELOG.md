@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.10.5] - 2026-10-18
+
+- `harness install` links the harness into the home directory; the implementer contract now travels with every handoff, ARCHI sources come from `config.yaml`, and the bootstrap forwarders, repo `.claude/` symlinks and Bitbucket CI file are gone.
+- Confirm-delta: none
+
 ## [2026.10.4] - 2026-10-18
 
 - The framework moves under `harness/`, and skills and agents reach its scripts through the `harness` command.
