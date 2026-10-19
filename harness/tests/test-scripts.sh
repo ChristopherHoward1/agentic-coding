@@ -867,6 +867,15 @@ touch untracked
 ```
 EOF
 check_exit "demo refuses an untracked worktree write" 1 "demo dirtied the worktree" "$ROOT/harness/scripts/demo.sh" x "$DEMO_REPO"
+mkdir -p "$DEMO_REPO/scratch" && touch "$DEMO_REPO/scratch/existing"
+cat >"$DEMO_REPO/work/x/plan.md" <<'EOF'
+## Demonstration
+```sh
+touch scratch/new
+```
+EOF
+check_exit "demo refuses a write inside an already-untracked directory" 1 "demo dirtied the worktree" "$ROOT/harness/scripts/demo.sh" x "$DEMO_REPO"
+rm -rf "$DEMO_REPO/scratch"
 printf '## Demonstration\n\nNone: documentation only\n' >"$DEMO_REPO/work/x/plan.md"
 # shellcheck disable=SC2016 # Positional arguments expand in the child bash.
 check "demo None prints the reason and passes" bash -c '
@@ -902,6 +911,11 @@ check_exit "archi-fresh explicit ref selects branch history" 1 "harness/" bash -
 
 setup_archi_fresh_fixture archi-missing missing-archi
 check_exit "archi-fresh exits 2 when one side has no history" 2 "ARCHI.md has no git history" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
+
+setup_archi_fresh_fixture archi-missing-source fresh
+printf 'archi:\n  sources: absent/\n' >"$ARCHI_REPO/config.yaml"
+commit_fixture "$ARCHI_REPO" 2026-08-16T10:02:00Z absent-source
+check_exit "archi-fresh exits 2 when source paths have no history" 2 "source paths have no git history" bash -c "cd '$ARCHI_REPO' && bash scripts/archi-fresh.sh"
 
 check "archi-fresh help documents optional ref" bash -c "
   out=\$(bash harness/scripts/archi-fresh.sh --help) &&
@@ -1540,6 +1554,8 @@ check_exit "agent-exec exits 0 when dirty redispatch cleans tree without commit"
 
 setup_agent_exec_fixture agent-nothing nothing
 check_exit "agent-exec exits non-zero when implementer produces nothing" 1 "no new commit" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF'"
+check_exit "agent-exec --allow-noop accepts a followup that changes nothing" 0 "made no changes" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF' --allow-noop"
+check_exit "agent-exec rejects an unknown third argument" 1 "usage: harness agent-exec" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF' --bogus"
 
 # --- opt-in notebook cleanliness hook
 NB_REPO="$TMP/notebook-clean"
