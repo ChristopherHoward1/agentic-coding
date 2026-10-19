@@ -6,7 +6,16 @@
 # Profile- or project-specific checks go in scripts/gate.d/*.sh (run last).
 set -uo pipefail
 
+case "${BASH_SOURCE[0]}" in
+  */*) HERE=${BASH_SOURCE[0]%/*} ;;
+  *) HERE=. ;;
+esac
+HERE=$(cd -P "$HERE" && pwd)
 cd "$(git rev-parse --show-toplevel)" || exit 1
+# shellcheck source=/dev/null
+source "$HERE/lib/project.sh"
+resolve_project
+cd "$PROJECT_ROOT" || exit 2
 
 fail=0
 fail_message() {
@@ -24,7 +33,7 @@ run() {
 required_tools=
 if [[ ${GATE_REQUIRED_TOOLS+set} ]]; then
   required_tools=$GATE_REQUIRED_TOOLS
-elif [[ -f config.yaml ]]; then
+elif [[ -f "$STATE_DIR/config.yaml" ]]; then
   required_tools=$(awk '
     /^[^[:space:]#][^:]*:/ {
       f = ($0 ~ /^gate:[[:space:]]*($|#)/)
@@ -41,7 +50,7 @@ elif [[ -f config.yaml ]]; then
       print
       exit
     }
-  ' config.yaml)
+  ' "$STATE_DIR/config.yaml")
 fi
 
 missing_required=()
@@ -137,7 +146,9 @@ if [[ -f go.mod ]]; then
 fi
 
 # --- Profile / project extensions ---------------------------------------
-for hook in scripts/gate.d/*.sh; do
+hook_dir=scripts/gate.d
+if [[ "$PROJECT_MODE" == registry ]]; then hook_dir="$STATE_DIR/scripts/gate.d"; fi
+for hook in "$hook_dir"/*.sh; do
   [[ -f "$hook" ]] && run bash "$hook"
 done
 

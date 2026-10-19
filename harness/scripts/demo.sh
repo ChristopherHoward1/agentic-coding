@@ -2,6 +2,8 @@
 # Run the first shell block in a plan's Demonstration section.
 set -uo pipefail
 
+HERE=$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 usage() {
   cat <<'USAGE'
 Usage: harness demo <slug> [<dir>]
@@ -21,7 +23,11 @@ if [[ $# -lt 1 || $# -gt 2 ]]; then
 fi
 dir=${2:-.}
 [[ $(git -C "$dir" rev-parse --is-inside-work-tree 2>/dev/null) == true ]] || error "$dir is not a git work tree"
+# shellcheck source=/dev/null
+source "$HERE/lib/project.sh"
+resolve_project "$dir"
 plan="$dir/work/$1/plan.md"
+if [[ "$PROJECT_MODE" == registry ]]; then plan="$STATE_DIR/work/$1/plan.md"; dir=$PROJECT_ROOT; fi
 [[ -f "$plan" ]] || error "no plan: $plan"
 block=$(mktemp) || error "cannot create temporary file"
 trap 'rm -f "$block"' EXIT

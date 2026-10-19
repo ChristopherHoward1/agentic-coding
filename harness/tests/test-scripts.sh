@@ -51,6 +51,8 @@ cd "$ROOT" || exit 1
 # value would reach every fixture gate and abort it. Keep this here, not beside the gate
 # cases — a guard that works only because of where it sits is lost by the next case
 # added above it. See knowledge/test-helper-contract.md.
+HARNESS_HOME=$(mktemp -d)
+export HARNESS_HOME
 unset GATE_REQUIRED_TOOLS
 
 commit_fixture() {
@@ -108,7 +110,11 @@ setup_release_fixture() {
     git remote add origin "$REL_REMOTE"
 
     mkdir -p scripts skills/3-review skills/1-plan/prompts work/demo
+    mkdir -p scripts/lib
+    cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/release.sh" scripts/release.sh
+    mkdir -p scripts/lib
+    cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/archi-fresh.sh" scripts/archi-fresh.sh
     cat >scripts/gate.sh <<'EOF'
 #!/usr/bin/env bash
@@ -181,6 +187,8 @@ setup_archi_fresh_fixture() {
     git config user.email tester@example.com
     git config user.name Tester
     mkdir -p scripts harness/skills profiles
+    mkdir -p scripts/lib
+    cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/archi-fresh.sh" scripts/archi-fresh.sh
     chmod +x scripts/archi-fresh.sh
     printf 'name: fixture\n' >config.yaml
@@ -236,6 +244,8 @@ setup_codex_review_fixture() {
     git config user.email tester@example.com
     git config user.name Tester
     mkdir -p scripts work/demo
+    mkdir -p scripts/lib
+    cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/codex-review.sh" scripts/codex-review.sh
     chmod +x scripts/codex-review.sh
     printf 'base\n' >base.txt
@@ -403,6 +413,8 @@ setup_agent_exec_fixture() {
     git config user.email tester@example.com
     git config user.name Tester
     mkdir -p scripts
+    mkdir -p scripts/lib
+    cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/agent-exec.sh" scripts/agent-exec.sh
     printf "fixture contract\n" >AGENTS.md
     chmod +x scripts/agent-exec.sh
@@ -468,6 +480,8 @@ setup_worktree_sync_fixture() {
     git config user.email tester@example.com
     git config user.name Tester
     mkdir -p scripts work/demo
+    mkdir -p scripts/lib
+    cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/worktree.sh" scripts/worktree.sh
     chmod +x scripts/worktree.sh
     printf 'worktrees:\n  dir: ../wts\n' >config.yaml
@@ -520,9 +534,15 @@ setup_fan_fixture() {
     git remote add origin "$FAN_REMOTE"
 
     mkdir -p scripts work/demo
+    mkdir -p scripts/lib
+    cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/worktree.sh" scripts/worktree.sh
+    mkdir -p scripts/lib
+    cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/agent-exec.sh" scripts/agent-exec.sh
     printf "fixture contract\n" >AGENTS.md
+    mkdir -p scripts/lib
+    cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/fan-exec.sh" scripts/fan-exec.sh
     cat >scripts/gate.sh <<'EOF'
 #!/usr/bin/env bash
@@ -589,6 +609,8 @@ setup_gate_fixture() {
     cd "$GATE_REPO" || exit 1
     git config user.email tester@example.com
     git config user.name Tester
+    mkdir -p scripts/lib
+    cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/gate.sh" scripts/gate.sh
     git add -A
     git commit -qm init
@@ -610,6 +632,8 @@ setup_state_fixture() {
     cd "$STATE_REPO" || exit 1
     git config user.email tester@example.com
     git config user.name Tester
+    mkdir -p scripts/lib
+    cp -R "$ROOT/harness/scripts/lib/." scripts/lib
     cp "$ROOT/harness/scripts/state.sh" scripts/state.sh
     chmod +x scripts/state.sh
 
@@ -767,11 +791,13 @@ check_exit "dispatcher (b): traversal name" 2 "Usage: harness" dispatcher_traver
 
 # --- worktree.sh lifecycle in a throwaway repo
 TMP=$(mktemp -d)
-trap 'rm -rf "$TMP"' EXIT
+trap 'rm -rf "$TMP" "$HARNESS_HOME"' EXIT
 
 # --- worktree-dir default without a worktrees config block
 FALLBACK_REPO="$TMP/fallback"
 mkdir -p "$FALLBACK_REPO/scripts"
+mkdir -p "$FALLBACK_REPO/scripts/lib"
+cp -R "$ROOT/harness/scripts/lib/." "$FALLBACK_REPO/scripts/lib"
 cp "$ROOT/harness/scripts/worktree.sh" "$FALLBACK_REPO/scripts/"
 printf 'profile: software\n' >"$FALLBACK_REPO/config.yaml"
 git init -q -b main "$FALLBACK_REPO"
@@ -1100,6 +1126,8 @@ check "codex-review fallback prompt uses local main base" bash -c "
   cd "$TMP"
   git init -q -b main sandbox && cd sandbox
   git commit -q --allow-empty -m init
+  mkdir -p lib
+  cp -R "$ROOT/harness/scripts/lib/." lib
   cp "$ROOT/harness/scripts/worktree.sh" wt.sh
   printf 'worktrees:\n  dir: ../wts\n' > config.yaml
   git add -A && git commit -qm files
@@ -1123,6 +1151,8 @@ git init -q --bare "$BASE_FEATURE_REMOTE"
   git config user.name Tester
   git remote add origin "$BASE_FEATURE_REMOTE"
   mkdir -p scripts
+  mkdir -p scripts/lib
+  cp -R "$ROOT/harness/scripts/lib/." scripts/lib
   cp "$ROOT/harness/scripts/worktree.sh" scripts/worktree.sh
   printf 'worktrees:\n  dir: ../base-feature-wts\n' >config.yaml
   printf 'main\n' >main.txt
@@ -1148,6 +1178,8 @@ git init -q -b main "$NO_ORIGIN"
   git config user.email tester@example.com
   git config user.name Tester
   mkdir -p scripts
+  mkdir -p scripts/lib
+  cp -R "$ROOT/harness/scripts/lib/." scripts/lib
   cp "$ROOT/harness/scripts/worktree.sh" scripts/worktree.sh
   printf 'worktrees:\n  dir: ../no-origin-wts\n' >config.yaml
   git add -A
@@ -1170,6 +1202,8 @@ git init -q --bare "$STALE_REMOTE"
   git config user.name Tester
   git remote add origin "$STALE_REMOTE"
   mkdir -p scripts
+  mkdir -p scripts/lib
+  cp -R "$ROOT/harness/scripts/lib/." scripts/lib
   cp "$ROOT/harness/scripts/worktree.sh" scripts/worktree.sh
   printf 'worktrees:\n  dir: ../stale-wts\n' >config.yaml
   printf 'base\n' >base.txt
@@ -1198,6 +1232,8 @@ git init -q --bare "$SEED_REMOTE"
   git config user.name Tester
   git remote add origin "$SEED_REMOTE"
   mkdir -p scripts work/seeded
+  mkdir -p scripts/lib
+  cp -R "$ROOT/harness/scripts/lib/." scripts/lib
   cp "$ROOT/harness/scripts/worktree.sh" scripts/worktree.sh
   printf 'worktrees:\n  dir: ../seed-wts\n' >config.yaml
   git add config.yaml scripts
@@ -2180,6 +2216,142 @@ commit_fixture "$ARCHI_REPO" 2026-08-16T10:06:00Z branch-config
 git -C "$ARCHI_REPO" checkout -q main
 # shellcheck disable=SC2016 # Positional arguments expand in the child bash.
 check_exit "archi.sources reads named ref config rather than HEAD" 0 '' bash -c 'cd "$1" && bash scripts/archi-fresh.sh wt/demo' _ "$ARCHI_REPO"
+
+# --- Registry state stays outside the work repo.
+# shellcheck disable=SC2329,SC2016 # Exported functions run in bash -e; fixture scripts expand later.
+registry_fixture() {
+  REG="$(cd -P "$TMP" && pwd)/registry-$1"
+  mkdir -p "$REG/repo/app" "$REG/hh"
+  git -C "$REG/repo" init -qb main
+  printf '#!/usr/bin/env bash\necho ok\n' >"$REG/repo/app/ok.sh"
+  printf '#!/usr/bin/env bash\necho $UNQUOTED\n' >"$REG/repo/bad.sh"
+  git -C "$REG/repo" add -A
+  git -C "$REG/repo" -c user.name=t -c user.email=t@t commit -qm init
+  export HARNESS_HOME="$REG/hh"
+  H="$ROOT/harness/bin/harness"
+}
+# shellcheck disable=SC2329,SC2016 # Exported case runs in a child bash; scripts expand there.
+registry_run() { (cd "$REG/repo" && bash "$H" "$@"); }
+# shellcheck disable=SC2329,SC2016 # Exported case runs in a child bash; scripts expand there.
+registry_lookup() {
+  set -e
+  registry_fixture lookup
+  mkdir -p "$HARNESS_HOME/projects/foreign" "$HARNESS_HOME/projects/stale" "$HARNESS_HOME/projects/malformed"
+  printf 'root=%s\n' "$TMP" >"$HARNESS_HOME/projects/foreign/project"
+  printf 'root=%s/gone\n' "$REG" >"$HARNESS_HOME/projects/stale/project"
+  echo 'subdir=app' >"$HARNESS_HOME/projects/malformed/project"
+  [[ $(registry_run project mode) == repo ]] || return 1
+  [[ $(registry_run project) == "$REG/repo" && $(registry_run project root) == "$REG/repo" ]] || return 1
+  echo 'worktrees:' >"$REG/repo/config.yaml"
+  git -C "$REG/repo" add config.yaml
+  git -C "$REG/repo" -c user.name=t -c user.email=t@t commit -qm config
+  registry_run worktree list
+  registry_run register --subdir app
+  [[ $(registry_run project mode) == registry ]] || return 1
+  [[ $(cd "$REG/repo/app" && bash "$H" project root) == "$REG/repo/app" ]] || return 1
+  WT=$(registry_run worktree add lookup)
+  [[ $(cd "$WT" && bash "$H" project mode) == registry ]] || return 1
+  mkdir -p "$HARNESS_HOME/projects/duplicate"
+  cp "$HARNESS_HOME/projects/repo-app/project" "$HARNESS_HOME/projects/duplicate/project"
+  registry_run project mode && exit 1
+  [[ $? == 2 ]] || return 1
+}
+# shellcheck disable=SC2329,SC2016 # Exported case runs in a child bash; scripts expand there.
+registry_register() {
+  set -e
+  registry_fixture register
+  registry_run register --name .. 2>"$REG/error" && exit 1
+  grep -q -- --name "$REG/error"
+  [[ ! -e "$HARNESS_HOME/projects" ]] || return 1
+  git -C "$REG/repo" worktree add -qb linked "$REG/linked"
+  (cd "$REG/linked" && bash "$H" register) && exit 1
+  [[ ! -e "$HARNESS_HOME/projects" && ! -e "$REG/linked/CLAUDE.local.md" ]] || return 1
+  echo tracked >"$REG/repo/CLAUDE.local.md"
+  git -C "$REG/repo" add CLAUDE.local.md
+  registry_run register && exit 1
+  [[ $(cat "$REG/repo/CLAUDE.local.md") == tracked && ! -e "$HARNESS_HOME/projects" ]] || return 1
+  git -C "$REG/repo" reset -q -- CLAUDE.local.md
+  rm "$REG/repo/CLAUDE.local.md"
+  mkdir "$REG/bad name"
+  git -C "$REG/bad name" init -qb main
+  (cd "$REG/bad name" && bash "$H" register) 2>"$REG/error" && exit 1
+  grep -q -- --name "$REG/error"
+  [[ ! -e "$HARNESS_HOME/projects" ]] || return 1
+  echo foreign >"$REG/repo/app/CLAUDE.local.md"
+  registry_run register --subdir app && exit 1
+  [[ $(cat "$REG/repo/app/CLAUDE.local.md") == foreign && ! -e "$HARNESS_HOME/projects" ]] || return 1
+  rm "$REG/repo/app/CLAUDE.local.md"
+  rm -rf "$REG/repo/.git/info"
+  S=$(registry_run register --subdir app)
+  [[ -d "$S/work" && -d "$S/knowledge" && -f "$S/project" ]] || return 1
+  [[ $(grep -c '^@' "$S/CLAUDE.md") == 3 ]] || return 1
+  grep -qxF "@$S/ARCHI.md" "$S/CLAUDE.md"
+  grep -qxF "@$S/PLAN.md" "$S/CLAUDE.md"
+  grep -q '/CONSTITUTION.md$' "$S/CLAUDE.md"
+  [[ -z $(git -C "$REG/repo" status --porcelain) ]] || return 1
+  registry_run register --subdir app
+  [[ $(grep -cx '/app/CLAUDE.local.md' "$REG/repo/.git/info/exclude") == 1 ]] || return 1
+  registry_run register --name other --subdir app && exit 1
+  [[ ! -e "$HARNESS_HOME/projects/other" ]] || return 1
+  registry_run register --name repo-app && exit 1
+  [[ $(registry_run project root) == "$REG/repo/app" ]] || return 1
+}
+# shellcheck disable=SC2329,SC2016 # Exported case runs in a child bash; scripts expand there.
+registry_flow() {
+  set -e
+  registry_fixture flow
+  S=$(registry_run register --subdir app)
+  printf 'worktrees:\n  dir: %s/wts\nimplementer:\n  command: '\''pwd > "%s/pwd"; touch changed'\''\n' "$REG" "$REG" >"$S/config.yaml"
+  mkdir -p "$S/work/demo" "$REG/repo/work/demo" "$S/scripts/gate.d"
+  printf '# Demo\n\n## Demonstration\n\n```sh\nbasename "$PWD"\n```\n' >"$S/work/demo/plan.md"
+  echo decoy >"$REG/repo/work/demo/plan.md"
+  WT=$(registry_run worktree add demo)
+  [[ -z $(git -C "$WT" ls-files work) ]] || return 1
+  [[ $(registry_run worktree sync-artifacts demo) == 'registry mode:'* ]] || return 1
+  printf '[[ "$PWD" == "%s/app" ]]\n' "$WT" >"$S/scripts/gate.d/cwd.sh"
+  (cd "$WT" && bash "$H" gate)
+  cp "$WT/bad.sh" "$WT/app/bad.sh"
+  git -C "$WT" add app/bad.sh
+  (cd "$WT" && bash "$H" gate) && exit 1
+  git -C "$WT" reset -q -- app/bad.sh
+  rm "$WT/app/bad.sh"
+  [[ $(registry_run demo demo "$WT") == app ]] || return 1
+  echo handoff >"$REG/handoff"
+  registry_run agent-exec "$WT" "$REG/handoff"
+  [[ $(cat "$REG/pwd") == "$WT/app" ]] || return 1
+  registry_run state demo | grep -x 'stage: plan'
+  echo 'Plan verdict: APPROVE' >>"$S/work/demo/plan.md"
+  registry_run state demo | grep -x 'stage: implement'
+  # No branch is needed for registry state transitions.
+  mkdir -p "$S/work/new"
+  echo 'Plan verdict: APPROVE' >"$S/work/new/plan.md"
+  registry_run state new | grep -x 'stage: implement'
+  echo handoff >"$S/work/new/handoff.md"
+  echo 'Code-review verdict: APPROVE' >>"$S/work/new/plan.md"
+  registry_run state new | grep -x 'stage: review'
+  registry_run state new | grep -x 'next_action: run harness gate'
+  registry_run codex-review demo 2>"$REG/error" && exit 1
+  [[ $? == 2 ]] || return 1
+  grep -q reviewer-set "$REG/error"
+  registry_run release demo 2>"$REG/error" && exit 1
+  [[ $? == 1 ]] || return 1
+  grep -q pr-release "$REG/error"
+  registry_run fan-exec dispatch demo "$REG/handoff" 1 2>"$REG/error" && exit 1
+  [[ $? == 1 ]] || return 1
+  grep -q 'repo-mode only' "$REG/error"
+  registry_run archi-fresh 2>"$REG/error" && exit 1
+  [[ $? == 2 ]] || return 1
+  touch -t 200001010000 "$S/ARCHI.md"
+  registry_run archi-fresh && exit 1
+  [[ $? == 1 ]] || return 1
+  touch "$S/ARCHI.md"
+  registry_run archi-fresh
+}
+export -f registry_fixture registry_run registry_lookup registry_register registry_flow
+export ROOT TMP
+check 'registry lookup skips unrelated stale and malformed entries under set -e' bash -e -c registry_lookup
+check 'registry register preflight and idempotent excluded imports' bash -e -c registry_register
+check 'registry project subdir gate worktree agent demo state and refusal flow' bash -e -c registry_flow
 
 # --- gate.sh runs and exits cleanly on this repo
 check "gate.sh runs on this repo" bash "$ROOT/harness/bin/harness" gate

@@ -1,4 +1,4 @@
-The gate failed on your implementation of work/{{SLUG}}/plan.md. You are resuming in the same worktree on branch wt/{{SLUG}}.
+The gate failed on your implementation of {{PLAN_PATH}}. You are resuming in the same worktree on branch wt/{{SLUG}}.
 
 Gate output:
 ```

@@ -11,7 +11,7 @@ HERE=$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 CONTRACT="$HERE/../AGENTS.md"
 [[ -s "$CONTRACT" ]] || { echo "Error: contract missing or empty: $CONTRACT" >&2; exit 1; }
 
-ROOT=$(git rev-parse --show-toplevel)
+git rev-parse --show-toplevel >/dev/null
 WORKTREE=${1:?usage: harness agent-exec <worktree-path> <handoff-file>}
 HANDOFF=${2:?usage: harness agent-exec <worktree-path> <handoff-file>}
 
@@ -19,7 +19,13 @@ HANDOFF=${2:?usage: harness agent-exec <worktree-path> <handoff-file>}
 WORKTREE=$(cd "$WORKTREE" && pwd -P)
 [[ -s "$HANDOFF" ]] || { echo "Error: handoff missing or empty: $HANDOFF" >&2; exit 1; }
 
-CMD=$(awk "/^implementer:/{f=1;next} f&&/command:/{sub(/^[[:space:]]*command:[[:space:]]*'/,\"\");sub(/'[[:space:]]*\$/,\"\");print;exit}" "$ROOT/config.yaml")
+# shellcheck source=/dev/null
+source "$HERE/lib/project.sh"
+resolve_project
+config="$STATE_DIR/config.yaml"
+if [[ "$PROJECT_MODE" == registry && ! -f "$config" ]]; then config=/dev/null; fi
+
+CMD=$(awk "/^implementer:/{f=1;next} f&&/command:/{sub(/^[[:space:]]*command:[[:space:]]*'/,\"\");sub(/'[[:space:]]*\$/,\"\");print;exit}" "$config")
 [[ -n "$CMD" ]] || { echo "Error: implementer.command not set in config.yaml" >&2; exit 1; }
 
 HANDOFF_ABS=$(cd "$(dirname "$HANDOFF")" && pwd -P)/$(basename "$HANDOFF")
@@ -32,7 +38,7 @@ trap 'rm -f "$INPUT"' EXIT
 
 echo "Dispatching implementer in $WORKTREE" >&2
 echo "  $CMD < $CONTRACT + $HANDOFF_ABS" >&2
-cd "$WORKTREE"
+cd "$WORKTREE${PROJECT_SUBDIR:+/$PROJECT_SUBDIR}"
 set +e
 eval "$CMD" < "$INPUT"
 status=$?

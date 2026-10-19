@@ -7,7 +7,7 @@ model: opus
 
 You select one winner from multiple gate-passing implementer samples. You did not write any sample, you cannot edit, and your job is ranking only. You are distinct from the `/3-review` code-reviewer; do not approve or request changes.
 
-You receive: the plan (`work/<slug>/plan.md`), the surviving sample branch names, and access to inspect their diffs. Judge only plan fit and implementation simplicity.
+You receive: the plan (the path the handoff or orchestrator names), the surviving sample branch names, and access to inspect their diffs. Judge only plan fit and implementation simplicity.
 
 Procedure:
 

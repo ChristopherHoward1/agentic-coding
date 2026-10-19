@@ -7,15 +7,10 @@
 #   harness worktree list
 set -euo pipefail
 
+HERE=$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 ROOT=$(git rev-parse --show-toplevel)
 cd "$ROOT"
-
-# Naive-but-sufficient config read; override with WORKTREES_DIR env var.
-WT_DIR=${WORKTREES_DIR:-$(awk '/^worktrees:/{f=1;next} f&&/dir:/{print $2; exit}' config.yaml)}
-WT_DIR=${WT_DIR:-../$(basename "$ROOT")-worktrees}
-
-cmd=${1:-}
-slug=${2:-}
 
 worktree_for_branch() {
   local branch="$1"
@@ -36,6 +31,25 @@ worktree_for_branch() {
   '
 }
 
+cmd=${1:-}
+slug=${2:-}
+case "$cmd" in
+  add|remove|sync-artifacts)
+    [[ -n "$slug" ]] || { echo "usage: harness worktree $cmd <slug>" >&2; exit 1; } ;;
+  list) ;;
+  *) echo 'usage: harness worktree {add|remove|sync-artifacts|list} [slug]' >&2; exit 1 ;;
+esac
+# shellcheck source=/dev/null
+source "$HERE/lib/project.sh"
+
+resolve_project
+config="$STATE_DIR/config.yaml"
+if [[ "$PROJECT_MODE" == registry && ! -f "$config" ]]; then config=/dev/null; fi
+
+# Naive-but-sufficient config read; override with WORKTREES_DIR env var.
+WT_DIR=${WORKTREES_DIR:-$(awk '/^worktrees:/{f=1;next} f&&/dir:/{print $2; exit}' "$config")}
+WT_DIR=${WT_DIR:-../$(basename "$ROOT")-worktrees}
+
 case "$cmd" in
   add)
     [[ -n "$slug" ]] || { echo "usage: harness worktree add <slug>" >&2; exit 1; }
@@ -52,7 +66,7 @@ case "$cmd" in
         git worktree add -b "wt/$slug" "$path" >&2
       fi
     fi
-    if [[ -f "$ROOT/work/$slug/plan.md" ]] &&
+    if [[ "$PROJECT_MODE" == repo && -f "$ROOT/work/$slug/plan.md" ]] &&
       [[ -z "$(git -C "$path" ls-tree -r --name-only HEAD -- "work/$slug/plan.md")" ]]; then
       mkdir -p "$path/work/$slug"
       cp "$ROOT/work/$slug/plan.md" "$path/work/$slug/plan.md"
@@ -69,6 +83,10 @@ case "$cmd" in
     ;;
   sync-artifacts)
     [[ -n "$slug" ]] || { echo "usage: harness worktree sync-artifacts <slug>" >&2; exit 1; }
+    if [[ "$PROJECT_MODE" == registry ]]; then
+      echo "registry mode: unit artifacts live in $STATE_DIR; nothing to sync"
+      exit 0
+    fi
     [[ "$(git rev-parse --git-dir)" == "$(git rev-parse --git-common-dir)" ]] || { echo "Error: sync-artifacts must run from the primary checkout" >&2; exit 1; }
     wt_root=$(worktree_for_branch "wt/$slug") || { echo "Error: no worktree for $slug" >&2; exit 1; }
     [[ -d "$ROOT/work/$slug" ]] || { echo "Error: primary checkout has no work/$slug directory" >&2; exit 1; }

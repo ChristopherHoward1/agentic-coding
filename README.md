@@ -130,6 +130,8 @@ knowledge/           cold-tier reference docs — earned, not designed (starts e
 
 ## Getting started
 
+For a work repo, run `harness register [--subdir <path>]` before `/init`; harness state lives under `$(harness project)` with no committed harness files.
+
 1. Use this repo as a template, or copy it into an existing project.
 2. Install the harness: `./harness/bin/harness install` (keep `~/.local/bin` on PATH).
 3. Open it in Claude Code and run `/init` — it scans the codebase, generates `ARCHI.md`, sets the profile, and verifies the gate runs.

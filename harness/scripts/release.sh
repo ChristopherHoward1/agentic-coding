@@ -295,9 +295,18 @@ if [[ $# -eq 0 ]]; then
   exit 2
 fi
 
+# shellcheck source=/dev/null
+source "$HERE/lib/project.sh"
+registry_release_guard() {
+  resolve_project
+  if [[ "$PROJECT_MODE" == registry ]]; then
+    die "registry mode has no release script yet (pr-release); open the PR by hand"
+  fi
+}
 case "$1" in
   tag-after-merge)
     [[ $# -eq 2 ]] || { usage; exit 2; }
+    registry_release_guard
     tag_after_merge "$2"
     ;;
   check-version)
@@ -329,6 +338,7 @@ case "$1" in
           ;;
       esac
     done
+    registry_release_guard
     release "$slug" "$confirm_delta"
     ;;
 esac

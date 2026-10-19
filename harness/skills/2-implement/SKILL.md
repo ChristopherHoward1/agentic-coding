@@ -5,7 +5,7 @@ description: Dispatch the implementer agent into an isolated worktree for an app
 
 # /2-implement — dispatch and gate
 
-Input: an approved work unit `work/<slug>/plan.md`.
+Input: an approved work unit `$(harness project)/work/<slug>/plan.md`.
 
 Read `implementer.fan` from `config.yaml`.
 
@@ -15,8 +15,8 @@ Read `implementer.fan` from `config.yaml`.
 ## Steps
 
 1. **Create the worktree:** `WT=$(harness worktree add <slug>)`.
-2. **Render the handoff** from `prompts/handoff.tpl` into `work/<slug>/handoff.md`. It must be self-contained — the implementer starts cold.
-3. **Dispatch:** `harness agent-exec "$WT" work/<slug>/handoff.md`. Capture the implementer's final summary into `work/<slug>/notes.md`, then from the repo root run `harness worktree sync-artifacts <slug>`.
+2. **Render the handoff** from `prompts/handoff.tpl` into `$(harness project)/work/<slug>/handoff.md`. Fill `{{PLAN_PATH}}` with the absolute `$(harness project)/work/<slug>/plan.md` path. It must be self-contained — the implementer starts cold.
+3. **Dispatch:** `harness agent-exec "$WT" "$(harness project)/work/<slug>/handoff.md"`. Capture the implementer's final summary into `$(harness project)/work/<slug>/notes.md`, then from the repo root run `harness worktree sync-artifacts <slug>`.
 4. **Run the gate in the worktree:** `cd "$WT" && harness gate`. Trust the exit code, not the implementer's claim.
 5. **On failure:** render `prompts/followup.tpl` with the gate output and re-dispatch, then from the repo root run `harness worktree sync-artifacts <slug>` after each dispatch. Retry dispatch/gate up to `gate.max_retries` from `config.yaml`. After that, stop and escalate to the Owner with the failing output — do not fix it yourself in this stage, and do not lower the bar.
 6. **On pass:** commit in the worktree if the implementer didn't, then proceed to `/3-review`.
@@ -31,8 +31,8 @@ Read `implementer.fan` from `config.yaml`.
 
 ## Fan Mode (`N>1`)
 
-1. Render the same handoff from `prompts/handoff.tpl` into `work/<slug>/handoff.md`.
-2. Run `harness fan-exec dispatch <slug> work/<slug>/handoff.md <N>`. Dispatch is sequential and prints a manifest containing only gate-passing sample branches.
+1. Render the same handoff from `prompts/handoff.tpl` into `$(harness project)/work/<slug>/handoff.md`.
+2. Run `harness fan-exec dispatch <slug> "$(harness project)/work/<slug>/handoff.md" <N>`. Dispatch is sequential and prints a manifest containing only gate-passing sample branches.
 3. Handle the manifest:
    - 0 survivors: run `harness fan-exec adopt <slug> <slug>-fan-1`, then run the existing failed-gate followup loop in `wt/<slug>` using `prompts/followup.tpl`, up to `gate.max_retries`; after that, stop and escalate to the Owner with the failing output.
    - 1 survivor: run `harness fan-exec adopt <slug> <survivor>`.

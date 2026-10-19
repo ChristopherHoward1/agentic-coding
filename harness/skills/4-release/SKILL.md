@@ -9,7 +9,7 @@ Input: a work unit slug.
 
 ## Steps
 
-1. **Run the release script:** from the repo root, run `harness worktree sync-artifacts <slug>`, then `harness release <slug> --confirm-delta "none"` (full TRIP: no in-session confirmation; `Confirm-delta` is logged as `none`).
+1. In registry mode, stop after review: `pr-release` owns release; hand the Owner the branch to PR by hand. In repo mode, **run the release script:** from the repo root, run `harness worktree sync-artifacts <slug>`, then `harness release <slug> --confirm-delta "none"` (full TRIP: no in-session confirmation; `Confirm-delta` is logged as `none`).
 2. **React to the exit code:**
    - Exit 0 → report the bump commit on the release branch, that no tag exists yet, and that `main` was untouched.
    - Non-zero → report the script output and stop.
