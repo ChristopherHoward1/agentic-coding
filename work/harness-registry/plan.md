@@ -316,6 +316,12 @@ Code review:
   - Claude MEDIUM: ARCHI freshness after the followup commit. → healed by step 7.
   - Remaining LOWs are recorded in `code-review-r2.md`.
 - Manual `/memory` check: the Owner verified the constitution, `ARCHI.md` and `PLAN.md` load through `CLAUDE.local.md` (see `notes.md`). The `/add-dir` edit check was not exercised.
+- **Round 3.** The release PR #60 failed CI.
+  - Cause: CI's shellcheck 0.9 reports SC2317 where local 0.11 reports SC2329 (the known `ci-shellcheck-pin` problem).
+  - Per the 2026-10-09 Decision, the release commit was dropped, and the orchestrator committed the directive fix plus the README Layout lines for the new scripts.
+  - Both fresh reviewers approved. The Claude reviewer reproduced the failure with 0.9 and saw it pass on both versions.
+  - Its MEDIUM, ARCHI freshness, was healed by step 7. Its second MEDIUM, the unexercised `/add-dir` check, is already recorded above.
+  - LOWs, recorded and not acted on: the comment's "SC2329 on >=0.10" boundary is probably 0.11; the suite's own shellcheck step skips `lib/` (the gate covers it).
 
 Code-review verdict: APPROVE
 Codex-review verdict: APPROVE
