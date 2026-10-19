@@ -1,7 +1,7 @@
-- **HIGH — Normalize `--subdir` before generating the exclude pattern** (`harness/scripts/register.sh:24–25,46`). `--subdir ./app` passes validation but writes `/./app/CLAUDE.local.md` to `.git/info/exclude`. Git does not match that pattern against `app/CLAUDE.local.md`, leaving the generated harness file untracked and vulnerable to accidental commit. `--subdir .` has the same problem. I verified the pattern mismatch with `git check-ignore`. Normalize these paths before constructing the registry entry and exclude line, and test that porcelain remains empty.
+- **MEDIUM — Subdirectory names containing glob characters break the exclude rule.** In [register.sh:52](/Users/cboyfly/Documents/repos/agentic-coding-worktrees/harness-registry/harness/scripts/register.sh:52), an existing directory such as `app[1]`, registered with `--name app`, produces `/app[1]/CLAUDE.local.md`. Git interprets the brackets as a pattern, so the generated file remains untracked and `git status` is dirty. Escape gitignore metacharacters when generating the rule, and use a literal pathspec for the tracked-file check.
 
-- **MEDIUM — The required constitution-loading check remains unverified** (`work/harness-registry/notes.md`). The notes explicitly leave the interactive `/memory` and state-directory Edit checks outstanding. The automated assertions verify generated import text, but cannot establish that Claude loads the constitution or permits state writes as required. Complete the manual acceptance check and record its results.
+- **MEDIUM — The required interactive constitution-loading check remains unverified.** [notes.md](/Users/cboyfly/Documents/repos/agentic-coding-worktrees/harness-registry/work/harness-registry/notes.md) explicitly leaves the `/memory`, external-import approval, and `/add-dir` Edit checks to the orchestrator. Generated-file assertions cannot establish that Claude actually loads the constitution or permits state-directory edits. Complete and record this acceptance check before declaring the unit finished.
 
-The read-only environment prevented running the fixture suites; review used source inspection and a read-only Git pattern check.
+No CRITICAL or HIGH findings.
 
-Codex verdict: REQUEST CHANGES
+Codex verdict: APPROVE
