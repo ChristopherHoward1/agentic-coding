@@ -30,8 +30,10 @@ Release note: {{One line for CHANGELOG.md.}}
 
 ## Demonstration
 
-Run the real changed behavior on real inputs, not test fixtures. Write only under
-`mktemp -d`. Use `None: <reason>` only for units with no runnable behavior.
+Run real changed behavior on real inputs, not test fixtures; write only under `mktemp -d`. Use `None: <reason>` only for units with no runnable behavior.
+The block runs under `bash -e`; show expected failures with `cmd || echo "exit=$?"`.
+To capture output and status, use `rc=0; out=$(cmd) || rc=$?`.
+Use `[ ]` / `test` for mid-block checks, or `[[ ... ]] || exit 1`: Bash 3.2 does not stop on mid-block `[[ ]]` failures.
 
 ```sh
 {{Commands demonstrating the changed behavior.}}

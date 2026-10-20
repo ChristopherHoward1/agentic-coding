@@ -832,7 +832,6 @@ echo earlier > earlier-ran
 ## Demonstration
 ```sh
 pwd
-false
 ## This is a shell comment, not a section boundary
 echo demo-complete
 ```
@@ -840,7 +839,6 @@ echo demo-complete
 echo second > second-ran
 ```
 EOF
-check_exit "demo passes with plain bash despite an intermediate failure" 0 "" "$ROOT/harness/scripts/demo.sh" x "$DEMO_REPO"
 # shellcheck disable=SC2016 # Positional arguments expand in the child bash.
 check "demo runs the full first block in the requested cwd" bash -c '
   out=$("$1/harness/scripts/demo.sh" x "$2") &&
@@ -848,6 +846,33 @@ check "demo runs the full first block in the requested cwd" bash -c '
 ' _ "$ROOT" "$DEMO_REPO"
 # shellcheck disable=SC2016 # Positional arguments expand in the child bash.
 check "demo never runs earlier or second blocks" bash -c '[[ ! -e "$1/earlier-ran" && ! -e "$1/second-ran" ]]' _ "$DEMO_REPO"
+cat >"$DEMO_REPO/work/x/plan.md" <<'EOF'
+## Demonstration
+```sh
+echo before
+false
+echo after
+```
+EOF
+check_exit "demo stops at an intermediate failure and names its code" 1 "code 1" "$ROOT/harness/scripts/demo.sh" x "$DEMO_REPO"
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check "demo prints only output before an intermediate failure" bash -c '
+  out=$("$1/harness/scripts/demo.sh" x "$2") || true
+  [[ "$out" == *before* && "$out" != *after* ]]
+' _ "$ROOT" "$DEMO_REPO"
+cat >"$DEMO_REPO/work/x/plan.md" <<'EOF'
+## Demonstration
+```sh
+[ 1 -eq 2 ]
+echo after
+```
+EOF
+check_exit "demo stops at a failing test command" 1 "code 1" "$ROOT/harness/scripts/demo.sh" x "$DEMO_REPO"
+# shellcheck disable=SC2016 # Positional arguments expand in the child bash.
+check "demo skips output after a failing test command" bash -c '
+  out=$("$1/harness/scripts/demo.sh" x "$2") || true
+  [[ "$out" != *after* ]]
+' _ "$ROOT" "$DEMO_REPO"
 cat >"$DEMO_REPO/work/x/plan.md" <<'EOF'
 ## Demonstration
 
@@ -905,7 +930,7 @@ mkdir -p "$TMP/demo-not-git"
 check_exit "demo non-git directory is a tooling error" 2 "not a git work tree" "$ROOT/harness/scripts/demo.sh" x "$TMP/demo-not-git"
 # shellcheck disable=SC2016 # Positional arguments expand in the child bash.
 check "demo help documents its arguments" bash -c '
-  out=$("$1/harness/scripts/demo.sh" --help) && [[ "$out" == *"Usage: harness demo <slug> [<dir>]"* ]]
+  out=$("$1/harness/scripts/demo.sh" --help) && [[ "$out" == *"Usage: harness demo <slug> [<dir>]"* && "$out" == *"bash -e"* ]]
 ' _ "$ROOT"
 check_exit "demo refuses missing arguments" 2 "Usage:" "$ROOT/harness/scripts/demo.sh"
 
