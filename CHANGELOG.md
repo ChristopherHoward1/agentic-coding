@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.10.8] - 2026-10-19
+
+- `harness agent-exec` commits whatever a successful dispatch leaves uncommitted, and `/2-implement` runs the demo itself. Implementers never touch git, the gate lints the working tree (untracked scripts in, deleted ones out), and the handoff authorizes every edit the plan names.
+- Confirm-delta: none
+
 ## [2026.10.7] - 2026-10-19
 
 - The public template now publishes only `harness/`, README and LICENSE. `scripts/publish.sh` replaces the template export, the skeletons move to `harness/skeleton/`, and `/init` copies them into a project.
