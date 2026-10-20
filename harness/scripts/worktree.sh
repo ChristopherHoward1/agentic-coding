@@ -2,6 +2,7 @@
 # Manage isolated implementation worktrees.
 # Usage:
 #   harness worktree add <slug>      # create worktree + branch wt/<slug>, print its path
+#   harness worktree base <slug>     # print the exact review base
 #   harness worktree remove <slug>   # remove worktree, keep the branch
 #   harness worktree sync-artifacts <slug>  # copy primary work artifacts into worktree + commit
 #   harness worktree list
@@ -34,15 +35,17 @@ worktree_for_branch() {
 cmd=${1:-}
 slug=${2:-}
 case "$cmd" in
-  add|remove|sync-artifacts)
+  add|base|remove|sync-artifacts)
     [[ -n "$slug" ]] || { echo "usage: harness worktree $cmd <slug>" >&2; exit 1; } ;;
   list) ;;
-  *) echo 'usage: harness worktree {add|remove|sync-artifacts|list} [slug]' >&2; exit 1 ;;
+  *) echo 'usage: harness worktree {add|base|remove|sync-artifacts|list} [slug]' >&2; exit 1 ;;
 esac
 # shellcheck source=/dev/null
 source "$HERE/lib/project.sh"
 
 resolve_project
+# shellcheck source=/dev/null
+source "$HERE/lib/stack.sh"
 config="$STATE_DIR/config.yaml"
 if [[ "$PROJECT_MODE" == registry && ! -f "$config" ]]; then config=/dev/null; fi
 
@@ -59,11 +62,17 @@ case "$cmd" in
     if git show-ref --verify --quiet "refs/heads/wt/$slug"; then
       git worktree add "$path" "wt/$slug" >&2
     else
-      git fetch origin --quiet 2>/dev/null || true
-      if git show-ref --verify --quiet refs/remotes/origin/main; then
-        git worktree add -b "wt/$slug" "$path" origin/main >&2
+      parent=$(stack_parent "$slug")
+      if [[ -n "$parent" ]]; then
+        git show-ref --verify --quiet "refs/heads/wt/$parent" || { echo "Error: wt/$parent missing" >&2; exit 1; }
+        git worktree add -b "wt/$slug" "$path" "wt/$parent" >&2
       else
-        git worktree add -b "wt/$slug" "$path" >&2
+        git fetch origin --quiet 2>/dev/null || true
+        if git show-ref --verify --quiet refs/remotes/origin/main; then
+          git worktree add -b "wt/$slug" "$path" origin/main >&2
+        else
+          git worktree add -b "wt/$slug" "$path" >&2
+        fi
       fi
     fi
     if [[ "$PROJECT_MODE" == repo && -f "$ROOT/work/$slug/plan.md" ]] &&
@@ -75,6 +84,9 @@ case "$cmd" in
     fi
     # stdout carries only the path, so callers can capture it
     cd "$path" && pwd -P
+    ;;
+  base)
+    review_base "$slug"
     ;;
   remove)
     [[ -n "$slug" ]] || { echo "usage: harness worktree remove <slug>" >&2; exit 1; }
@@ -107,7 +119,7 @@ case "$cmd" in
     git worktree list
     ;;
   *)
-    echo "usage: harness worktree {add|remove|sync-artifacts|list} [slug]" >&2
+    echo "usage: harness worktree {add|base|remove|sync-artifacts|list} [slug]" >&2
     exit 1
     ;;
 esac

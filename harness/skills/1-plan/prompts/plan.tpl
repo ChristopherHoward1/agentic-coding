@@ -2,6 +2,8 @@
 
 **Slug:** {{SLUG}} · **Date:** {{DATE}} · **Status:** draft | approved | implemented | merged
 
+{{Optional header line when this unit builds on an unmerged parent: Stacked on: <parent-slug>}}
+
 ## Goal
 
 {{One paragraph: the problem and what done looks like.}}

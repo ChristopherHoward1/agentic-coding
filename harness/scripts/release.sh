@@ -158,6 +158,21 @@ check_clean_worktree() {
     || die "$label has untracked files"
 }
 
+check_stack_landed() {
+  local slug="$1" parent base fork wt
+  parent=$(stack_parent "$slug") || die "cannot read stack parent"
+  [[ -n "$parent" ]] || return 0
+  git fetch origin main || die "cannot fetch origin/main"
+  if ! git cat-file -e "origin/main:work/$parent/plan.md" 2>/dev/null; then
+    die "stacked on $parent, which has not landed on origin/main; release $parent first"
+  fi
+  base=$(review_base "$slug") || die "cannot select review base"
+  [[ "$base" != origin/main ]] || return 0
+  fork=$(stack_fork "$slug" "$parent") || die "cannot find stack fork"
+  wt=$(worktree_for_branch "wt/$slug") || die "missing wt/$slug worktree"
+  die "stacked on $parent, which has landed; restack first: git -C $wt rebase --onto origin/main $fork"
+}
+
 check_origin_main_ancestor() {
   local release_branch="$1"
 
@@ -232,6 +247,7 @@ release() {
 
   check_verdict "$plan_path"
   check_clean_worktree "$release_checkout" "$release_branch"
+  check_stack_landed "$slug"
   check_origin_main_ancestor "$release_branch"
   check_previous_retro
   check_gate
@@ -299,6 +315,8 @@ fi
 source "$HERE/lib/project.sh"
 registry_release_guard() {
   resolve_project
+  # shellcheck source=/dev/null
+  source "$HERE/lib/stack.sh"
   if [[ "$PROJECT_MODE" == registry ]]; then
     die "registry mode has no release script yet (pr-release); open the PR by hand"
   fi
