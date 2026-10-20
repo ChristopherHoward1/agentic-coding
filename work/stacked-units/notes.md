@@ -27,3 +27,13 @@ diff files: child.txt
 base after merge-commit landing of amended p: fork-point SHA
 diff files: child.txt 
 ```
+
+## Followup 1 (review round 1 findings)
+
+Fixed all three findings: escaped printed worktree paths, omitted `-C` when the child worktree is absent, and updated both ARCHI test summaries. Extended existing tests within scope.
+
+Mutation: dropped each escape in an isolated copy; verified landing; rewrite-amend and release-landed tests failed (128), then passed after restoration; `uname -s`: Darwin.
+
+`bash harness/bin/harness gate`: PASS. No partial criteria or out-of-scope changes.
+
+Demo after followup 1: exit 0, same six lines.
