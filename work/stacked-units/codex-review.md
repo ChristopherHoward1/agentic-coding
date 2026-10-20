@@ -1,3 +1,5 @@
-- **HIGH — Restack advice can move `main` when the child has no worktree.** In `harness/scripts/lib/stack.sh:54–55`, an absent child worktree produces `git rebase --onto wt/p <fork>` without identifying the child branch. Reproduce by removing `c` with `harness worktree remove c`, amending `p`, then running `harness worktree base c` from the primary checkout. Following its printed command rebases the currently checked-out `main`; in the usual topology, it moves `main` onto the unmerged parent. Append `wt/<slug>` to the command, or require recreating the child worktree before printing executable advice. The new missing-worktree test checks only the command’s text, so it misses this behavior.
+No substantive findings. The stack-base selection, release guard, and executable restack commands match the approved plan. The accepted deferral remains outside this review.
 
-Codex verdict: REQUEST CHANGES
+All six changed shell files pass `bash -n`. Runtime tests and the demonstration were not run because the environment is read-only.
+
+Codex verdict: APPROVE
