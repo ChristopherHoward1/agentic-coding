@@ -17,6 +17,8 @@ usage() {
 
 registry_fan_guard() {
   resolve_project
+  # shellcheck source=/dev/null
+  source "$HERE/lib/stack.sh"
   [[ "$PROJECT_MODE" == repo ]] || { echo 'fan-exec: fan mode is repo-mode only' >&2; exit 1; }
 }
 
@@ -65,7 +67,7 @@ dispatch() {
   local slug="${1:-}"
   local handoff="${2:-}"
   local n="${3:-}"
-  local k wt branch agent_status gate_status
+  local k wt branch agent_status gate_status parent
   local passers=()
 
   [[ -n "$slug" && -n "$handoff" && -n "$n" ]] || usage
@@ -73,6 +75,8 @@ dispatch() {
   [[ -s "$handoff" ]] || { echo "Error: handoff missing or empty: $handoff" >&2; exit 1; }
 
   registry_fan_guard
+  parent=$(stack_parent "$slug") || exit 2
+  [[ -z "$parent" ]] || { echo "fan mode does not support stacked units" >&2; exit 2; }
 
   for ((k = 1; k <= n; k++)); do
     branch="wt/$slug-fan-$k"

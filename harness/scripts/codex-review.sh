@@ -101,12 +101,9 @@ else
   printf '(none recorded)\n' >>"$prompt"
 fi
 
-git fetch origin --quiet 2>/dev/null || true
-if git show-ref --verify --quiet refs/remotes/origin/main; then
-  base=origin/main
-else
-  base=main
-fi
+# shellcheck source=/dev/null
+source "$HERE/lib/stack.sh"
+base=$(review_base "$slug") || die2 "cannot select review base"
 
 printf '\n%s\n' "--- DIFF ($base...$branch excluding work/$slug) ---" >>"$prompt"
 git diff "$base...$branch" -- ':/' ":(exclude,top)work/$slug" >>"$prompt" \

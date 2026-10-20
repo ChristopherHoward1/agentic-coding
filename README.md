@@ -108,6 +108,7 @@ harness/scripts/     the deterministic layer:
                        install.sh     link dispatcher, skills and agents into the home directory
                        register.sh    register a work repo: home-directory state, nothing committed
                        project.sh     print the project's state dir, mode or project root
+                       lib/stack.sh   shared stack parent, fork point and review base (sourced)
                        lib/project.sh shared registry/repo-mode resolution (sourced, not a command)
                        gate.sh        stack-detecting pass/fail
                        worktree.sh    isolated-checkout lifecycle

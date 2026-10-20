@@ -1040,7 +1040,8 @@ check "codex-review prompt passes round number" grep -F "REVIEW_ROUND" harness/s
 check "3-review skill tracks round counter" grep -F "work/<slug>/review-round" harness/skills/3-review/SKILL.md
 check "3-review skill routes by severity" grep -F "CRITICAL/HIGH" harness/skills/3-review/SKILL.md
 check "3-review skill caps at round 3 mechanically" grep -F "counter reaches 3" harness/skills/3-review/SKILL.md
-check "3-review skill keeps codex-review work artifacts out of diff" grep -F "git diff origin/main...wt/<slug> -- ':/' \":(exclude,top)work/<slug>\"" harness/skills/3-review/SKILL.md
+# shellcheck disable=SC2016
+check "3-review skill keeps codex-review work artifacts out of diff" grep -F "git diff \"\$base...wt/<slug>\" -- ':/' \":(exclude,top)work/<slug>\"" harness/skills/3-review/SKILL.md
 
 setup_codex_review_fixture codex-approve normal
 check_exit "codex-review approve exits 0" 0 "" bash -c "cd '$COD_PRIMARY' && bash scripts/codex-review.sh demo"
@@ -2472,6 +2473,240 @@ check "registry subdir normalization and validation" bash -e -c registry_subdir
 check 'registry lookup skips unrelated stale and malformed entries under set -e' bash -e -c registry_lookup
 check 'registry register preflight and idempotent excluded imports' bash -e -c registry_register
 check 'registry project subdir gate worktree agent demo state and refusal flow' bash -e -c registry_flow
+
+# --- Stacked units: each case owns a non-bare clone and local bare origin.
+# shellcheck disable=SC2317,SC2329
+stack_fixture() {
+  t=$(mktemp -d "$TMP/stack.XXXXXX")
+  export GIT_AUTHOR_NAME=Tester GIT_AUTHOR_EMAIL=test@example.com
+  export GIT_COMMITTER_NAME=Tester GIT_COMMITTER_EMAIL=test@example.com
+  export HARNESS_HOME="$t/home" WORKTREES_DIR="$t/wts"
+  git init -q --bare -b main "$t/origin.git"
+  git clone -q "$t/origin.git" "$t/r" 2>/dev/null
+  cd "$t/r"
+  git config core.logAllRefUpdates true
+  mkdir -p scripts/lib
+  cp -R "$ROOT/harness/scripts/lib/." scripts/lib/
+  cp "$ROOT/harness/scripts/worktree.sh" "$ROOT/harness/scripts/release.sh" \
+    "$ROOT/harness/scripts/codex-review.sh" "$ROOT/harness/scripts/fan-exec.sh" scripts/
+  printf '2026.1.0\n' >VERSION
+  printf 'base\n' >base.txt
+  printf 'reviewer:\n  command: cat >"%s/prompt"; echo "Codex verdict: APPROVE"\n' "$t" >config.yaml
+  git add -A && git commit -qm init && git push -q origin main
+  git clone -q "$t/origin.git" "$t/land"
+  local plan_root="$PWD"
+  if [[ "${1:-}" == registry ]]; then
+    plan_root="$HARNESS_HOME/projects/x"
+    mkdir -p "$plan_root"
+    printf 'root=%s\n' "$PWD" >"$plan_root/project"
+  fi
+  mkdir -p "$plan_root/work/p" "$plan_root/work/c"
+  printf '# Parent\n' >"$plan_root/work/p/plan.md"
+  printf '# Child\nStacked on: p\n## Review\nCode-review verdict: APPROVE\nCodex-review verdict: APPROVE\n' >"$plan_root/work/c/plan.md"
+  p=$(bash scripts/worktree.sh add p)
+  echo parent >"$p/parent.txt"
+  git -C "$p" add -A && git -C "$p" commit -qm parent
+  parent_base=$(git merge-base origin/main wt/p)
+  c=$(bash scripts/worktree.sh add c)
+  fork=$(git rev-parse wt/p)
+  echo child >"$c/child.txt"
+  git -C "$c" add -A && git -C "$c" commit -qm child
+  git merge-base --is-ancestor wt/p wt/c
+}
+# shellcheck disable=SC2317,SC2329
+stack_diff() {
+  [[ "$(git diff --name-only "$1...wt/c" -- ':/' ':(exclude,top)work/c')" == child.txt ]]
+}
+# shellcheck disable=SC2317,SC2329
+stack_land() {
+  git -C "$p" push -qf origin wt/p
+  git -C "$t/land" fetch -q origin
+  if [[ "$1" == merge ]]; then
+    git -C "$t/land" merge -q --no-ff -m landed origin/wt/p
+  else
+    echo unrelated >"$t/land/unrelated.txt"
+    git -C "$t/land" add -A && git -C "$t/land" commit -qm unrelated
+    git -C "$t/land" push -q origin main
+    git rev-list --reverse "$parent_base..wt/p" | while read -r rev; do
+      git -C "$t/land" cherry-pick "$rev" || exit 1
+    done
+  fi
+  git -C "$t/land" push -q origin main
+  git fetch -q origin
+  if [[ "$1" == rebase ]]; then
+    if git merge-base --is-ancestor wt/p origin/main; then return 1; fi
+  fi
+}
+# shellcheck disable=SC2317,SC2329
+stack_base_case() {
+  stack_fixture
+  case "$1" in
+    unmerged)
+      [[ "$(bash scripts/worktree.sh base c)" == wt/p ]] || return 1
+      stack_diff wt/p
+      echo more >"$p/more.txt"; git -C "$p" add -A; git -C "$p" commit -qm more
+      [[ "$(bash scripts/worktree.sh base c)" == wt/p ]] || return 1
+      stack_diff wt/p ;;
+    merge|rebase)
+      stack_land "$1"
+      local expected=wt/p
+      [[ "$1" != merge ]] || expected=origin/main
+      [[ "$(bash scripts/worktree.sh base c)" == "$expected" ]] || return 1
+      stack_diff "$expected" ;;
+  esac
+}
+# shellcheck disable=SC2317,SC2329
+stack_rewrite() {
+  case "$1" in
+    amend|again) echo amended >"$p/parent.txt"; git -C "$p" commit -qam amended --amend ;;
+    squash) git -C "$p" reset --soft "$parent_base"; echo rewritten >>"$p/work/p/plan.md"; echo changed >"$p/parent.txt"; git -C "$p" add -A; git -C "$p" commit -qm squashed ;;
+    partial) git -C "$p" reset --soft HEAD~1; git -C "$p" commit -qm partial ;;
+    drop) git -C "$p" reset --hard HEAD~1 ;;
+    rebase)
+      echo upstream >"$t/land/upstream.txt"; git -C "$t/land" add -A; git -C "$t/land" commit -qm upstream
+      git -C "$t/land" push -q origin main; git fetch -q origin
+      git -C "$p" rebase origin/main ;;
+  esac
+}
+# shellcheck disable=SC2317,SC2329
+stack_rewrite_case() {
+  stack_fixture
+  stack_rewrite "$1"
+  if [[ "$1" == again ]]; then
+    git -C "$c" rebase --onto wt/p "$fork"
+    fork=$(git rev-parse wt/p)
+    echo twice >"$p/parent.txt"; git -C "$p" commit -qam twice --amend
+  fi
+  local base command
+  base=$(bash scripts/worktree.sh base c 2>"$t/note")
+  [[ "$base" == "$fork" && "$base" != wt/p && "$base" != origin/main ]]
+  stack_diff "$base"
+  grep -q 'rebase --onto wt/p' "$t/note"
+  command=$(sed 's/^.*to pick it up: //' "$t/note")
+  bash -c "$command"
+  [[ "$(bash scripts/worktree.sh base c)" == wt/p ]] || return 1
+  stack_diff wt/p
+}
+# shellcheck disable=SC2317,SC2329
+stack_release_case() {
+  stack_fixture
+  case "$1" in
+    advanced) echo unrelated >"$t/land/unrelated.txt"; git -C "$t/land" add -A; git -C "$t/land" commit -qm unrelated; git -C "$t/land" push -q origin main ;;
+    rewritten|amended-landed) stack_rewrite amend ;;
+    expired) git reflog expire --expire=now --expire-unreachable=now refs/heads/wt/p ;;
+  esac
+  case "$1" in landed|amended-landed) stack_land rebase ;; esac
+  local status=0 command
+  bash scripts/release.sh c >"$t/out" 2>"$t/err" || status=$?
+  [[ "$status" -ne 0 && "$(cat "$c/VERSION")" == 2026.1.0 ]]
+  case "$1" in
+    landed|amended-landed)
+      grep -q "restack first: git -C .* rebase --onto origin/main $fork" "$t/err"
+      command=$(sed -n 's/^.*restack first: //p' "$t/err")
+      bash -c "$command"
+      [[ "$(bash scripts/worktree.sh base c)" == origin/main ]] || return 1
+      stack_diff origin/main
+      status=0
+      bash scripts/release.sh c >"$t/out" 2>"$t/err" || status=$?
+      [[ "$status" -ne 0 ]] || return 1
+      if grep -q 'stacked on' "$t/err"; then return 1; fi
+      [[ "$(cat "$c/VERSION")" == 2026.1.0 ]] ;;
+    *) grep -q 'has not landed' "$t/err"; ! grep -q 'is stale' "$t/err" ;;
+  esac
+}
+# shellcheck disable=SC2317,SC2329
+stack_edge_case() {
+  if [[ "$1" == registry ]]; then stack_fixture registry; else stack_fixture; fi
+  case "$1" in
+    missing-parent)
+      git worktree remove --force "$p"; git branch -D wt/p
+      local status=0
+      bash scripts/worktree.sh base c >"$t/out" 2>"$t/err" || status=$?
+      [[ "$status" == 2 ]] || return 1
+      grep -q 'delete the Stacked on: line from wt/c:work/c/plan.md' "$t/err"
+      status=0; bash scripts/codex-review.sh c >"$t/out" 2>"$t/err" || status=$?
+      [[ "$status" == 2 && ! -e work/c/codex-review.md ]] ;;
+    missing-child)
+      git worktree remove --force "$c"; git branch -D wt/c
+      local status=0
+      bash scripts/worktree.sh base c >"$t/out" 2>"$t/err" || status=$?
+      [[ "$status" == 2 ]] || return 1
+      grep -q 'wt/c missing' "$t/err" ;;
+    fallback)
+      git -C "$c" rm work/c/plan.md; git -C "$c" commit -qm remove-plan
+      [[ "$(cd "$c"; bash "$t/r/scripts/worktree.sh" base c)" == wt/p ]] ;;
+    header)
+      mkdir -p work/header; printf '# Header\n## Approach\nStacked on: p\n' >work/header/plan.md
+      local h
+      h=$(bash scripts/worktree.sh add header)
+      if git merge-base --is-ancestor wt/p wt/header; then return 1; fi
+      mkdir -p work/missing; printf '# Missing\nStacked on: absent\n' >work/missing/plan.md
+      local status=0
+      bash scripts/worktree.sh add missing >"$t/out" 2>"$t/err" || status=$?
+      [[ "$status" == 1 ]] || return 1
+      grep -q 'wt/absent' "$t/err"
+      if git show-ref --verify --quiet refs/heads/wt/missing; then return 1; fi
+      [[ -d "$h" ]] ;;
+    review)
+      bash scripts/codex-review.sh c
+      grep -q -- '--- DIFF (wt/p...wt/c' "$t/prompt"
+      if grep -q 'diff --git a/parent.txt' "$t/prompt"; then return 1; fi
+      grep -q 'diff --git a/child.txt' "$t/prompt" ;;
+    fan)
+      echo handoff >"$t/handoff"
+      local status=0
+      bash scripts/fan-exec.sh dispatch c "$t/handoff" 2 >"$t/out" 2>"$t/err" || status=$?
+      [[ "$status" == 2 ]] || return 1
+      grep -q 'fan mode does not support stacked units' "$t/err"
+      [[ "$(git worktree list --porcelain | grep -c '^worktree ')" == 3 ]] ;;
+    errors)
+      # shellcheck source=/dev/null
+      source scripts/lib/project.sh
+      resolve_project
+      # shellcheck source=/dev/null
+      source scripts/lib/stack.sh
+      local failure status
+      for failure in --fork-point --is-ancestor; do
+        git() {
+          if [[ "${1:-}" == merge-base && "${2:-}" == "$failure" ]]; then
+            echo 'injected git error' >&2
+            return 128
+          fi
+          command git "$@"
+        }
+        status=0
+        review_base c >"$t/out" 2>"$t/err" || status=$?
+        [[ "$status" == 2 && ! -s "$t/out" ]]
+        grep -q 'injected git error' "$t/err"
+        unset -f git
+      done ;;
+    registry)
+      [[ ! -e work/p/plan.md && ! -e work/c/plan.md ]]
+      [[ ! -e "$p/work/p/plan.md" && ! -e "$c/work/c/plan.md" ]]
+      [[ -f "$HARNESS_HOME/projects/x/work/c/plan.md" ]]
+      [[ "$(bash scripts/worktree.sh base c)" == wt/p ]]
+      stack_land merge
+      [[ "$(bash scripts/worktree.sh base c)" == origin/main ]] ;;
+  esac
+}
+export -f stack_fixture stack_diff stack_land stack_base_case stack_rewrite stack_rewrite_case stack_release_case stack_edge_case
+for scenario in unmerged merge rebase; do
+  # shellcheck disable=SC2016
+  check "stack base $scenario" bash -e -c 'stack_base_case "$1"' _ "$scenario"
+done
+for scenario in amend squash rebase partial drop again; do
+  # shellcheck disable=SC2016
+  check "stack rewrite $scenario" bash -e -c 'stack_rewrite_case "$1"' _ "$scenario"
+done
+for scenario in unmerged advanced rewritten expired landed amended-landed; do
+  # shellcheck disable=SC2016
+  check "stack release $scenario" bash -e -c 'stack_release_case "$1"' _ "$scenario"
+done
+for scenario in missing-parent missing-child fallback header review fan errors registry; do
+  # shellcheck disable=SC2016
+  check "stack edge $scenario" bash -e -c 'stack_edge_case "$1"' _ "$scenario"
+done
+
 
 # --- gate.sh runs and exits cleanly on this repo
 check "gate.sh runs on this repo" bash "$ROOT/harness/bin/harness" gate
