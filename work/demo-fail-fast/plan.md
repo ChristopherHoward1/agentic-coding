@@ -1,6 +1,6 @@
 # Demo fail-fast: a failing command mid-block fails the demonstration
 
-**Slug:** demo-fail-fast · **Date:** 2026-10-20 · **Status:** approved
+**Slug:** demo-fail-fast · **Date:** 2026-10-20 · **Status:** implemented
 
 ## Goal
 
@@ -88,3 +88,12 @@ Round 3 (fresh plan-reviewer): APPROVE, with three LOWs, all applied:
 3. Dropped the two expected-failure-form tests. They test Bash rather than `demo.sh` and pass with `-e` removed. The Demonstration exercises both forms, and `plan.tpl` documents them.
 
 Plan verdict: APPROVE
+
+Code review round 1: both reviewers APPROVE.
+- code-reviewer: all criteria met. The reviewer verified the mutation itself: with `-e` removed, 4 of the new checks fail. It also ran the gate (PASS) and the demo (matches Expected). Two LOWs.
+- codex: one LOW, the same as the code-reviewer's first.
+- LOW 1 (both reviewers): ARCHI line 21 named "expected-failure forms" tests that plan-review round 3 dropped. The orchestrator corrected the wording after both approvals. It is a description sync of approved code, the same exemption `/3-review` step 7 gives ARCHI heals, so no new round was started.
+- LOW 2 (code-reviewer): one long line in `plan.tpl`. Style only, left as is.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
