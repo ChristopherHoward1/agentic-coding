@@ -1,6 +1,6 @@
 # The orchestrator owns implementer commits and the demo
 
-**Slug:** codex-worktree-commit · **Date:** 2026-10-19 · **Status:** approved
+**Slug:** codex-worktree-commit · **Date:** 2026-10-19 · **Status:** implemented
 
 ## Goal
 
@@ -141,3 +141,17 @@ Expected: `subject: Implementer changes for main`, `status: []`, `A new.sh` and 
 
 Owner approval (2026-10-19): approved over the round-3 REVISE. No CRITICAL or HIGH findings were open, and all round-3 findings were applied.
 Plan verdict: APPROVE
+
+**Code review, round 1.** Both reviewers approved with LOW findings only.
+- **Claude reviewer.** Re-ran the gate (242 + 6 pass) and the demo, both in the worktree, with matching output. Mutation-tested all 7 guards in a scratch clone.
+  - **LOWs:**
+    - `PLAN.md` touched;
+    - an index pre-staged by a rule-breaking implementer bypasses the `work/` exclusion;
+    - the commit subject is empty on a detached HEAD;
+    - the ARCHI test-case wording groups the gate cases under agent-exec.
+- **Codex.** LOW: `PLAN.md` touched.
+- **On `PLAN.md`.** The hunk is the orchestrator's "In progress" line. `/1-plan` step 5 and Decision 2026-09-08 put that edit on the unit branch; the implementer didn't make it. The stale `Candidate:` line is retired at `/5-retro`.
+- **Other LOWs.** Not fixed: they're outside the plan's scenarios, and the worktree always has `wt/<slug>` checked out.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
