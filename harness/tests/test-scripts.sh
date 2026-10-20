@@ -2515,7 +2515,7 @@ stack_fixture() {
 }
 # shellcheck disable=SC2317,SC2329
 stack_diff() {
-  [[ "$(git diff --name-only "$1...wt/c" -- ':/' ':(exclude,top)work/c')" == child.txt ]]
+  [[ "$(git diff --name-only "$1...wt/c" -- ':/' ':(exclude,top)work/c')" == child.txt ]] || return 1
 }
 # shellcheck disable=SC2317,SC2329
 stack_land() {
@@ -2577,19 +2577,25 @@ stack_rewrite_case() {
     fork=$(git rev-parse wt/p)
     echo twice >"$p/parent.txt"; git -C "$p" commit -qam twice --amend
   fi
-  local base command
+  local base command main_before
   base=$(bash scripts/worktree.sh base c 2>"$t/note")
-  [[ "$base" == "$fork" && "$base" != wt/p && "$base" != origin/main ]]
+  [[ "$base" == "$fork" && "$base" != wt/p && "$base" != origin/main ]] || return 1
   stack_diff "$base"
   grep -q 'rebase --onto wt/p' "$t/note"
   command=$(sed 's/^.*to pick it up: //' "$t/note")
   if [[ "$1" == amend ]]; then
     git worktree remove "$c"
-    [[ "$(bash scripts/worktree.sh base c 2>"$t/no-worktree-note")" == "$base" ]]
-    [[ "$(sed 's/^.*to pick it up: //' "$t/no-worktree-note")" == "git rebase --onto wt/p $fork" ]]
-    git worktree add "$c" wt/c
+    [[ "$(bash scripts/worktree.sh base c 2>"$t/no-worktree-note")" == "$base" ]] || return 1
+    if grep -q rebase "$t/no-worktree-note"; then return 1; fi
+    grep -q 'harness worktree add c' "$t/no-worktree-note"
+    c=$(bash scripts/worktree.sh add c)
+    [[ "$(bash scripts/worktree.sh base c 2>"$t/note")" == "$base" ]] || return 1
+    command=$(sed 's/^.*to pick it up: //' "$t/note")
+    [[ "$command" == "git -C $(printf '%q' "$c") rebase --onto wt/p $fork" ]] || return 1
   fi
+  main_before=$(git rev-parse main)
   bash -c "$command"
+  [[ "$(git rev-parse main)" == "$main_before" ]] || return 1
   [[ "$(bash scripts/worktree.sh base c)" == wt/p ]] || return 1
   stack_diff wt/p
 }
@@ -2604,7 +2610,7 @@ stack_release_case() {
   case "$1" in landed|amended-landed) stack_land rebase ;; esac
   local status=0 command
   bash scripts/release.sh c >"$t/out" 2>"$t/err" || status=$?
-  [[ "$status" -ne 0 && "$(cat "$c/VERSION")" == 2026.1.0 ]]
+  [[ "$status" -ne 0 && "$(cat "$c/VERSION")" == 2026.1.0 ]] || return 1
   case "$1" in
     landed|amended-landed)
       grep -q "restack first: git -C .* rebase --onto origin/main $fork" "$t/err"
@@ -2616,7 +2622,7 @@ stack_release_case() {
       bash scripts/release.sh c >"$t/out" 2>"$t/err" || status=$?
       [[ "$status" -ne 0 ]] || return 1
       if grep -q 'stacked on' "$t/err"; then return 1; fi
-      [[ "$(cat "$c/VERSION")" == 2026.1.0 ]] ;;
+      [[ "$(cat "$c/VERSION")" == 2026.1.0 ]] || return 1 ;;
     *) grep -q 'has not landed' "$t/err"; ! grep -q 'is stale' "$t/err" ;;
   esac
 }
@@ -2631,7 +2637,7 @@ stack_edge_case() {
       [[ "$status" == 2 ]] || return 1
       grep -q 'delete the Stacked on: line from wt/c:work/c/plan.md' "$t/err"
       status=0; bash scripts/codex-review.sh c >"$t/out" 2>"$t/err" || status=$?
-      [[ "$status" == 2 && ! -e work/c/codex-review.md ]] ;;
+      [[ "$status" == 2 && ! -e work/c/codex-review.md ]] || return 1 ;;
     missing-child)
       git worktree remove --force "$c"; git branch -D wt/c
       local status=0
@@ -2640,7 +2646,7 @@ stack_edge_case() {
       grep -q 'wt/c missing' "$t/err" ;;
     fallback)
       git -C "$c" rm work/c/plan.md; git -C "$c" commit -qm remove-plan
-      [[ "$(cd "$c"; bash "$t/r/scripts/worktree.sh" base c)" == wt/p ]] ;;
+      [[ "$(cd "$c"; bash "$t/r/scripts/worktree.sh" base c)" == wt/p ]] || return 1 ;;
     header)
       mkdir -p work/header; printf '# Header\n## Approach\nStacked on: p\n' >work/header/plan.md
       local h
@@ -2652,7 +2658,7 @@ stack_edge_case() {
       [[ "$status" == 1 ]] || return 1
       grep -q 'wt/absent' "$t/err"
       if git show-ref --verify --quiet refs/heads/wt/missing; then return 1; fi
-      [[ -d "$h" ]] ;;
+      [[ -d "$h" ]] || return 1 ;;
     review)
       bash scripts/codex-review.sh c
       grep -q -- '--- DIFF (wt/p...wt/c' "$t/prompt"
@@ -2664,7 +2670,7 @@ stack_edge_case() {
       bash scripts/fan-exec.sh dispatch c "$t/handoff" 2 >"$t/out" 2>"$t/err" || status=$?
       [[ "$status" == 2 ]] || return 1
       grep -q 'fan mode does not support stacked units' "$t/err"
-      [[ "$(git worktree list --porcelain | grep -c '^worktree ')" == 3 ]] ;;
+      [[ "$(git worktree list --porcelain | grep -c '^worktree ')" == 3 ]] || return 1 ;;
     errors)
       # shellcheck source=/dev/null
       source scripts/lib/project.sh
@@ -2682,17 +2688,17 @@ stack_edge_case() {
         }
         status=0
         review_base c >"$t/out" 2>"$t/err" || status=$?
-        [[ "$status" == 2 && ! -s "$t/out" ]]
+        [[ "$status" == 2 && ! -s "$t/out" ]] || return 1
         grep -q 'injected git error' "$t/err"
         unset -f git
       done ;;
     registry)
-      [[ ! -e work/p/plan.md && ! -e work/c/plan.md ]]
-      [[ ! -e "$p/work/p/plan.md" && ! -e "$c/work/c/plan.md" ]]
-      [[ -f "$HARNESS_HOME/projects/x/work/c/plan.md" ]]
-      [[ "$(bash scripts/worktree.sh base c)" == wt/p ]]
+      [[ ! -e work/p/plan.md && ! -e work/c/plan.md ]] || return 1
+      [[ ! -e "$p/work/p/plan.md" && ! -e "$c/work/c/plan.md" ]] || return 1
+      [[ -f "$HARNESS_HOME/projects/x/work/c/plan.md" ]] || return 1
+      [[ "$(bash scripts/worktree.sh base c)" == wt/p ]] || return 1
       stack_land merge
-      [[ "$(bash scripts/worktree.sh base c)" == origin/main ]] ;;
+      [[ "$(bash scripts/worktree.sh base c)" == origin/main ]] || return 1 ;;
   esac
 }
 export -f stack_fixture stack_diff stack_land stack_base_case stack_rewrite stack_rewrite_case stack_release_case stack_edge_case
