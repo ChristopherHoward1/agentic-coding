@@ -1,6 +1,6 @@
 # Stacked units: branch a unit from its unmerged parent and review only its own diff
 
-**Slug:** stacked-units · **Date:** 2026-10-19 · **Status:** approved
+**Slug:** stacked-units · **Date:** 2026-10-19 · **Status:** implemented
 
 ## Goal
 
@@ -39,7 +39,7 @@ Done = a plan can declare `Stacked on: <parent>`. `worktree add` then branches f
        - Unmerged, including after it gains commits: `F` is on `wt/<parent>`, so the base is `wt/<parent>`.
        - Merged by merge commit or fast-forward: `F` is on main, so the base is the main ref.
        - Rebase-merged (this repo): `F` is on `wt/<parent>`, off main, so the base is `wt/<parent>`. Release refuses with the restack command (step 5).
-       - Restacked onto main after any landing: no reflog entry of `wt/<parent>` is an ancestor of the child, so the base is the main ref.
+       - Restacked onto main after any landing: the only reflog entry of `wt/<parent>` that is an ancestor of the child is its creation point on main, so `F` is on main and the base is the main ref.
        - Rewritten while unmerged (amend, squash, rebase): `F` is an old tip, so the base is `F`. The stderr note gives the command that picks up the rewrite, after which the base is `wt/<parent>`.
        - Rewritten, then landed: `F` is off main and off `wt/<parent>`, so the base is `F`. Release refuses with the restack command.
 3. **`harness worktree`:**
@@ -213,3 +213,21 @@ Expected: `base while p unmerged: wt/p`, then `diff files: child.txt`, `base aft
 
 Owner approval (2026-10-19): approved over the round-5 REVISE. All six round-5 findings were applied, including the reviewer's own `--fork-point` fix for the HIGH; no round 6 was run.
 Plan verdict: APPROVE
+
+### Code review
+
+**Round 1: both APPROVE.** Followup 1 fixed: unquoted worktree paths in the printed restack commands (codex MEDIUM), an empty `-C` path when the child has no worktree (LOW), and the ARCHI test summaries (LOW). Deferred in `deferrals.md`: a deleted `wt/<parent>` after a rebase landing (code-review MEDIUM). PLAN.md on the branch is the orchestrator's Now line (`/1-plan` step 5), not footprint creep.
+
+**Round 2: codex REQUEST CHANGES, code-review APPROVE.** Followup 2 fixed:
+1. **HIGH (codex).** The round-1 fix printed `git rebase --onto wt/<parent> <F>` with no branch when the child had no worktree, which rebases whatever is checked out. The note now says to recreate the worktree instead; the test runs the recreated advice and checks `main` doesn't move.
+2. **MEDIUM (code-review).** Bare `[[ ]]` checks in the stack tests didn't trip `set -e` under macOS Bash 3.2. Each now carries `|| return 1`; three mutations each fail one case on Darwin.
+3. **LOW (code-review), applied by the orchestrator to this plan.** The "restacked onto main" state description was wrong; the code was right.
+
+**Round 3: both APPROVE.** Open, not blocking:
+- **MEDIUM, deferred** (`deferrals.md`): with no fork point (a child merge-synced with main, then the parent rebased), the base silently falls back to the main ref and the diff carries parent commits. Release still refuses.
+- **MEDIUM:** `archi-fresh` stale after the round-2 code commit; healed in `/3-review` step 7.
+- **LOW:** a rewritten-then-landed parent prints `review_base`'s note before release's restack refusal, so two commands appear.
+- **LOW:** a near-miss `Stacked on:` line (trailing space, `wt/` prefix, bold) is ignored silently.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
