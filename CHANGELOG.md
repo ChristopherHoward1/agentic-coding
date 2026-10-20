@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.10.9] - 2026-10-20
+
+- A plan can declare `Stacked on: <parent>`. `harness worktree add` then branches from the unmerged parent. `harness worktree base` gives both reviews the exact fork point as their diff base until the parent lands, even if the parent was rewritten. Release refuses a unit that still carries its parent's commits and prints the restack command.
+- Confirm-delta: none
+
 ## [2026.10.8] - 2026-10-19
 
 - `harness agent-exec` commits whatever a successful dispatch leaves uncommitted, and `/2-implement` runs the demo itself. Implementers never touch git, the gate lints the working tree (untracked scripts in, deleted ones out), and the handoff authorizes every edit the plan names.
