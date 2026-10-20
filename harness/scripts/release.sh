@@ -170,7 +170,7 @@ check_stack_landed() {
   [[ "$base" != origin/main ]] || return 0
   fork=$(stack_fork "$slug" "$parent") || die "cannot find stack fork"
   wt=$(worktree_for_branch "wt/$slug") || die "missing wt/$slug worktree"
-  die "stacked on $parent, which has landed; restack first: git -C $wt rebase --onto origin/main $fork"
+  die "stacked on $parent, which has landed; restack first: git -C $(printf '%q' "$wt") rebase --onto origin/main $fork"
 }
 
 check_origin_main_ancestor() {

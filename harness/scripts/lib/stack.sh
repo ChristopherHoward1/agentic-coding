@@ -50,5 +50,7 @@ review_base() {
   done
   wt=$(git worktree list --porcelain | awk -v branch="refs/heads/wt/$slug" '/^worktree / {path=substr($0,10)} $1 == "branch" && $2 == branch {print path; exit}') || return 2
   printf '%s\n' "$fork"
-  echo "note: $parent was rewritten since $slug branched; to pick it up: git -C $wt rebase --onto wt/$parent $fork" >&2
+  local location=
+  if [[ -n "$wt" ]]; then location=" -C $(printf '%q' "$wt")"; fi
+  echo "note: $parent was rewritten since $slug branched; to pick it up: git$location rebase --onto wt/$parent $fork" >&2
 }
