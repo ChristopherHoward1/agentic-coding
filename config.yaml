@@ -1,6 +1,6 @@
 # The one knob. Everything vendor- or project-specific lives here.
 
-profile: software            # software | machine-learning | database | work
+profile: software            # software | machine-learning | database | work | work-slim
 
 models:
   orchestrator: inherit      # the main Claude Code session

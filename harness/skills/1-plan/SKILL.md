@@ -13,7 +13,7 @@ Input: the Owner's request (argument or conversation context).
 2. **Pick a slug** (`kebab-case`, short) and draft `$(harness project)/work/<slug>/plan.md` from `prompts/plan.tpl`. Verify every codebase claim against the actual code — footprints especially.
 3. **Spawn the reviewer.** Launch the `plan-reviewer` agent (fresh thread, never this one) with: the draft plan path and instruction to review per its own definition.
 4. **Incorporate.** Apply REVISE findings you agree with; where you disagree, record the disagreement and your reasoning in the plan's `## Review` section — the Owner arbitrates disagreements, not you.
-5. **Present** the final plan to the Owner: goal, footprint, acceptance criteria, and the reviewer verdict, in a few lines. On approval, add the work unit to `PLAN.md → Now` and proceed to `/2-implement`.
+5. **Present** the final plan to the Owner: goal, footprint, acceptance criteria, and the reviewer verdict, in a few lines. If the Owner approves over a REVISE, record `Owner approval (<date>): <what was approved and why>` in `## Review`, then `Plan verdict: APPROVE` on the next line; never write that verdict without the reviewer's APPROVE or that Owner line. On approval, add the work unit to `PLAN.md → Now` and proceed to `/2-implement`.
 
 ## Rules
 

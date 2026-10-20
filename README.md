@@ -119,7 +119,7 @@ harness/scripts/     the deterministic layer:
                        state.sh       derive a work unit's stage and next action
                        release.sh     preconditions, version/changelog, tag-after-merge
 harness/examples/    opt-in gate hooks
-harness/profiles/    software · machine-learning · database · work — add slots, never override
+harness/profiles/    software · machine-learning · database · work · work-slim — add slots, never override
 harness/skeleton/    starting config.yaml, ARCHI.md, PLAN.md, VERSION and CHANGELOG.md
 harness/tests/       smoke suite for the shell layer
 ```
