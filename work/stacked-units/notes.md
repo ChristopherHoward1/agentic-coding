@@ -37,3 +37,19 @@ Mutation: dropped each escape in an isolated copy; verified landing; rewrite-ame
 `bash harness/bin/harness gate`: PASS. No partial criteria or out-of-scope changes.
 
 Demo after followup 1: exit 0, same six lines.
+
+## Followup 2 (review round 2 findings)
+
+Fixed the missing-worktree note and strengthened stack assertions for Bash 3.2. Tests now recreate the child worktree, verify the escaped `-C` command, execute it, and confirm `main` stays unchanged.
+
+Mutation results, each restored afterward:
+
+- Status guard removed; landing confirmed; only `stack edge errors` failed; Darwin.
+- Always print `-C` rebase note; landing confirmed; only `stack rewrite amend` failed; Darwin.
+- Registry ignores parent; landing confirmed; only `stack edge registry` failed; Darwin.
+
+`bash harness/bin/harness gate`: **PASS**. `git diff --check`: clean.
+
+Only the two scoped files changed. No partial criteria or out-of-scope findings.
+
+Demo after followup 2: exit 0, same six lines.
