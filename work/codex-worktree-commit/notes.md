@@ -15,3 +15,16 @@ Mutation evidence—all restored:
 - `--exclude-standard` removed; old absent/new present confirmed; failed `gate skips ignored scripts`; Darwin.
 
 No partially met criteria or out-of-scope observations. Commit and demo left to the orchestrator as instructed.
+
+## Orchestrator gate + demo (2026-10-19)
+
+Gate: `bash harness/bin/harness gate` in the worktree, PASS.
+Demo: `bash harness/bin/harness demo codex-worktree-commit`, exit 0:
+```
+subject: Implementer changes for main
+status: []
+A	new.sh
+D	old.sh
+gate with unstaged deletion: pass
+gate with untracked bad.sh: fail (names bad.sh)
+```
