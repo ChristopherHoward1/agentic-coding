@@ -8,7 +8,7 @@ usage() {
   cat <<'USAGE'
 Usage: harness demo <slug> [<dir>]
 
-Runs the plan's Demonstration from <dir> (default .).
+Runs the plan's Demonstration under bash -e from <dir> (default .).
 Exit 0 = pass, 1 = demo failure, 2 = plan or tooling error.
 USAGE
 }
@@ -66,7 +66,7 @@ done <"$plan"
 (( section )) || error 'no ## Demonstration section'
 (( found )) || error 'no shell block or None: in ## Demonstration'
 before=$(git -C "$dir" status --porcelain --untracked-files=all) || error "cannot read worktree status"
-(cd "$dir" && bash "$block")
+(cd "$dir" && bash -e "$block")
 status=$?
 after=$(git -C "$dir" status --porcelain --untracked-files=all) || error "cannot read worktree status"
 verdict=0
