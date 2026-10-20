@@ -7,11 +7,12 @@ Branch: wt/{{SLUG}} (already checked out in this worktree — verify with `git b
 Footprint (from the plan, repeated here as the hard boundary):
 {{FILES_TO_MODIFY}}
 
+Every edit the plan names is authorized; stop only for an edit outside the footprint.
+Nothing is committed while you work, so reads through `HEAD` (`git archive`, `git show HEAD:…`) will not see your changes.
+
 Key constraints:
 {{CONSTRAINTS}}
 
 When done:
 1. Run harness gate from the repo root — it must pass.
-2. Commit your work on this branch with a clear message.
-3. Run `harness demo {{SLUG}}` using the installed copy against the now-clean branch tree. If it fails, fix the problem, re-run the gate, commit, and re-run the demo. Exit 2 is a plan or tooling error, never a demo verdict; stop and surface it if it cannot be fixed within scope.
-4. Print a final summary: what changed and why, paste the demo output, criteria partially met (if any), out-of-scope observations.
+2. Print a final summary: what changed and why, criteria partially met (if any), out-of-scope observations.

@@ -11,5 +11,4 @@ Key constraints:
 {{CONSTRAINTS}}
 
 When done:
-1. Commit your work on this branch with a clear message.
-2. Print a final summary: what you wrote or rewrote and why, criteria partially met (if any), out-of-scope observations.
+1. Print a final summary: what you wrote or rewrote and why, criteria partially met (if any), out-of-scope observations.
