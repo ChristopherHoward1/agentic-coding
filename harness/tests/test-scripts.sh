@@ -2480,7 +2480,7 @@ stack_fixture() {
   t=$(mktemp -d "$TMP/stack.XXXXXX")
   export GIT_AUTHOR_NAME=Tester GIT_AUTHOR_EMAIL=test@example.com
   export GIT_COMMITTER_NAME=Tester GIT_COMMITTER_EMAIL=test@example.com
-  export HARNESS_HOME="$t/home" WORKTREES_DIR="$t/wts"
+  export HARNESS_HOME="$t/home" WORKTREES_DIR="$t/work trees"
   git init -q --bare -b main "$t/origin.git"
   git clone -q "$t/origin.git" "$t/r" 2>/dev/null
   cd "$t/r"
@@ -2583,6 +2583,12 @@ stack_rewrite_case() {
   stack_diff "$base"
   grep -q 'rebase --onto wt/p' "$t/note"
   command=$(sed 's/^.*to pick it up: //' "$t/note")
+  if [[ "$1" == amend ]]; then
+    git worktree remove "$c"
+    [[ "$(bash scripts/worktree.sh base c 2>"$t/no-worktree-note")" == "$base" ]]
+    [[ "$(sed 's/^.*to pick it up: //' "$t/no-worktree-note")" == "git rebase --onto wt/p $fork" ]]
+    git worktree add "$c" wt/c
+  fi
   bash -c "$command"
   [[ "$(bash scripts/worktree.sh base c)" == wt/p ]] || return 1
   stack_diff wt/p
