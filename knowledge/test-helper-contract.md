@@ -109,3 +109,16 @@ raised all three of these in its first two rounds, at a cost of two of its three
 - **Literal pins.** Static greps in the suite pin exact strings in skills, agents and scripts,
   for example `work/<slug>/review-round` and `git show "main:config.yaml"`. Before rewording a
   path or command in prose or in a script, grep the suite for that literal.
+
+## `bash -e` does not catch a failing `[[ ]]` on macOS
+
+macOS `/bin/bash` is 3.2.57. There, a failing `[[ ... ]]` that is not the last command of a
+function or `-c` body does not trigger `set -e`; execution continues. Bash 4.1+ (CI's Linux)
+does stop. So a case like this can never fail locally:
+
+    check "desc" bash -e -c 'out=$(cmd); [[ $out == wt/p ]]; other_cmd'   # inert on 3.2
+
+Give every non-final test command an explicit exit: `[[ ... ]] || return 1` inside a function,
+`|| exit 1` at the top level of the body. `stacked-units` (v2026.10.9) sent nine such
+checks to review. The implementer's five mutations each still failed a case, so the evidence
+looked complete; the reviewer's mutations of mid-body checks passed. Mutate a mid-body check too.
