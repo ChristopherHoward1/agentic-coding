@@ -437,6 +437,20 @@ case "${AGENT_MODE:-nothing}" in
   dirty)
     printf 'dirty\n' >agent-result.txt
     ;;
+  all-changes)
+    printf 'modified\n' >base.txt
+    rm old.txt
+    printf 'new\n' >new.txt
+    ;;
+  work-code|work-only|registry-work)
+    mkdir -p work/other
+    printf 'artifact\n' >work/other/file.txt
+    [[ "$AGENT_MODE" != work-code ]] || printf 'code\n' >base.txt
+    ;;
+  failing)
+    printf 'failed\n' >agent-result.txt
+    exit 7
+    ;;
   predirty-clean)
     rm -f preexisting-dirty.txt
     ;;
@@ -450,6 +464,7 @@ implementer:
   command: 'AGENT_MODE=$mode AGENT_WORKTREE_PATH=$AGENT_WORKTREE $AGENT_IMPL'
 EOF
     printf 'base\n' >base.txt
+    printf 'old\n' >old.txt
     git add -A
     git commit -qm init
     mkdir -p "$tmp_root/wts"
@@ -1534,11 +1549,80 @@ setup_gate_fixture gate-empty-env-overrides-config
 )
 check "gate treats empty GATE_REQUIRED_TOOLS as no required tools" bash -c "cd '$GATE_REPO' && out=\$(GATE_REQUIRED_TOOLS= PATH='$GATE_BIN' bash scripts/gate.sh 2>&1); status=\$?; [[ \"\$status\" -eq 0 ]] && ! grep -Fq 'missing required tool' <<<\"\$out\""
 
+# shellcheck disable=SC2317,SC2329 # Invoked indirectly by check in a child bash.
+agent_leftovers_case() {
+  setup_agent_exec_fixture "leftovers-$1" "$1"
+  local before status=0
+  before=$(git -C "$AGENT_WORKTREE" rev-parse HEAD)
+  if [[ "$1" == registry-work ]]; then
+    mkdir -p "$HARNESS_HOME/projects/leftovers"
+    printf 'root=%s\nsubdir=\n' "$AGENT_PRIMARY" >"$HARNESS_HOME/projects/leftovers/project"
+    cp "$AGENT_PRIMARY/config.yaml" "$HARNESS_HOME/projects/leftovers/config.yaml"
+  fi
+  (cd "$AGENT_PRIMARY" && bash scripts/agent-exec.sh "$AGENT_WORKTREE" "$AGENT_HANDOFF") || status=$?
+  case "$1" in
+    failing)
+      [[ $status == 7 && $(git -C "$AGENT_WORKTREE" rev-parse HEAD) == "$before" && -f "$AGENT_WORKTREE/agent-result.txt" ]] ;;
+    work-only)
+      [[ $status == 0 && $(git -C "$AGENT_WORKTREE" rev-parse HEAD) == "$before" && $(git -C "$AGENT_WORKTREE" status --porcelain) == '?? work/' ]] ;;
+    *)
+      [[ $status == 0 && $(git -C "$AGENT_WORKTREE" rev-list --count "$before..HEAD") == 1 ]] || return 1
+      [[ $(git -C "$AGENT_WORKTREE" log -1 --format=%s) == 'Implementer changes for wt/demo' ]] || return 1
+      case "$1" in
+        all-changes)
+          [[ -z $(git -C "$AGENT_WORKTREE" status --porcelain) ]] || return 1
+          git -C "$AGENT_WORKTREE" show --no-renames --name-status --format= HEAD >"$TMP/changes"
+          grep -qx $'A\tnew.txt' "$TMP/changes" && grep -qx $'D\told.txt' "$TMP/changes" && grep -qx $'M\tbase.txt' "$TMP/changes" ;;
+        work-code)
+          [[ $(git -C "$AGENT_WORKTREE" status --porcelain) == '?? work/' && -z $(git -C "$AGENT_WORKTREE" ls-tree -r --name-only HEAD -- work) && $(git -C "$AGENT_WORKTREE" show HEAD:base.txt) == code ]] ;;
+        registry-work)
+          [[ -z $(git -C "$AGENT_WORKTREE" status --porcelain) && $(git -C "$AGENT_WORKTREE" show HEAD:work/other/file.txt) == artifact ]] ;;
+      esac ;;
+  esac
+}
+export -f setup_agent_exec_fixture agent_leftovers_case
+export ROOT TMP
+check 'agent-exec auto-commits additions modifications and deletions' bash -e -c 'agent_leftovers_case all-changes'
+check 'agent-exec repo mode excludes work artifacts' bash -e -c 'agent_leftovers_case work-code'
+check 'agent-exec work-only dispatch makes no commit' bash -e -c 'agent_leftovers_case work-only'
+check 'agent-exec registry mode commits project work files' bash -e -c 'agent_leftovers_case registry-work'
+check 'agent-exec failed dispatch commits nothing' bash -e -c 'agent_leftovers_case failing'
+
+# shellcheck disable=SC2317,SC2329,SC2016 # Child bash invokes the case; fixture expands positional arguments later.
+gate_working_tree_case() {
+  setup_gate_fixture "lint-$1"
+  ln -s "$(command -v shellcheck)" "$GATE_BIN/shellcheck"
+  printf '#!/usr/bin/env bash\necho old\n' >"$GATE_REPO/old.sh"
+  git -C "$GATE_REPO" add old.sh
+  git -C "$GATE_REPO" commit -qm old
+  case "$1" in
+    deleted) rm "$GATE_REPO/old.sh" ;;
+    untracked) printf '#!/usr/bin/env bash\nrm $1\n' >"$GATE_REPO/bad.sh" ;;
+    ignored)
+      printf 'bad.sh\n' >"$GATE_REPO/.gitignore"
+      printf '#!/usr/bin/env bash\nrm $1\n' >"$GATE_REPO/bad.sh" ;;
+  esac
+  local out status=0
+  out=$(cd "$GATE_REPO" && PATH="$GATE_BIN" bash scripts/gate.sh 2>&1) || status=$?
+  if [[ "$1" == untracked ]]; then
+    [[ $status == 1 && "$out" == *bad.sh* ]]
+  else
+    [[ $status == 0 && "$out" != *bad.sh* ]]
+  fi
+}
+export -f setup_gate_fixture gate_working_tree_case
+check 'gate skips deleted tracked scripts' bash -e -c 'gate_working_tree_case deleted'
+check 'gate checks untracked scripts' bash -e -c 'gate_working_tree_case untracked'
+check 'gate skips ignored scripts' bash -e -c 'gate_working_tree_case ignored'
+
 # --- agent-exec.sh argument validation
 check_fails "agent-exec rejects missing handoff" bash harness/scripts/agent-exec.sh /tmp nonexistent-handoff.md
 
 setup_agent_exec_fixture agent-commit commit
+agent_commit_before=$(git -C "$AGENT_WORKTREE" rev-parse HEAD)
 check_exit "agent-exec exits 0 when implementer commits" 0 "" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF'"
+
+check "agent-exec adds no extra implementer commit" test "$(git -C "$AGENT_WORKTREE" rev-list --count "$agent_commit_before..HEAD")" = 1
 
 setup_agent_exec_fixture agent-relative-worktree commit
 check_exit "agent-exec exits 0 with relative worktree path when implementer commits" 0 "" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '../wts/demo-wt' '$AGENT_HANDOFF'"
@@ -1554,7 +1638,9 @@ check_exit "agent-exec exits 0 when dirty redispatch cleans tree without commit"
 
 setup_agent_exec_fixture agent-nothing nothing
 check_exit "agent-exec exits non-zero when implementer produces nothing" 1 "no new commit" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF'"
+agent_noop_before=$(git -C "$AGENT_WORKTREE" rev-parse HEAD)
 check_exit "agent-exec --allow-noop accepts a followup that changes nothing" 0 "made no changes" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF' --allow-noop"
+check "agent-exec allow-noop makes no commit" test "$(git -C "$AGENT_WORKTREE" rev-parse HEAD)" = "$agent_noop_before"
 check_exit "agent-exec rejects an unknown third argument" 1 "usage: harness agent-exec" bash -c "cd '$AGENT_PRIMARY' && bash scripts/agent-exec.sh '$AGENT_WORKTREE' '$AGENT_HANDOFF' --bogus"
 
 # --- opt-in notebook cleanliness hook
@@ -1770,7 +1856,7 @@ check "fan dispatch auto-commits non-committing sample work" bash -c "
   [ \"\$(git show wt/demo-fan-2:branch.txt)\" = wt/demo-fan-2 ] &&
   [ -z \"\$(git ls-tree -r --name-only wt/demo-fan-2 -- work/demo)\" ] &&
   [ -f '$FAN_WTS/demo-fan-2/work/demo/plan.md' ] &&
-  [ \"\$(git log -1 --format=%s wt/demo-fan-2)\" = 'Fan sample implementation for wt/demo-fan-2' ]
+  [ \"\$(git log -1 --format=%s wt/demo-fan-2)\" = 'Implementer changes for wt/demo-fan-2' ]
 "
 fan_no_commit_diff="$TMP/fan-no-commit-diff.out"
 check "fan adopt preserves auto-committed sample work and cleans samples" bash -c "

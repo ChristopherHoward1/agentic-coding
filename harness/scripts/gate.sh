@@ -117,8 +117,8 @@ fi
 
 # --- Shell --------------------------------------------------------------
 shell_files=()
-while IFS= read -r f; do shell_files+=("$f"); done \
-  < <(git ls-files '*.sh' 2>/dev/null)
+while IFS= read -r f; do [[ -f "$f" ]] && shell_files+=("$f"); done \
+  < <(git ls-files --cached --others --exclude-standard '*.sh' 2>/dev/null)
 if [[ ${#shell_files[@]} -gt 0 ]]; then
   if command -v shellcheck >/dev/null; then
     run shellcheck "${shell_files[@]}"

@@ -68,3 +68,15 @@ if [[ -z "$STATUS_BEFORE" && "$HEAD_AFTER" == "$HEAD_BEFORE" && -z "$(git -C "$W
   echo "Error: implementer produced no new commit and left no worktree changes" >&2
   exit 1
 fi
+
+if [[ -n "$(git -C "$WORKTREE" status --porcelain)" ]]; then
+  if [[ "$PROJECT_MODE" == repo ]]; then
+    git -C "$WORKTREE" add -A -- ':/' ':(exclude,top)work'
+  else
+    git -C "$WORKTREE" add -A
+  fi
+  if ! git -C "$WORKTREE" diff --cached --quiet; then
+    branch=$(git -C "$WORKTREE" branch --show-current)
+    git -C "$WORKTREE" commit -qm "Implementer changes for $branch"
+  fi
+fi

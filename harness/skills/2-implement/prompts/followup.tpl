@@ -1,8 +1,8 @@
-The gate failed on your implementation of {{PLAN_PATH}}. You are resuming in the same worktree on branch wt/{{SLUG}}.
+The gate or demonstration failed on your implementation of {{PLAN_PATH}}. You are resuming in the same worktree on branch wt/{{SLUG}}.
 
-Gate output:
+Failure output:
 ```
-{{GATE_OUTPUT}}
+{{FAILURE_OUTPUT}}
 ```
 
-Fix every item marked ✗. Stay inside the plan's footprint. Re-run harness gate until it passes, commit the fix, then re-run `harness demo {{SLUG}}` on the clean tree and paste its output in an updated summary. If the demo fails, fix, re-gate, commit, and re-run it. If a failure cannot be fixed within the plan's scope, stop and explain why instead of working around it.
+Fix the reported failure. Stay inside the plan's footprint. Re-run harness gate until it passes, then print an updated summary. If a failure cannot be fixed within the plan's scope, stop and explain why instead of working around it.
