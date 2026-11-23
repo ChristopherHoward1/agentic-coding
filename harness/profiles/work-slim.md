@@ -36,14 +36,14 @@ Pick the lightest lane that fits. When unsure, say which lane and why in one lin
    1. `harness gate` passes.
    2. Write the PR description (below) first; it stands in for the plan.
    3. Spawn a fresh `code-reviewer` with the diff `git diff "$(harness worktree base <slug>)...wt/<slug>"` and the PR description as the plan. Tell it there is no `harness demo` for this change; the description's **How verified** is the evidence to check. Fix CRITICAL/HIGH findings and re-review with a new reviewer, up to 3 rounds, then escalate to the Owner.
-   4. Re-run `harness gate` on the final head after review fixes and record its SHA. Open the PR against the integration branch; after approval, check immediately before merging that `source.commit.hash` equals the gated SHA. The PR is the record: no VERSION, CHANGELOG, tag or retro.
+   4. Re-run `harness gate` on the final head after review fixes and record its SHA. Open the PR against the integration branch; after approval, check immediately before merging that the gated SHA starts with the PR's `source.commit.hash`. The PR is the record: no VERSION, CHANGELOG, tag or retro.
 3. **Loop** — `/1-plan` → `/2-implement` → `/3-review`, only when a wrong approach would cost days: a new pipeline, a schema or data-contract change, a refactor across modules. `/4-release` stops after review in registry mode; open the PR targeting the integration branch as in Ship step 4. Skip `/5-retro`.
 
 4. **Promote** — only when the Owner asks.
-   1. If `git rev-list --no-merges origin/<integration>..origin/main` is non-empty, stop and tell the Owner; merge `origin/main` into the integration branch through a self-merged PR, then re-run Promote.
+   1. If `git diff --quiet "$(git merge-base origin/main origin/<integration>)" origin/main` fails, main moved outside Promote: stop and tell the Owner; merge `origin/main` into the integration branch through a self-merged PR, then re-run Promote.
    2. Run `git worktree add --detach <tmp> origin/<integration>`, run `harness gate` there, note the SHA, then `git worktree remove <tmp>`.
-   3. Open the `<integration>` → `main` PR with `close_source_branch: false`; say the source branch must be kept. List each PR since the last promote using numbers from `git log --first-parent --merges origin/main..origin/<integration>` merge subjects and titles and source branches from the REST API.
-   4. Tag `wt/*` sources `[reviewed]` (gated and fresh-reviewed), all others `[unreviewed]`. List merges without PR numbers and every commit from `git log --first-parent --no-merges origin/main..origin/<integration>` as `[unreviewed]` with SHA and subject. In How verified claim review only for `[reviewed]` lines, and add the gate result and SHA.
+   3. Push the gated SHA to a frozen branch with `git push origin <sha>:refs/heads/promote/<yyyy-mm-dd>` and open its PR to `main`. Record the gated SHA (the promote branch head) in the description. List each PR since the last promote using numbers from `git log --first-parent --merges origin/main..<sha>` merge subjects and titles and source branches from the REST API.
+   4. Tag `wt/*` sources `[reviewed]` (gated and fresh-reviewed), all others `[unreviewed]`. List merges without PR numbers and every commit from `git log --first-parent --no-merges origin/main..<sha>` as `[unreviewed]` with SHA and subject. In How verified claim review only for `[reviewed]` lines, and add the gate result and SHA.
    5. Never merge to `main`; the coworker's approval is the release.
 
 ## PR description
