@@ -9,10 +9,10 @@ Input: what to write or rewrite, from the Owner's request.
 
 ## Steps
 
-1. **Branch:** `WT=$(harness worktree add <slug>)`, and write in that worktree, never the primary checkout.
+1. **Branch:** pick a short kebab-case slug for the change, run `WT=$(harness worktree add <slug>)`, and write in that worktree, never the primary checkout.
 2. **Write the prose yourself.** Check every claim against the shipped code, skills and profiles. Name nothing that doesn't exist, and don't describe planned work as done.
 3. **Show the Owner the diff.** The Owner is the reader and the reviewer of prose quality; there is no automated judge.
-4. **Ship by the small-fix lane:** commit, push the branch, open a PR to the default branch, and merge it once the Owner is happy and CI passes. Then remove the worktree and branch. Prose never goes through `/3-review` → `/4-release`, which would review it as code.
+4. **Ship by the small-fix lane:** commit, push the branch, open a PR to the branch the worktree was based on (`integration_branch` when it is set, otherwise `main`), and merge it once the Owner is happy and CI passes. Then remove the worktree and branch. Prose never goes through `/3-review` → `/4-release`, which would review it as code.
 
 ## Rules
 
