@@ -2,7 +2,7 @@
 
 A small, opinionated framework for building software with AI agents — where **no agent is ever trusted to check its own work.**
 
-One Claude Code session acts as the **Orchestrator**: it plans, dispatches, and drives the loop. Every stage that could go wrong is checked by a *different* agent — a fresh thread, cold context, often a different model — and by a deterministic shell gate that no agent can talk its way past. The human is the **Owner**: they set direction. Under full TRIP autonomy, the Orchestrator runs the release, including the push, PR, merge, and tag.
+One Claude Code session acts as the **Orchestrator**: it plans, dispatches, and drives the loop. Every stage that could go wrong is checked by a *different* agent — a fresh thread, cold context, often a different model — and by a deterministic shell gate that no agent can talk its way past. The human is the **Owner**: they set direction. The Orchestrator runs the release end to end: push, PR, merge and tag.
 
 No custom runtime. No ceremony that doesn't catch a defect.
 
@@ -50,7 +50,7 @@ Trivial fixes (typos, one-liners, config tweaks) skip the loop — you just do t
 
 The writer does not review its own work. Reviewers have read-only tools, so they report findings rather than fix them.
 
-Each review and re-review gets fresh, cold context. Roles can use different models or vendors to catch different mistakes.
+Each review and re-review runs in a fresh thread that sees only the diff and the plan. A reviewer that watched the code being written is anchored to its reasoning. Roles can use different models or vendors, so one model's blind spot is another's obvious bug.
 
 `harness gate` must pass; no agent can overrule it. The gate catches mechanical defects, and reviewers catch what a green gate hides.
 
