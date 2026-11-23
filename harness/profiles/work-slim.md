@@ -8,13 +8,18 @@ The `work` profile's **S3 write discipline**, **Snowflake** and **Gate** section
 
 - **Implementer runtime** — `implementer.runtime: claude` with `command: 'claude -p --dangerously-skip-permissions'`, as in `work`, for the rare change that runs `/2-implement`.
 - **EVAL_METRIC**, **NOTEBOOK_STRATEGY** and **REPO_HYGIENE** — as defined in `$(harness root)/profiles/machine-learning.md`. Copy `nb-clean.sh` and `ds-hygiene.sh` from `$(harness root)/examples/gate.d/` into the state dir's `scripts/gate.d/`.
+- **integration_branch** — check `origin/dev` and `origin/develop`; for a candidate run `git merge-base --is-ancestor origin/main origin/<candidate>` and show the Owner the result before confirmation. If it fails, recommend creating `dev` from `origin/main`; if neither exists, offer to create `dev` from `origin/main` only with the Owner's yes. Record the answer in `$(harness project)/config.yaml`. Ask a registered project missing the key before its first Explore, Ship or Promote.
 - **Gate tools** — the repo's linter and test runner (for example `gate.required_tools: ruff:pytest`).
+
+## Integration branch
+
+Units and ad hoc work land on `integration_branch` only through PRs, never direct pushes; `main` changes only through Promote. Open and merge PRs through the Bitbucket REST API, using `merge_strategy: merge_commit` for self-merges so PR numbers remain in merge subjects. The Owner may click merge instead.
 
 ## Lanes
 
 Pick the lightest lane that fits. When unsure, say which lane and why in one line before starting.
 
-1. **Explore** — no loop, no review. Query, plot, fit and compare in notebooks under `notebooks/<initials>/`, on a branch. Write findings to `reports/<topic>.md`:
+1. **Explore** — no loop, no review. Query, plot, fit and compare in notebooks under `notebooks/<initials>/`, on a branch from `origin/<integration>`; never use a `wt/` branch name. Merge keepers through a self-merged PR without review. Write findings to `reports/<topic>.md`:
    - **Question**, and the decision it informs.
    - **Data** — source, S3 path and partition, row counts, filters.
    - **Method** — what was fit or computed, and against what baseline.
@@ -27,12 +32,19 @@ Pick the lightest lane that fits. When unsure, say which lane and why in one lin
    - Each question heading's section (not each subheading) ends with a markdown cell holding only `**Owner:**`. Add one to each section the agent writes or edits; leave sections it doesn't touch as they are. The agent never writes in, edits or deletes an Owner cell; an existing Owner cell keeps its text and moves with its heading.
    - No interpretation of what a result means, recommendations, caveat lists or next steps unless the Owner asks. When asked, expand only the section named.
 
-2. **Ship** — code that a person or a later run depends on. Move it out of the notebook into a `.py` module with tests, in a worktree on its own branch.
+2. **Ship** — code that a person or a later run depends on. Move it out of the notebook into a `.py` module with tests, using `harness worktree add <slug>`.
    1. `harness gate` passes.
    2. Write the PR description (below) first; it stands in for the plan.
-   3. Spawn a fresh `code-reviewer` with the branch diff against `origin/main` and the PR description as the plan. Tell it there is no `harness demo` for this change; the description's **How verified** is the evidence to check. Fix CRITICAL/HIGH findings and re-review with a new reviewer, up to 3 rounds, then escalate to the Owner.
-   4. Open the PR. The PR is the record: no VERSION, CHANGELOG, tag or retro.
-3. **Loop** — `/1-plan` → `/2-implement` → `/3-review`, only when a wrong approach would cost days: a new pipeline, a schema or data-contract change, a refactor across modules. `/4-release` stops after review in registry mode; open the PR as in Ship step 4. Skip `/5-retro`.
+   3. Spawn a fresh `code-reviewer` with the diff `git diff "$(harness worktree base <slug>)...wt/<slug>"` and the PR description as the plan. Tell it there is no `harness demo` for this change; the description's **How verified** is the evidence to check. Fix CRITICAL/HIGH findings and re-review with a new reviewer, up to 3 rounds, then escalate to the Owner.
+   4. Re-run `harness gate` on the final head after review fixes and record its SHA. Open the PR against the integration branch; after approval, check immediately before merging that `source.commit.hash` equals the gated SHA. The PR is the record: no VERSION, CHANGELOG, tag or retro.
+3. **Loop** — `/1-plan` → `/2-implement` → `/3-review`, only when a wrong approach would cost days: a new pipeline, a schema or data-contract change, a refactor across modules. `/4-release` stops after review in registry mode; open the PR targeting the integration branch as in Ship step 4. Skip `/5-retro`.
+
+4. **Promote** — only when the Owner asks.
+   1. If `git rev-list --no-merges origin/<integration>..origin/main` is non-empty, stop and tell the Owner; merge `origin/main` into the integration branch through a self-merged PR, then re-run Promote.
+   2. Run `git worktree add --detach <tmp> origin/<integration>`, run `harness gate` there, note the SHA, then `git worktree remove <tmp>`.
+   3. Open the `<integration>` → `main` PR with `close_source_branch: false`; say the source branch must be kept. List each PR since the last promote using numbers from `git log --first-parent --merges origin/main..origin/<integration>` merge subjects and titles and source branches from the REST API.
+   4. Tag `wt/*` sources `[reviewed]` (gated and fresh-reviewed), all others `[unreviewed]`. List merges without PR numbers and every commit from `git log --first-parent --no-merges origin/main..origin/<integration>` as `[unreviewed]` with SHA and subject. In How verified claim review only for `[reviewed]` lines, and add the gate result and SHA.
+   5. Never merge to `main`; the coworker's approval is the release.
 
 ## PR description
 

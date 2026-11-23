@@ -47,7 +47,7 @@ resolve_project
 # shellcheck source=/dev/null
 source "$HERE/lib/stack.sh"
 config="$STATE_DIR/config.yaml"
-if [[ "$PROJECT_MODE" == registry && ! -f "$config" ]]; then config=/dev/null; fi
+if [[ ! -f "$config" ]]; then config=/dev/null; fi
 
 # Naive-but-sufficient config read; override with WORKTREES_DIR env var.
 WT_DIR=${WORKTREES_DIR:-$(awk '/^worktrees:/{f=1;next} f&&/dir:/{print $2; exit}' "$config")}
@@ -68,10 +68,16 @@ case "$cmd" in
         git worktree add -b "wt/$slug" "$path" "wt/$parent" >&2
       else
         git fetch origin --quiet 2>/dev/null || true
+        if ref=$(integration_ref); then
+          git worktree add -b "wt/$slug" "$path" "$ref" >&2
+        else
+          rc=$?
+          [[ "$rc" -eq 1 ]] || exit "$rc"
         if git show-ref --verify --quiet refs/remotes/origin/main; then
           git worktree add -b "wt/$slug" "$path" origin/main >&2
         else
           git worktree add -b "wt/$slug" "$path" >&2
+        fi
         fi
       fi
     fi

@@ -223,6 +223,7 @@ rollback_release() {
 }
 
 release() {
+  [[ -z "$(integration_branch)" || "$(integration_branch)" == main ]] || die "release does not support integration_branch $(integration_branch)"
   local slug="$1"
   local confirm_delta="$2"
   local plan_path="work/$slug/plan.md"

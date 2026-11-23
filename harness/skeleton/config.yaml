@@ -1,5 +1,8 @@
 # The one knob. Everything vendor- or project-specific lives here.
 
+# Branch for worktrees and reviews (default: main).
+# integration_branch: main
+
 profile: software            # software | machine-learning | database | work | work-slim
 
 models:

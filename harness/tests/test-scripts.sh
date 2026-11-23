@@ -2745,6 +2745,48 @@ for scenario in missing-parent missing-child fallback header review fan errors r
 done
 
 
+# Integration branch fixtures use a separate registry and real remote refs.
+# shellcheck disable=SC2317,SC2329
+integration_case() {
+  local scenario="$1" t repo state wt rc
+  t=$(mktemp -d "${TMPDIR:-/tmp}/integration.XXXXXX")
+  export HARNESS_HOME="$t/home" WORKTREES_DIR="$t/wts"
+  export GIT_AUTHOR_NAME=Tester GIT_AUTHOR_EMAIL=test@example.com
+  export GIT_COMMITTER_NAME=Tester GIT_COMMITTER_EMAIL=test@example.com
+  mkdir -p "$HARNESS_HOME"
+  git init -q --bare -b main "$t/origin.git"
+  git clone -q "$t/origin.git" "$t/repo" 2>/dev/null
+  repo="$t/repo"; cd "$repo" || return 1
+  git commit -q --allow-empty -m main && git push -q origin main
+  git checkout -qb dev && git commit -q --allow-empty -m dev && git push -q origin dev && git checkout -q main
+  state="$repo"
+  case "$scenario" in
+    registry|registry-base) state="$HARNESS_HOME/projects/x"; mkdir -p "$state"; printf 'root=%s\nsubdir=\n' "$repo" >"$state/project" ;;
+  esac
+  case "$scenario" in
+    dev|dev-base|registry|registry-base|release) echo 'integration_branch: dev' >"$state/config.yaml" ;;
+    quoted) echo 'integration_branch: "dev"' >"$state/config.yaml" ;;
+    missing|missing-base) echo 'integration_branch: nope' >"$state/config.yaml" ;;
+    invalid) echo "integration_branch: 'bad..name'" >"$state/config.yaml" ;;
+    main) echo 'integration_branch: main' >"$state/config.yaml" ;;
+    unset) : >"$state/config.yaml" ;;
+  esac
+  case "$scenario" in
+    release) rc=0; bash "$ROOT/harness/scripts/release.sh" x >"$t/out" 2>"$t/err" || rc=$?; [[ $rc -ne 0 ]] || return 1; grep -q integration_branch "$t/err" ;;
+    missing|invalid) rc=0; bash "$ROOT/harness/scripts/worktree.sh" add x >"$t/out" 2>"$t/err" || rc=$?; [[ $rc -ne 0 ]] || return 1; ! git show-ref --verify --quiet refs/heads/wt/x || return 1; grep -q integration_branch "$t/err" || return 1; if [[ "$scenario" == missing ]]; then grep -q nope "$t/err"; else grep -q "invalid integration_branch" "$t/err"; fi ;;
+    dev-base) git branch wt/x main; [[ "$(bash "$ROOT/harness/scripts/worktree.sh" base x)" == origin/dev ]] ;;
+    missing-base) git branch wt/x main; rc=0; bash "$ROOT/harness/scripts/worktree.sh" base x >"$t/out" 2>"$t/err" || rc=$?; [[ $rc -ne 0 ]] || return 1; grep -q nope "$t/err" ;;
+    *) wt=$(bash "$ROOT/harness/scripts/worktree.sh" add x) || return 1
+       case "$scenario" in dev|quoted|registry|registry-base) [[ "$(git -C "$wt" log -1 --format=%s)" == dev ]] || return 1; [[ "$(bash "$ROOT/harness/scripts/worktree.sh" base x)" == origin/dev ]] || return 1 ;;
+       *) [[ "$(git -C "$wt" log -1 --format=%s)" == main ]] || return 1; [[ "$(bash "$ROOT/harness/scripts/worktree.sh" base x)" == origin/main ]] || return 1 ;; esac ;;
+  esac
+}
+export -f integration_case
+for scenario in dev dev-base quoted unset main no-config registry registry-base missing missing-base invalid release; do
+  # shellcheck disable=SC2016
+  check "integration branch $scenario" bash -e -c 'integration_case "$1"' _ "$scenario"
+done
+
 # --- gate.sh runs and exits cleanly on this repo
 check "gate.sh runs on this repo" bash "$ROOT/harness/bin/harness" gate
 
