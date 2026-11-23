@@ -16,10 +16,33 @@ stack_fork() {
   git merge-base --fork-point "wt/$2" "wt/$1"
 }
 
+integration_branch() {
+  [[ -f "$STATE_DIR/config.yaml" ]] || return 0
+  local branch
+  branch=$(awk '/^integration_branch:/{print $2; exit}' "$STATE_DIR/config.yaml")
+  case "$branch" in \"*\"|\'*\') branch=${branch:1:${#branch}-2} ;; esac
+  printf '%s\n' "$branch"
+}
+
+integration_ref() {
+  local branch
+  branch=$(integration_branch)
+  [[ -n "$branch" && "$branch" != main ]] || return 1
+  if ! git check-ref-format --branch "$branch" >/dev/null 2>&1; then
+    echo "invalid integration_branch: $branch" >&2; return 2
+  fi
+  git fetch origin --quiet 2>/dev/null || true
+  if ! git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+    echo "integration_branch $branch has no origin/$branch ref" >&2; return 2
+  fi
+  printf 'origin/%s\n' "$branch"
+}
+
 review_base() {
   local slug="$1" parent mainref=main fork status ref plan wt
   git fetch origin --quiet 2>/dev/null || true
   if git show-ref --verify --quiet refs/remotes/origin/main; then mainref=origin/main; fi
+  if ref=$(integration_ref); then mainref=$ref; else status=$?; [[ "$status" -eq 1 ]] || return "$status"; fi
   parent=$(stack_parent "$slug") || return 2
   if [[ -z "$parent" ]]; then printf '%s\n' "$mainref"; return 0; fi
   plan="wt/$slug:work/$slug/plan.md and commit that in the worktree"
