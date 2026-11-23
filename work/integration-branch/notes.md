@@ -26,3 +26,16 @@ HEAD is now at c253d13 dev only
 dev only
 integration-branch-ok
 ```
+
+# Followup (review round 1)
+
+Implemented the review fixes in [work-slim.md](/Users/cboyfly/Documents/repos/agentic-coding-worktrees/integration-branch/harness/profiles/work-slim.md) and [test-scripts.sh](/Users/cboyfly/Documents/repos/agentic-coding-worktrees/integration-branch/harness/tests/test-scripts.sh).
+
+Promote now checks main’s tree and opens the PR from a frozen branch at the gated SHA. Ship checks Bitbucket’s abbreviated source hash as a prefix of the gated SHA. The no-config test now exercises the missing-config read.
+
+Verification passed: `harness gate` and `harness demo integration-branch`. The requested mutation landed and caused the no-config case to fail; the original guard was restored, and the case passed in the final gate.
+
+No requested criteria remain partially met. The plan’s outdated acceptance-criterion text was left for the orchestrator to update, as instructed.
+
+
+GATE: PASS (280 + 6). Demo exit 0.
