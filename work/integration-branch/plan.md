@@ -185,3 +185,8 @@ Code review round 2: code-reviewer APPROVE (it ran both mutations itself, includ
 1. A same-day second promote would fast-forward `promote/<date>` under an open PR. Promote branches are now `promote/<short-sha>`, never updated.
 2. `wt/*` alone proved no review (the code-reviewer raised the same as a LOW). Ship now writes `Reviewed-SHA:` into the PR description, and Promote tags `[reviewed]` only when that line matches the merged source hash.
 Also sent back: a diverged `dev` candidate gets a new branch name suggested, and the ARCHI test bullet refreshed. LOWs left as-is: squash merges of the promote PR (work enforces merge commits), test temp dirs not removed (matching the existing cases), and a triple helper call in the release guard.
+
+Code review round 3: code-reviewer APPROVE (four LOWs). Codex REQUEST CHANGES with two HIGHs, which left the review at its 3-round cap and went to the Owner:
+1. Override, with the analysis recorded: "A self-merged PR's merge commit can carry unreviewed conflict-resolution code that `[reviewed]` hides." Bitbucket's UI and REST merge refuse a PR with conflicts, so conflicts are resolved on the source branch, where the gate and the `Reviewed-SHA:` check see them. The only other route to such a merge commit is a direct push to the integration branch, and the profile forbids that. The Claude reviewer raised nothing on this behavior in three rounds.
+2. Accepted: Promote fetches `origin` before its checks and pins the fetched integration SHA for every later step.
+Owner approval (2026-11-23): fix #2 and run a fourth review round, past the 3-round cap; override #1 as analyzed above.
