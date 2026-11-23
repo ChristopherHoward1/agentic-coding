@@ -13,7 +13,7 @@ The `work` profile's **S3 write discipline**, **Snowflake** and **Gate** section
 
 ## Integration branch
 
-Units and ad hoc work land on `integration_branch` only through PRs, never direct pushes; `main` changes only through Promote. Open and merge PRs through the Bitbucket REST API, using `merge_strategy: merge_commit` for self-merges so PR numbers remain in merge subjects. The Owner may click merge instead.
+`<integration>` means the configured `integration_branch` value. Units and ad hoc work land on `integration_branch` only through PRs, never direct pushes; `main` changes only through Promote. Open and merge PRs through the Bitbucket REST API, using `merge_strategy: merge_commit` for self-merges so PR numbers remain in merge subjects. The Owner may click merge instead.
 
 ## Lanes
 
@@ -40,11 +40,12 @@ Pick the lightest lane that fits. When unsure, say which lane and why in one lin
 3. **Loop** — `/1-plan` → `/2-implement` → `/3-review`, only when a wrong approach would cost days: a new pipeline, a schema or data-contract change, a refactor across modules. `/4-release` stops after review in registry mode; open the PR targeting the integration branch as in Ship step 4. Skip `/5-retro`.
 
 4. **Promote** — only when the Owner asks.
-   1. If `git diff --quiet "$(git merge-base origin/main origin/<integration>)" origin/main` fails, main moved outside Promote: stop and tell the Owner; merge `origin/main` into the integration branch through a self-merged PR, then re-run Promote.
-   2. Run `git worktree add --detach <tmp> origin/<integration>`, run `harness gate` there, note the SHA, then `git worktree remove <tmp>`.
-   3. Push the gated SHA to a frozen branch with `git push origin <sha>:refs/heads/promote/<short-sha>` and open its PR to `main`. Never update an existing promote branch; a new gated SHA gets a new branch and PR. Record the gated SHA (the promote branch head) in the description. List each PR since the last promote using numbers from `git log --first-parent --merges origin/main..<sha>` merge subjects and titles and source branches from the REST API.
-   4. Tag a PR `[reviewed]` only when its description has a `Reviewed-SHA:` line whose SHA starts with the PR's merged `source.commit.hash`; tag every other PR `[unreviewed]`. List merges without PR numbers and every commit from `git log --first-parent --no-merges origin/main..<sha>` as `[unreviewed]` with SHA and subject. In How verified claim review only for `[reviewed]` lines, and add the gate result and SHA.
-   5. Never merge to `main`; the coworker's approval is the release.
+   1. Run `git fetch origin`, then pin the integration tip with `sha=$(git rev-parse origin/<integration>)`.
+   2. If `git diff --quiet "$(git merge-base origin/main "$sha")" origin/main` fails, main moved outside Promote: stop and tell the Owner; merge `origin/main` into the integration branch through a self-merged PR, then re-run Promote.
+   3. Run `git worktree add --detach <tmp> "$sha"`, run `harness gate` there, note the SHA, then `git worktree remove <tmp>`.
+   4. Push the gated SHA to a frozen branch with `git push origin "$sha":refs/heads/promote/<short-sha>` and open its PR to `main`. Never update an existing promote branch; a new gated SHA gets a new branch and PR. Record the gated SHA (the promote branch head) in the description. List each PR since the last promote using numbers from `git log --first-parent --merges origin/main..$sha` merge subjects and titles and source branches from the REST API.
+   5. Tag a PR `[reviewed]` only when its description has a `Reviewed-SHA:` line whose SHA starts with the PR's merged `source.commit.hash`; tag every other PR `[unreviewed]`. List merges without PR numbers and every commit from `git log --first-parent --no-merges origin/main..$sha` as `[unreviewed]` with SHA and subject. In How verified claim review only for `[reviewed]` lines, and add the gate result and SHA.
+   6. Never merge to `main`; the coworker's approval is the release.
 
 ## PR description
 
