@@ -11,6 +11,13 @@ For projects where model/data quality — not just code correctness — defines 
 - **NOTEBOOK_STRATEGY** — notebooks are exploratory-only by default: they do not gate correctness and are not reviewed as product artifacts. Shared or correctness-critical logic moves to a `.py` module covered by the normal gate. Notebooks are single-author scratch files under an owner namespace such as `notebooks/<initials>/...`; two people do not co-edit the same notebook. To keep JSON diffs mergeable, copy `$(harness root)/examples/gate.d/nb-clean.sh` to `scripts/gate.d/nb-clean.sh` in ML/CV repos that track notebooks; it fails on tracked `*.ipynb` files with non-empty `outputs` or `execution_count`. Fix notebooks with `nbstripout --install` or `jupyter nbconvert --clear-output --inplace <notebook.ipynb>`.
 - **REPO_HYGIENE** — decide whether to copy `$(harness root)/examples/gate.d/ds-hygiene.sh` to `scripts/gate.d/ds-hygiene.sh`. When enabled, it fails on oversized tracked data/model artifacts and hardcoded local paths in tracked Python/notebook files. Decide the hook's local policy knobs: `DS_DATA_MAX_BYTES`, `DS_DATA_ALLOW_DIRS`, and `DS_PATH_SCAN`; `DS_DATA_ALLOW_DIRS` is a colon-separated list of literal path prefixes, so include a separator boundary when needed. `gate.d/` hooks run on every gate regardless of `profile:`. This is a gate-time guard over working-tree size, run after agent-exec commits implementer output on the unit branch and before review; it flags tracked blobs but does not recover repo history and goes quiet after an already-committed blob is removed from the working tree.
 
+## Notebook writing
+
+Notebooks the agent writes or edits carry structure and core findings, not prose. Interpreting the results is the Owner's job, more so here than for backing scripts.
+- Markdown cells hold headings and subheadings: one question per heading, followed by the code that answers it.
+- Under each heading, at most a line or two of core findings: the number, its n and interval, the partition.
+- No interpretation, opinions, recommendations, caveat lists or next steps unless the Owner asks for them. When asked, expand only the section named.
+
 ## Adds to the loop
 
 - **/1-plan:** a plan changing model, features, or data must state its expected effect on EVAL_METRIC and how that will be measured. "Should improve things" is not a criterion.
