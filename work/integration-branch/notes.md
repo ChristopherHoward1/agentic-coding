@@ -39,3 +39,12 @@ No requested criteria remain partially met. The plan’s outdated acceptance-cri
 
 
 GATE: PASS (280 + 6). Demo exit 0.
+
+# Followup (review round 2)
+
+Updated [work-slim.md](/Users/cboyfly/Documents/repos/agentic-coding-worktrees/integration-branch/harness/profiles/work-slim.md) to use immutable SHA-named promote branches, record `Reviewed-SHA` evidence, and recommend a new branch name when a diverged candidate is `dev`. Updated [ARCHI.md](/Users/cboyfly/Documents/repos/agentic-coding-worktrees/integration-branch/ARCHI.md) to mention the integration-branch tests.
+
+Both `harness gate` and `harness demo integration-branch` passed. The ARCHI freshness check uses committed history, so the orchestrator must commit the ARCHI update alongside this follow-up before that check can reflect it.
+
+
+GATE: PASS (280 + 6). Demo exit 0. archi-fresh exit 0.
