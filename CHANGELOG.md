@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.11.2] - 2026-11-23
+
+- Ships three small fixes. The README describes the current loop, shared-repo use and a shorter rationale. `/docs` has the orchestrator write prose directly, with no codex dispatch. `plan.tpl`'s footprint lists the `PLAN.md` Now line by default. `/docs` opens its PR to the integration branch when one is set.
+- Confirm-delta: none
+
 ## [2026.11.1] - 2026-11-23
 
 - Projects can set `integration_branch` (for example `dev`), so unit worktrees and review diffs base on it. `work-slim` declares it at `/init` and lands units and ad hoc work there through self-merged PRs, and a Promote lane opens the single PR to `main`.
