@@ -6,3 +6,23 @@ Implemented integration-branch support for worktree creation and review bases, w
 
 No acceptance criteria are partially met. `PLAN.md` was left to the orchestrator as instructed; no changes were committed.
 
+
+# Gate
+
+GATE: PASS (orchestrator, in worktree; 280 + 6 tests)
+
+# Demo (exit 0)
+
+```
+Preparing worktree (new branch 'wt/demo')
+branch 'wt/demo' set up to track 'origin/dev'.
+HEAD is now at c253d13 dev only
+dev only
+origin/dev
+missing-branch exit=2: integration_branch nope has no origin/nope ref
+Preparing worktree (new branch 'wt/reg')
+branch 'wt/reg' set up to track 'origin/dev'.
+HEAD is now at c253d13 dev only
+dev only
+integration-branch-ok
+```
