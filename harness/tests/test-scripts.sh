@@ -2751,6 +2751,7 @@ integration_case() {
   local scenario="$1" t repo state wt rc
   t=$(mktemp -d "${TMPDIR:-/tmp}/integration.XXXXXX")
   export HARNESS_HOME="$t/home" WORKTREES_DIR="$t/wts"
+  [[ "$scenario" != no-config ]] || unset WORKTREES_DIR
   export GIT_AUTHOR_NAME=Tester GIT_AUTHOR_EMAIL=test@example.com
   export GIT_COMMITTER_NAME=Tester GIT_COMMITTER_EMAIL=test@example.com
   mkdir -p "$HARNESS_HOME"
