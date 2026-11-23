@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.11.0] - 2026-11-23
+
+- Agent-written notebooks (`machine-learning`, `work-slim`) keep headings, core findings and two or three lines of descriptive analysis per question, and end each question with an empty `**Owner:**` cell the agent never touches.
+- Confirm-delta: none
+
 ## [2026.10.10] - 2026-10-20
 
 - `harness demo` runs the Demonstration block under `bash -e`, so a command that fails mid-block now fails the demo. On Bash 3.2, mid-block `[[ ]]` checks still need `|| exit 1`.
