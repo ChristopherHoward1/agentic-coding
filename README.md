@@ -107,7 +107,7 @@ harness/CONSTITUTION.md  the orchestrator's rules, imported by each project's CL
 harness/AGENTS.md    the implementer's contract
 harness/skills/      the loop as skills:
                        1-plan · 2-implement · 3-review · 4-release · 5-retro · init · compact · docs
-                       (1-plan, 2-implement & docs carry prompts/*.tpl)
+                       (1-plan & 2-implement carry prompts/*.tpl)
 harness/agents/      the checkers (installed into ~/.claude/agents/) (read-only, own models, cold context):
                        plan-reviewer · code-reviewer · fan-selector
 harness/bin/harness  location-independent command dispatcher
