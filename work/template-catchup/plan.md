@@ -1,6 +1,6 @@
 # Template catch-up: release the merged small fixes
 
-**Slug:** template-catchup · **Date:** 2026-11-23 · **Status:** approved
+**Slug:** template-catchup · **Date:** 2026-11-23 · **Status:** implemented
 
 ## Goal
 
@@ -39,3 +39,7 @@ Plan verdict: APPROVE
 
 Code review round 1: codex APPROVE. Code-reviewer APPROVE, with one MEDIUM in the released range: `/docs` (#80) branched from the integration branch but opened its PR to the default branch, bypassing Promote. The orchestrator fixed it directly in this unit, since it wrote #80: the PR targets the worktree's base branch, and the slug's source is now stated. A fresh round follows. LOWs left as-is: the constitution's small-fix wording versus `/docs`' merge step, and the handoff template's deletion not named in the note.
 
+Code review round 2: code-reviewer APPROVE (two LOWs: "otherwise `main`" simplifies the reused-branch and no-origin cases; criterion 1's wording doesn't cover the branch's own `/docs` fix). Codex APPROVE, no findings.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
