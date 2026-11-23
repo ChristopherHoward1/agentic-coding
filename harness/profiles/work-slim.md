@@ -21,10 +21,12 @@ Pick the lightest lane that fits. When unsure, say which lane and why in one lin
    - **Result** — numbers with uncertainty (n, interval, held-out vs in-sample).
    - **Read** — left blank for the Owner. Fill it only when asked.
 
-   Notebooks the agent writes or edits carry structure and core findings, not prose. Interpreting the results is the Owner's job, more so here than for backing scripts.
+   Notebooks the agent writes or edits carry structure, core findings and a short descriptive read. Reasoning about what the results mean is left to the Owner, more so here than for backing scripts.
    - Markdown cells hold headings and subheadings: one question per heading, followed by the code that answers it.
-   - Under each heading, at most a line or two of core findings: the number, its n and interval, the partition.
-   - No interpretation, opinions, recommendations, caveat lists or next steps unless the Owner asks for them. When asked, expand only the section named.
+   - After the code: the core finding (the number, its n and interval, the partition), then at most two or three lines of descriptive analysis: direction, size, and how it compares with the baseline or a prior run.
+   - Each question heading's section (not each subheading) ends with a markdown cell holding only `**Owner:**`. Add one to each section the agent writes or edits; leave sections it doesn't touch as they are. The agent never writes in, edits or deletes an Owner cell; an existing Owner cell keeps its text and moves with its heading.
+   - No interpretation of what a result means, recommendations, caveat lists or next steps unless the Owner asks. When asked, expand only the section named.
+
 2. **Ship** — code that a person or a later run depends on. Move it out of the notebook into a `.py` module with tests, in a worktree on its own branch.
    1. `harness gate` passes.
    2. Write the PR description (below) first; it stands in for the plan.
