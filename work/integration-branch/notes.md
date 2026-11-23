@@ -48,3 +48,11 @@ Both `harness gate` and `harness demo integration-branch` passed. The ARCHI fres
 
 
 GATE: PASS (280 + 6). Demo exit 0. archi-fresh exit 0.
+
+# Followup (review round 3, Owner-authorized round 4)
+
+Updated [work-slim.md](/Users/cboyfly/Documents/repos/agentic-coding-worktrees/integration-branch/harness/profiles/work-slim.md) so Promote fetches first, pins the integration tip, and uses that SHA throughout. The Integration branch section now defines `<integration>`.
+
+`harness gate`, `harness demo integration-branch`, and `harness archi-fresh wt/integration-branch` all passed. No acceptance criteria remain partially met; the overridden merge-commit finding was left out of scope.
+
+GATE: PASS. Demo exit 0.
