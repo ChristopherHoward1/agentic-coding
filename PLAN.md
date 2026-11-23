@@ -51,6 +51,7 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 - 2026-10-20 — A LOW documentation-wording fix that both reviewers raised may be applied after both APPROVE without a new review round, like `/3-review` step 7's ARCHI heal: a description sync of approved code. Any behavior or test change still triggers a fresh round — `work/demo-fail-fast/retro.md`
 - 2026-11-23 — A small fix lands on `main` but reaches the template only with the next release, and `release.sh` needs both review verdicts. When the Owner wants one released now, run it as a minimal loop unit (prose-only → `None:` demo), and if an earlier small fix touched `harness/`, put the `ARCHI.md` edit in the plan, since `ARCHI.md` is already stale — `work/notebook-owner-room/retro.md`
 - 2026-11-23 — A lane that exists only as profile prose (no script, no runnable demo) gets reviewed as a protocol. Before plan review, write each claim it makes to a human (for example "reviewed", "gated") against the evidence that proves it, tied to a SHA. In `integration-branch`, Promote drew 4 plan rounds and 6 codex HIGHs across 4 code rounds, all on fetching, pinning and evidence — `work/integration-branch/retro.md`
+- 2026-11-23 — `/docs` no longer dispatches codex: the orchestrator writes documentation prose in a worktree and the Owner reviews the diff. A codex round trip added latency and a correction pass without a real independent check (Owner call after `readme-refresh`, PR #79)
 
 ## Risks
 

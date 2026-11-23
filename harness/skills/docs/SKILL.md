@@ -1,22 +1,22 @@
 ---
 name: docs
-description: Dispatch codex/GPT into an isolated worktree to write or rewrite documentation prose for an approved docs work unit.
+description: Write or rewrite documentation prose (README, guides, profile text) directly, on a branch through the small-fix lane. Use when the change is prose only.
 ---
 
-# /docs — dispatch documentation writer
+# /docs — write documentation
 
-Input: a docs work unit slug with `$(harness project)/work/<slug>/plan.md`. The plan names which documentation to write or rewrite and declares the file footprint.
+Input: what to write or rewrite, from the Owner's request.
 
 ## Steps
 
-1. **Create the worktree:** `WT=$(harness worktree add <slug>)`. Documentation work happens in worktrees, never the primary checkout.
-2. **Render the handoff** from `prompts/handoff.tpl` into `$(harness project)/work/<slug>/handoff.md`. Fill `{{SLUG}}` from the plan slug, `{{FILES_TO_MODIFY}}` from the plan's "Files to modify" list, and `{{CONSTRAINTS}}` from the plan's constraints, including "Files NOT to touch". Fill `{{PLAN_PATH}}` with the absolute `$(harness project)/work/<slug>/plan.md` path. It must be self-contained — the docs writer starts cold — and no unresolved `{{...}}` placeholders may remain.
-3. **Dispatch codex/GPT:** `harness agent-exec "$WT" "$(harness project)/work/<slug>/handoff.md"`. This intentionally uses the existing two-argument dispatch form and reuses `implementer.command`, which is codex/GPT; GPT authors the prose. Capture the writer's final summary in `$(harness project)/work/<slug>/notes.md`, then from the repo root run `harness worktree sync-artifacts <slug>`.
-4. **Present the diff** to the Owner. The Owner and coworkers are the readers of prose quality; there is no automated prose-quality judge.
-5. **Ship lane:** use the small-fix path: branch + tell the Owner. Do not send pure documentation prose through `/3-review` -> `/4-release`, because the dual-vendor `/3-review` bases diffs on the review base and gates on code-review sentinels, which reviews prose as code.
+1. **Branch:** `WT=$(harness worktree add <slug>)`, and write in that worktree, never the primary checkout.
+2. **Write the prose yourself.** Check every claim against the shipped code, skills and profiles. Name nothing that doesn't exist, and don't describe planned work as done.
+3. **Show the Owner the diff.** The Owner is the reader and the reviewer of prose quality; there is no automated judge.
+4. **Ship by the small-fix lane:** commit, push the branch, open a PR to the default branch, and merge it once the Owner is happy and CI passes. Then remove the worktree and branch. Prose never goes through `/3-review` → `/4-release`, which would review it as code.
 
 ## Rules
 
-- **No gate loop.** Prose has no exit-code contract. If a docs change also edits code or scripts, that is out of scope for `/docs`; `/docs` is for documentation prose.
-- **No self-review; writer never reviews.** codex writes the prose; the orchestrator does not rewrite codex's prose in-thread. This preserves the framework's writer != reviewer invariant.
-- Footprint violations reported by the docs writer go back to planning, not into ad-hoc scope expansion.
+- **Prose only.** If the change needs a code, script or test edit, that part goes through `/1-plan`.
+- **No gate loop.** Prose has no exit-code contract.
+- **Plain and short.** No filler, marketing tone or private shorthand. Explain each term a cold reader wouldn't know, or cut it.
+- **Published files stay generic.** A file that ships in a public template names no dogfood-only scripts and nothing from the Owner's work environment.
