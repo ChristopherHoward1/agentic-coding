@@ -2,7 +2,7 @@
 
 A small, opinionated framework for building software with AI agents — where **no agent is ever trusted to check its own work.**
 
-One Claude Code session acts as the **Orchestrator**: it plans, dispatches, and drives the loop. Every stage that could go wrong is checked by a *different* agent — a fresh thread, cold context, often a different model — and by a deterministic shell gate that no agent can talk its way past. The human is the **Owner**: they set direction and merge.
+One Claude Code session acts as the **Orchestrator**: it plans, dispatches, and drives the loop. Every stage that could go wrong is checked by a *different* agent — a fresh thread, cold context, often a different model — and by a deterministic shell gate that no agent can talk its way past. The human is the **Owner**: they set direction. Under full TRIP autonomy, the Orchestrator runs the release, including the push, PR, merge, and tag.
 
 No custom runtime. No ceremony that doesn't catch a defect.
 
@@ -26,13 +26,13 @@ flowchart TD
 
     Impl["<b>/2-implement</b><br/>implementer writes code in isolated worktree wt/slug<br/>configurable · default Codex"] --> Gate{"harness gate<br/>exit 0 or not"}
     Gate -- "fail — output IS the retry prompt" --> Impl
-    Gate -- "pass" --> CRev
+    Gate -- "pass: harness demo runs the plan’s ## Demonstration block" --> CRev
 
-    CRev{{"<b>/3-review</b><br/>code-reviewer · NEW fresh thread · different model<br/>sees diff + plan only"}}:::grill
+    CRev{{"<b>/3-review</b><br/>fresh Claude code-reviewer + Codex second-vendor reviewer<br/>independent · cold · read-only"}}:::grill
     CRev -- "REVISE — back to the implementer" --> Impl
     CRev -- "Code-review verdict: APPROVE<br/>Codex-review verdict: APPROVE" --> Rel
 
-    Rel["<b>/4-release</b><br/>release.sh re-runs gate + preconditions<br/>bumps version on branch"] --> Merge["Owner merges PR<br/>rebase / fast-forward"]:::human
+    Rel["<b>/4-release</b><br/>release.sh re-runs gate + preconditions<br/>bumps version on branch"] --> Merge["Orchestrator merges PR<br/>rebase / fast-forward"]
     Merge --> Tag["tag-after-merge<br/>verify origin/main, then tag"]
     Tag --> Retro["<b>/5-retro</b><br/>lessons routed: knowledge / PLAN.md / new unit<br/>next release blocked until retro exists"] --> Done([tagged release]):::human
 
@@ -40,7 +40,7 @@ flowchart TD
     classDef human fill:#e8f0ff,stroke:#3a6ea5,stroke-width:2px,color:#000;
 ```
 
-The five **`/slash`-command stages** are the loop. `{{Hexagons}}` are the **adversarial checkpoints** — an agent whose only job is to try to break the previous agent's work. Blue nodes are the **Owner**. Everything else is the Orchestrator driving deterministic machinery.
+The five **`/slash`-command stages** are the loop. `{{Hexagons}}` are the **adversarial checkpoints** — an agent whose only job is to try to break the previous agent's work. Blue nodes mark the Owner and the completed release. Everything else is the Orchestrator driving the loop. In repo mode both reviewers must approve; in registry mode review uses only the code-reviewer, and the loop stops after review for the Owner or the profile’s lanes to take the PR from there. A plan can declare `Stacked on: <parent>` to build on an unmerged unit.
 
 Trivial fixes (typos, one-liners, config tweaks) skip the loop — you just do them on a branch. The loop is for work with enough surface area to get wrong.
 
@@ -48,17 +48,11 @@ Trivial fixes (typos, one-liners, config tweaks) skip the loop — you just do t
 
 ## Why the agents grill each other
 
-The core bet of this framework: **a single agent grading its own output is the weakest link in the pipeline.** It has already committed to an approach, it has the same blind spots on review as it had on write, and it is motivated to declare victory. So the framework never lets that happen. Three independent forces have to agree before anything ships:
+The writer does not review its own work. Reviewers have read-only tools, so they report findings rather than fix them.
 
-**1. Writer ≠ reviewer, mechanically.** Reviews come only from subagents defined in `harness/agents/` (installed into `~/.claude/agents/`) — with **read-only tools**, so a reviewer *cannot* quietly fix what it finds; it can only report. The Orchestrator that dispatched the work never reviews that work. This isn't a guideline in a prompt; it's enforced by which tools each agent is handed.
+Each review and re-review gets fresh, cold context. Roles can use different models or vendors to catch different mistakes.
 
-**2. Fresh, cold context defeats anchoring.** Every review runs in a brand-new thread that has never seen the implementation conversation — it gets *only* the diff and the plan. A reviewer that watched the code being written is already anchored to its reasoning; one that sees just the result asks "does this actually match the plan?" from scratch. Re-reviews after a fix get *another* new thread, because a reviewer that already approved a direction is compromised on the next pass.
-
-**3. A different model breaks correlated blind spots.** The implementer, the reviewers, and the selector can each run a different model (set per role in `config.yaml`). A bug the writer's model can't see is often obvious to a different one. Same-vendor agreement is corroboration, not proof — so the deterministic gate carries the real weight, and agent agreement backs it up.
-
-**And above all of them sits a script.** `harness gate` exits `0` or it doesn't. No agent — Orchestrator or reviewer — can overrule it, reinterpret it, or call work "done" while it's red. When it fails, its output *is* the prompt fed back to the implementer. Judgment lives in the agents; the pass/fail decision lives in code.
-
-> **Why this pays off:** the gate and the reviewers catch *different classes* of defect. The gate catches what's mechanically checkable — a lint error, a broken test, a shellcheck warning. The adversarial reviewer catches what a passing gate can hide: an edge case with no test, a plan requirement quietly unmet, a shell idiom that works on the author's machine and breaks on bash 3.2. Neither alone is enough. Rounds of an independent agent *trying to break* green code routinely surface real bugs the gate signed off on — which is exactly the point of making them argue.
+`harness gate` must pass; no agent can overrule it. The gate catches mechanical defects, and reviewers catch what a green gate hides.
 
 ---
 
@@ -76,6 +70,19 @@ flowchart LR
 ```
 
 It's off by default (`implementer.fan: 1` — byte-for-byte the single-agent path). Set N > 1 only when the extra implementer tokens are worth it. It reduces per-run *variance*; it does **not** replace cross-model review.
+
+---
+
+## Using it in a shared repo
+
+`harness register` keeps harness state in a home-directory state directory, so no harness files are committed to the repo. The `work-slim` profile offers four lanes:
+
+- **Explore:** work in notebooks and write reports without the loop.
+- **Ship:** pass the gate and a fresh review, then self-merge a PR.
+- **Loop:** run the full loop through review for changes that could cost days to get wrong.
+- **Promote:** open one PR from the integration branch to protected `main`, listing each change as `[reviewed]` or `[unreviewed]`.
+
+Set `integration_branch` in `config.yaml` (for example, `dev`) to base unit worktrees and review diffs on that branch. Small PRs can then land there without waiting for protected-branch approval; Promote carries them to `main`.
 
 ---
 
