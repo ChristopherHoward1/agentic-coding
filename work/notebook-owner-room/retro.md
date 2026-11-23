@@ -1,0 +1,6 @@
+# Retro: notebook-owner-room (v2026.11.0)
+
+1. **What did the gate miss that a reviewer caught?** The gate doesn't check prose. In round 1 the plan-reviewer ran acceptance criterion 1 and found it could never pass: the `sed` range start missed `work-slim`'s indented copy. → `not worth keeping`: the 2026-08-27 decision (a check isn't done until it's shown to fail) already covers this, and the reviewer applied it.
+2. **What did every check miss?** `7f7c87b` went in through the small-fix lane and overcorrected ("no interpretation"). Only the Owner's use at work caught it. → `not worth keeping`: profile guidance is tuned by real use, and no check can stand in for the Owner here.
+3. **What got re-derived that a doc would have prevented?** That a small fix can't be released without a loop unit (`release.sh` needs both verdicts), and that `7f7c87b` had already left `ARCHI.md` stale on `main`. → `process`: one line in `PLAN.md` → Decisions.
+4. **What friction repeated from a prior retro?** None. With `PLAN.md` listed under Files to modify, it again drew no footprint finding, which confirms the `footprint-plan-md` candidate (its Now line is updated). The template's sync PR merge failed once with a transient "Base branch was modified" while the PR was clean, and a retry merged it. → `not worth keeping`: a one-off GitHub API error.
