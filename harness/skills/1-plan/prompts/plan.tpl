@@ -16,6 +16,7 @@
 
 Files to modify:
 - {{path}}
+- `PLAN.md` (orchestrator: this unit's Now line)
 
 Files NOT to touch:
 - {{path — only when there's a live hazard}}
