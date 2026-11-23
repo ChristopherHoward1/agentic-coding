@@ -1,6 +1,6 @@
 # Integration branch: work units land on `dev`, and `main` is the release
 
-**Slug:** integration-branch · **Date:** 2026-11-23 · **Status:** approved
+**Slug:** integration-branch · **Date:** 2026-11-23 · **Status:** implemented
 
 ## Goal
 
@@ -31,7 +31,7 @@ Done means:
   - **New Promote lane, run only when the Owner asks:**
     0. `git fetch origin`, then pin `sha=$(git rev-parse origin/<integration>)` and use it in every later step.
     1. If `git diff --quiet "$(git merge-base origin/main "$sha")" origin/main` fails, `main` moved outside Promote: stop and tell the Owner. The remedy is to merge `origin/main` into the integration branch through a self-merged PR, then re-run Promote.
-    2. Gate the integration tip in a throwaway detached worktree: `git worktree add --detach <tmp> origin/<integration>`, run `harness gate` inside it, note the SHA, then `git worktree remove <tmp>`.
+    2. Gate the integration tip in a throwaway detached worktree: `git worktree add --detach <tmp> "$sha"`, run `harness gate` inside it, note the SHA, then `git worktree remove <tmp>`.
     3. Push the gated SHA to a frozen `promote/<short-sha>` branch (never updated once pushed) and open its PR to `main`, so later merges to the integration branch can't ride along. Its description has one line per PR merged since the last promote: PR number from the merge subjects in `git log --first-parent --merges origin/main..origin/<integration>`, title and source branch from the REST API.
     4. Tag a PR `[reviewed]` only when its description has a `Reviewed-SHA:` line (written by Ship step 4 after approval and the final gate) whose SHA starts with the PR's merged `source.commit.hash`; anything else is `[unreviewed]`. A merge without a PR number, and every commit from `git log --first-parent --no-merges origin/main..<sha>`, is also listed as `[unreviewed]` with its SHA and subject. How verified makes the review claim only for `[reviewed]` lines, and adds the gate result with its SHA.
     5. Never merge to `main`; the coworker's approval is the release.
@@ -191,3 +191,8 @@ Code review round 3: code-reviewer APPROVE (four LOWs). Codex REQUEST CHANGES wi
 1. Override, with the analysis recorded: "A self-merged PR's merge commit can carry unreviewed conflict-resolution code that `[reviewed]` hides." Bitbucket's UI and REST merge refuse a PR with conflicts, so conflicts are resolved on the source branch, where the gate and the `Reviewed-SHA:` check see them. The only other route to such a merge commit is a direct push to the integration branch, and the profile forbids that. The Claude reviewer raised nothing on this behavior in three rounds.
 2. Accepted: Promote fetches `origin` before its checks and pins the fetched integration SHA for every later step.
 Owner approval (2026-11-23): fix #2 and run a fourth review round, past the 3-round cap; override #1 as analyzed above.
+
+Code review round 4 (Owner-authorized): code-reviewer APPROVE. It ran the gate, the demo and the helper mutation itself. Its LOWs were ARCHI freshness (healed below, per /3-review step 7), pinning `origin/main` as well (not acted on: a late `main` change only shows up as extra PR diff), and plan wording (`$sha` in the detached worktree, synced). Codex APPROVE, no findings.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
