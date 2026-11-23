@@ -1,6 +1,6 @@
 # Notebook owner room: short descriptive analysis per heading, plus an empty Owner cell
 
-**Slug:** notebook-owner-room · **Date:** 2026-11-23 · **Status:** approved
+**Slug:** notebook-owner-room · **Date:** 2026-11-23 · **Status:** implemented
 
 ## Goal
 
@@ -64,3 +64,9 @@ Round 1 (plan-reviewer): REVISE. All five findings applied:
 Round 2 (fresh plan-reviewer): APPROVE, with four small findings, all applied: the Goal's analysis list now matches the rule; a criterion pins the profile text to this plan's blockquote; the ARCHI `work-slim` check is a grep; Owner cells go in sections the agent writes or edits. Noted, no change: `work.md` doesn't point at `## Notebook writing`, so `work`-profile repos don't get the rule (out of scope here).
 
 Plan verdict: APPROVE
+
+Code review round 1 (fresh code-reviewer): APPROVE; all eight criteria met, gate and demo pass. Two LOWs, not acted on: a blank line added before `2. **Ship**` in `work-slim.md` (harmless; numbering holds), and "holding only `**Owner:**`" could read as forbidding a filled-in Owner cell (the never-writes-in/edits/deletes sentence already prevents the bad outcome).
+Codex review round 1: APPROVE, no findings.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
