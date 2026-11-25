@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.11.3] - 2026-11-25
+
+- `harness register --subdir` treats `[`, `*`, `?` and `\` in the subdir literally: the exclude line is escaped and the tracked check uses a literal pathspec (closes the `harness-registry` deferral). The codex reviewer now runs at `model_reasoning_effort=high`, in this repo's config and the skeleton.
+- Confirm-delta: none
+
 ## [2026.11.2] - 2026-11-23
 
 - Ships three small fixes. The README describes the current loop, shared-repo use and a shorter rationale. `/docs` has the orchestrator write prose directly, with no codex dispatch. `plan.tpl`'s footprint lists the `PLAN.md` Now line by default. `/docs` opens its PR to the integration branch when one is set.
