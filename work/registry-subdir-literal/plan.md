@@ -1,6 +1,6 @@
 # Registry subdir literal paths
 
-**Slug:** registry-subdir-literal · **Date:** 2026-11-25 · **Status:** approved
+**Slug:** registry-subdir-literal · **Date:** 2026-11-25 · **Status:** implemented
 
 ## Goal
 
@@ -100,3 +100,11 @@ Plan review round 2: APPROVE, with three findings, all applied.
 2. The demo adds an over-match repo (`a*b` beside an untracked `axb/`).
 3. The demo cleans up with `trap` and keeps stderr on both register calls.
 Plan verdict: APPROVE
+
+Code review round 1: both reviewers APPROVE. The code-reviewer ran the plan's three mutations plus four more (dropping the `?`, `\` or `[]` escapes, and disabling the idempotency grep); each one failed the new case. It also checked the released range (0515dd9) against the release note. Codex: no findings. Three LOWs were left as they are:
+1. `GIT_LITERAL_PATHSPECS=1` in the caller's environment would turn `:(literal)` into a literal prefix. The `foreign CLAUDE.local.md` check still refuses, so this was not worth changing.
+2. The `PLAN.md` Now line is added at release.
+3. The demo's second register also prints the `/add-dir` hint on stderr.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
