@@ -38,7 +38,7 @@ if [[ "$PROJECT_MODE" == registry && ( "$STATE_DIR" != "$state" || "$PROJECT_SUB
   die 'remove the existing entry, its CLAUDE.local.md and exclude line by hand first'
 fi
 [[ ! -e "$state" || "$STATE_DIR" == "$state" ]] || die 'name already used by another root; use --name'
-[[ -z "$(git ls-files -- "${subdir:+$subdir/}CLAUDE.local.md")" ]] || die 'CLAUDE.local.md is tracked'
+[[ -z "$(git ls-files -- ":(literal)${subdir:+$subdir/}CLAUDE.local.md")" ]] || die 'CLAUDE.local.md is tracked'
 if [[ -e "$local_md" ]]; then
   [[ "$(cat "$local_md")" == "$expected" && "$(wc -l <"$local_md")" -eq 1 ]] || die 'foreign CLAUDE.local.md'
 fi
@@ -49,7 +49,7 @@ printf '@%s/CONSTITUTION.md\n@%s/ARCHI.md\n@%s/PLAN.md\n\nThis project runs in r
 printf '%s\n' "$expected" >"$local_md"
 exclude=$(git rev-parse --git-path info/exclude)
 mkdir -p "${exclude%/*}"
-line="/${subdir:+$subdir/}CLAUDE.local.md"
+line=$(printf '/%sCLAUDE.local.md' "${subdir:+$subdir/}" | sed 's/[][\\*?]/\\&/g')
 if [[ ! -f "$exclude" ]] || ! grep -qxF "$line" "$exclude"; then printf '\n%s\n' "$line" >>"$exclude"; fi
 echo "$state"
 echo "Owner: run /add-dir $state or add it to permissions.additionalDirectories" >&2
