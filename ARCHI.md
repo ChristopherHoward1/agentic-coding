@@ -37,7 +37,7 @@ Bash (`set -uo pipefail`, macOS/Linux) and Markdown. No compiled language, no pa
 - **`harness state <slug>`** — prints the work unit's derived execution state (`stage`/`review`/`next_action`) so a cold session learns where a unit stands and what comes next without the prior conversation; read-only, gate result out of scope by design.
 - **`harness fan-exec dispatch <slug> <handoff> <N>` / `adopt <slug> <sample-branch>`** — the best-of-N primitive behind `2-implement`'s Fan Mode; sequential (N× wall-clock), activated only when `implementer.fan > 1`.
 
-Registry mode: gate hooks/config and unit artifacts live in the state dir; gate, agent-exec and demo run in the project subfolder. Worktree add never commits plans and sync-artifacts is a no-op. State reaches release after the code-review approval; codex-review refuses because there is no codex reviewer at work, while release and fan-exec wait on pr-release. ARCHI freshness compares state-file mtime to project source commits. Repo mode retains the behavior described above.
+Registry mode: gate hooks/config and unit artifacts live in the state dir; gate, agent-exec and demo run in the project subfolder. Worktree add never commits plans and sync-artifacts is a no-op. State reaches release after the code-review approval and stays there (the repo-side `work/.last-released` marker is read in repo mode only, so done waits on pr-release); codex-review refuses because there is no codex reviewer at work, while release and fan-exec wait on pr-release. ARCHI freshness compares state-file mtime to project source commits. Repo mode retains the behavior described above.
 
 ## Key flows
 
