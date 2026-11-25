@@ -56,7 +56,7 @@ fi
 unit_dir="$STATE_DIR/work/$slug"
 # ponytail: registry stops at release even after a hand-merged PR; pr-release will define done.
 last_released=
-if [[ -f work/.last-released ]]; then
+if [[ "$PROJECT_MODE" == repo && -f work/.last-released ]]; then
   last_released=$(
     awk '
       NR == 1 {
