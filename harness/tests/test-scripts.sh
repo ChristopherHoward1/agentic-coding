@@ -2531,6 +2531,9 @@ registry_flow() {
   echo 1 >"$S/work/new/review-round"
   registry_run state new | grep -x 'next_action: /3-review'
   echo 'Code-review verdict: APPROVE' >>"$S/work/new/plan.md"
+  mkdir -p "$REG/repo/work/new"
+  echo new >"$REG/repo/work/.last-released"
+  echo learned >"$REG/repo/work/new/retro.md"
   registry_run state new | grep -x 'review: approve'
   registry_run state new | grep -x 'stage: release'
   registry_run state new | grep -x 'next_action: /4-release'
