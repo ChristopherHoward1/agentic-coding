@@ -27,7 +27,7 @@ root=$(git rev-parse --show-toplevel) || die2 "not inside a git checkout"
 # shellcheck source=/dev/null
 source "$HERE/lib/project.sh"
 resolve_project
-[[ "$PROJECT_MODE" == repo ]] || die2 "registry mode has no second reviewer yet (reviewer-set)"
+[[ "$PROJECT_MODE" == repo ]] || die2 "registry mode has no codex reviewer; /3-review uses the code-reviewer only"
 artifact="$root/work/$slug/codex-review.md"
 current_branch=$(git symbolic-ref --quiet --short HEAD || true)
 

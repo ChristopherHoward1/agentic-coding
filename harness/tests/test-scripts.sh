@@ -659,6 +659,11 @@ setup_state_fixture() {
         printf '# Demo\n\nPlan verdict: APPROVE\n' >work/demo/plan.md
         printf 'handoff\n' >work/demo/handoff.md
         ;;
+      review-round)
+        printf '# Demo\n\nPlan verdict: APPROVE\n' >work/demo/plan.md
+        printf 'handoff\n' >work/demo/handoff.md
+        printf '1\n' >work/demo/review-round
+        ;;
       review-single-sentinel)
         {
           printf '# Demo\n\n'
@@ -990,6 +995,14 @@ check "state derives review stage before codex review" bash -c "
   grep -qx 'stage: review' <<<\"\$out\" &&
   grep -qx 'review: pending' <<<\"\$out\" &&
   grep -qx 'next_action: run harness gate' <<<\"\$out\"
+"
+
+setup_state_fixture state-review-round review-round
+check "state resumes review from round counter" bash -c "
+  cd '$STATE_REPO' &&
+  out=\$(bash scripts/state.sh demo) &&
+  grep -qx 'stage: review' <<<\"\$out\" &&
+  grep -qx 'next_action: /3-review' <<<\"\$out\"
 "
 
 setup_state_fixture state-release release
@@ -2513,12 +2526,17 @@ registry_flow() {
   echo 'Plan verdict: APPROVE' >"$S/work/new/plan.md"
   registry_run state new | grep -x 'stage: implement'
   echo handoff >"$S/work/new/handoff.md"
-  echo 'Code-review verdict: APPROVE' >>"$S/work/new/plan.md"
   registry_run state new | grep -x 'stage: review'
   registry_run state new | grep -x 'next_action: run harness gate'
+  echo 1 >"$S/work/new/review-round"
+  registry_run state new | grep -x 'next_action: /3-review'
+  echo 'Code-review verdict: APPROVE' >>"$S/work/new/plan.md"
+  registry_run state new | grep -x 'review: approve'
+  registry_run state new | grep -x 'stage: release'
+  registry_run state new | grep -x 'next_action: /4-release'
   registry_run codex-review demo 2>"$REG/error" && exit 1
   [[ $? == 2 ]] || return 1
-  grep -q reviewer-set "$REG/error"
+  grep -q "registry mode has no codex reviewer; /3-review uses the code-reviewer only" "$REG/error"
   registry_run release demo 2>"$REG/error" && exit 1
   [[ $? == 1 ]] || return 1
   grep -q pr-release "$REG/error"

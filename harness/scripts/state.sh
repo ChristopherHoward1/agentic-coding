@@ -47,14 +47,14 @@ else
   plan=$(<"$plan_path")
 fi
 
-if [[ "$PROJECT_MODE" == repo ]] && has_line 'Code-review verdict: APPROVE' && has_line 'Codex-review verdict: APPROVE'; then
+if has_line 'Code-review verdict: APPROVE' && { [[ "$PROJECT_MODE" == registry ]] || has_line 'Codex-review verdict: APPROVE'; }; then
   review=approve
 else
   review=pending
 fi
 
 unit_dir="$STATE_DIR/work/$slug"
-# ponytail: registry stops at review; pr-release will define release and done.
+# ponytail: registry stops at release even after a hand-merged PR; pr-release will define done.
 last_released=
 if [[ -f work/.last-released ]]; then
   last_released=$(
@@ -76,7 +76,7 @@ elif [[ ! -f "$unit_dir/handoff.md" && ( "$PROJECT_MODE" == registry || "$branch
   next_action='/2-implement'
 elif [[ "$review" != approve ]]; then
   stage=review
-  if [[ -f "$unit_dir/codex-review.md" ]]; then
+  if [[ -f "$unit_dir/codex-review.md" || -f "$unit_dir/review-round" ]]; then
     next_action='/3-review'
   else
     next_action='run harness gate'
