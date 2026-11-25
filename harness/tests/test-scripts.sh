@@ -2441,6 +2441,47 @@ registry_subdir() {
   done
 }
 # shellcheck disable=SC2317,SC2329,SC2016 # SC2317 on shellcheck <0.10, SC2329 on >=0.10; Exported case runs in a child bash; scripts expand there.
+registry_literal() {
+  set -e
+  local value sibling fixture
+  registry_fixture literal-bracket
+  mkdir -p "$REG/repo/app[1]" "$REG/repo/app1"
+  echo tracked >"$REG/repo/app1/CLAUDE.local.md"
+  git -C "$REG/repo" add app1/CLAUDE.local.md
+  git -C "$REG/repo" -c user.name=t -c user.email=t@t commit -qm tracked
+  registry_run register --name x --subdir 'app[1]'
+  grep -qxF '/app\[1\]/CLAUDE.local.md' "$REG/repo/.git/info/exclude"
+  [[ -z $(git -C "$REG/repo" status --porcelain) ]] || return 1
+  registry_run register --name x --subdir 'app[1]'
+  [[ $(grep -cxF '/app\[1\]/CLAUDE.local.md' "$REG/repo/.git/info/exclude") == 1 ]] || return 1
+  for fixture in star question backslash; do
+    case "$fixture" in
+      star) value='a*b'; sibling=axb ;;
+      question) value='q?'; sibling=qx ;;
+      backslash) value='a\b'; sibling=ab ;;
+    esac
+    registry_fixture "literal-$fixture"
+    mkdir -p "$REG/repo/$value" "$REG/repo/$sibling"
+    echo sibling >"$REG/repo/$sibling/CLAUDE.local.md"
+    if [[ "$fixture" == star ]]; then
+      git -C "$REG/repo" add "$sibling/CLAUDE.local.md"
+      git -C "$REG/repo" -c user.name=t -c user.email=t@t commit -qm tracked
+    fi
+    registry_run register --name x --subdir "$value"
+    if [[ "$fixture" == star ]]; then
+      git -C "$REG/repo" reset -q HEAD^ -- "$sibling/CLAUDE.local.md"
+    fi
+    git -C "$REG/repo" check-ignore -q "$value/CLAUDE.local.md"
+    if git -C "$REG/repo" check-ignore -q "$sibling/CLAUDE.local.md"; then return 1; fi
+  done
+  registry_fixture literal-tracked
+  mkdir -p "$REG/repo/app[1]"
+  echo tracked >"$REG/repo/app[1]/CLAUDE.local.md"
+  git -C "$REG/repo" add 'app[[]1]/CLAUDE.local.md'
+  if registry_run register --name x --subdir 'app[1]' 2>"$REG/error"; then return 1; fi
+  grep -qF 'CLAUDE.local.md is tracked' "$REG/error"
+}
+# shellcheck disable=SC2317,SC2329,SC2016 # SC2317 on shellcheck <0.10, SC2329 on >=0.10; Exported case runs in a child bash; scripts expand there.
 registry_flow() {
   set -e
   registry_fixture flow
@@ -2492,11 +2533,12 @@ registry_flow() {
   touch "$S/ARCHI.md"
   registry_run archi-fresh
 }
-export -f registry_subdir registry_fixture registry_run registry_lookup registry_register registry_flow
+export -f registry_subdir registry_fixture registry_run registry_lookup registry_register registry_literal registry_flow
 export ROOT TMP
 check "registry subdir normalization and validation" bash -e -c registry_subdir
 check 'registry lookup skips unrelated stale and malformed entries under set -e' bash -e -c registry_lookup
 check 'registry register preflight and idempotent excluded imports' bash -e -c registry_register
+check 'registry subdir metacharacters are literal' bash -e -c registry_literal
 check 'registry project subdir gate worktree agent demo state and refusal flow' bash -e -c registry_flow
 
 # --- Stacked units: each case owns a non-bare clone and local bare origin.
