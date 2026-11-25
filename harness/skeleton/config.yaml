@@ -20,7 +20,7 @@ implementer:
   # command: 'claude -p --dangerously-skip-permissions'
 
 reviewer:
-  command: 'codex exec --sandbox read-only -'
+  command: 'codex exec -c model_reasoning_effort=high --sandbox read-only -'
 
 gate:
   command: harness gate
