@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Opt-in data contract gate. Copy to scripts/gate.d/data-contract.sh to enable.
+# Example: {"path":"data/sales.csv","columns":{"id":"int","amount":"float"},"rows":[1,null],"extra_columns":"forbid"}
+# path is relative to the data root; columns maps names to int, float, str,
+# bool, or any (presence only). rows is [min, max], with null for no maximum;
+# CSV headers are excluded. extra_columns is forbid (default) or allow.
 set -uo pipefail
 : "${DATA_CONTRACT_DIR=contracts}" "${DATA_CONTRACT_SCAN_ROWS=100000}"
 contracts=("$DATA_CONTRACT_DIR"/*.json)
@@ -67,6 +71,8 @@ for filename in contracts:
                 count = 0
                 mismatches = set()
                 for row in reader:
+                    if not row:
+                        continue
                     count += 1
                     if count > scan:
                         continue
@@ -99,7 +105,7 @@ for filename in contracts:
                 dtype = columns.get(field.name, 'any')
                 actual = str(field.type)
                 mapped = ('int' if actual.startswith(('int', 'uint')) else
-                          'float' if actual.startswith(('float', 'double', 'decimal')) else
+                          'float' if actual.startswith(('float', 'double', 'decimal', 'halffloat')) else
                           'str' if actual in ('string', 'large_string') else
                           'bool' if actual == 'bool' else None)
                 if dtype != 'any' and dtype != mapped:
