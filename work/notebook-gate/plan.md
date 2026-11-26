@@ -1,6 +1,6 @@
 # Notebook gate
 
-**Slug:** notebook-gate · **Date:** 2026-11-26 · **Status:** approved
+**Slug:** notebook-gate · **Date:** 2026-11-26 · **Status:** implemented
 
 ## Goal
 
@@ -289,3 +289,10 @@ Code review round 1:
   - no double slash in the temp path;
   - idle-skip cases run from a subfolder missing in the primary checkout;
   - the dead test line is removed.
+
+Code review round 2: both APPROVE.
+- **Code-reviewer:** every new guard is pinned by mutation except `halffloat` and the trailing-slash path fix, which are LOW and deferred. It took about 9 minutes with `TEST_FILTER`.
+- **Codex:** one MEDIUM, about CSV rows wider than the header, deferred to `deferrals.md`.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
