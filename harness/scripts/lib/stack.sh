@@ -73,7 +73,11 @@ review_base() {
   if fork=$(stack_fork "$slug" "$parent"); then :; else
     status=$?
     [[ "$status" -eq 1 ]] || return 2
-    echo "warning: no fork point for wt/$slug on wt/$parent; the review diff may include the parent's commits; rebase by hand: git -C $(printf '%q' "$wt") rebase -i $mainref" >&2
+    if [[ -n "$wt" ]]; then
+      echo "warning: no fork point for wt/$slug on wt/$parent; the review diff may include the parent's commits; rebase by hand: git -C $(printf '%q' "$wt") rebase -i $mainref" >&2
+    else
+      echo "warning: no fork point for wt/$slug on wt/$parent; the review diff may include the parent's commits; recreate the worktree (harness worktree add $slug) and re-run harness worktree base $slug" >&2
+    fi
     printf '%s\n' "$mainref"
     return 0
   fi
@@ -102,6 +106,7 @@ restack() {
   parent=$(stack_parent "$slug") || return 2
   [[ -n "$parent" ]] || { echo "wt/$slug is not stacked" >&2; return 1; }
   wt=$(worktree_for_branch "wt/$slug") || { echo "no worktree for $slug" >&2; return 1; }
+  [[ "$(git -C "$wt" rev-parse --git-dir)" != "$(git -C "$wt" rev-parse --git-common-dir)" ]] || { echo "no worktree for $slug" >&2; return 1; }
   git show-ref --verify --quiet "refs/heads/wt/$parent" || { echo "wt/$parent is gone, so the fork point is lost; drop the parent's commits by hand: git -C $(printf '%q' "$wt") rebase -i $mainref" >&2; return 1; }
   [[ -z "$(git -C "$wt" status --porcelain)" ]] || { echo "$wt has uncommitted changes" >&2; return 1; }
   target="wt/$parent"
