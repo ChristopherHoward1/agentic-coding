@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.11.6] - 2026-11-26
+
+- `harness worktree restack <slug>` moves a stacked unit onto its parent in one command, whatever the parent's state: rewritten, grown, or landed by rebase or merge commit. It never leaves a rebase in progress, and the existing printed commands now name it. `harness worktree base` warns when an unmerged parent has no fork point, and a near-miss `Stacked on:` line warns instead of being ignored.
+- Confirm-delta: none
+
 ## [2026.11.5] - 2026-11-26
 
 - In registry mode `harness release <slug>` now prepares the PR instead of refusing. It checks the verdicts and the `Reviewed-SHA:` that `/3-review` now records, and refuses if `wt/<slug>` moved after review or isn't based on the integration branch. It then gates that SHA and writes `work/<slug>/pr.md`. Nothing is pushed and no forge is called. `harness state` reports a registry unit done once its reviewed SHA is in the integration branch.
