@@ -19,7 +19,7 @@ implementer:
 
 ## Machine-learning hygiene
 
-If a work repo is also an ML/data-science repo, copy the relevant `NOTEBOOK_STRATEGY` and `REPO_HYGIENE` declarations from `$(harness root)/profiles/machine-learning.md` during /init. `config.yaml` selects exactly one `profile:` with no merging, and `scripts/gate.d/*.sh` hooks run on every gate regardless of `profile:`. The DS hygiene hook is a gate-time guard over working-tree size, run after agent-exec commits implementer output on the unit branch and before review; it flags tracked blobs but does not recover already-committed artifact history. Its allowed directories are literal path prefixes, so choose prefixes with separator boundaries where that distinction matters.
+If a work repo is also an ML/data-science repo, copy the relevant `NOTEBOOK_STRATEGY`, `REPO_HYGIENE`, `NOTEBOOK_EXEC` and `DATA_CONTRACTS` declarations from `$(harness root)/profiles/machine-learning.md` during /init. `config.yaml` selects exactly one `profile:` with no merging, and `scripts/gate.d/*.sh` hooks run on every gate regardless of `profile:`. The DS hygiene hook is a gate-time guard over working-tree size, run after agent-exec commits implementer output on the unit branch and before review; it flags tracked blobs but does not recover already-committed artifact history. Its allowed directories are literal path prefixes, so choose prefixes with separator boundaries where that distinction matters.
 
 ## S3 write discipline
 
@@ -60,6 +60,6 @@ Queries run from a notebook using the company's custom SageMaker module — not 
 
 Work repos use `harness register [--subdir <path>]` and commit no harness files. Run `harness gate` locally; state and hooks live under `$(harness project)`.
 
-Known limit: the example `nb-clean` and `ds-hygiene` hooks change to the git toplevel and scan the whole repo in subfolder mode. Narrow them when real use asks.
+Known limit: the example `nb-clean` and `ds-hygiene` hooks change to the git toplevel and scan the whole repo in subfolder mode. Narrow them when real use asks. The `nb-exec` and `data-contract` hooks run from the project root.
 
 Declare durable gate tool prerequisites under `gate.required_tools` in `config.yaml` as a colon-separated scalar, for example `shellcheck:ruff`. `GATE_REQUIRED_TOOLS` may override it for one command, but do not export it across a larger test or gate run.
