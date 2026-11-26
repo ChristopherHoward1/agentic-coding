@@ -1,6 +1,6 @@
 # PR release (forge: none)
 
-**Slug:** pr-release · **Date:** 2026-11-25 · **Status:** approved
+**Slug:** pr-release · **Date:** 2026-11-25 · **Status:** implemented
 
 ## Goal
 
@@ -258,3 +258,17 @@ Plan review round 4: APPROVE, with five LOWs, all applied:
 4. `/4-release` step 2 applies to both modes.
 5. `state.sh` reads `pr.md`'s last `Reviewed-SHA:` line.
 Plan verdict: APPROVE
+
+Implementation: dispatch 1 built the feature but skipped most of the test matrix. Followup 1 added it (306 tests). The orchestrator then made a targeted ARCHI edit on the branch before review, per the 2026-11-25 decision.
+
+Code review round 1: both reviewers REQUEST CHANGES.
+- **Codex HIGH:** `/4-release` step 1 listed push and open-PR before the exit-code check.
+- **Code-reviewer HIGH (codex MEDIUM, same issue):** on bash 3.2, mid-function `[[ ]]` assertions don't fail under `-e`, so the post-gate re-check mutation survived 306/306.
+- **Fix:** followup 2 made every assertion `|| return 1`, proved the mid-gate cases fail with the re-check removed, reordered the prose, and fixed three LOWs (registry exit-0 report, work-slim list indentation, a scoped `## Why` check). ARCHI was then edited again on the branch.
+
+Code review round 2: both reviewers APPROVE.
+- **Code-reviewer:** all seven required mutation pins, plus five extra mutations, fail the suite. LOWs left as they are: `pr.md` mode 0600, the migration message for older registry plans without `Reviewed-SHA`, no temp-file cleanup trap, the primary-checkout path comparison, and the dense step-1 paragraph.
+- **Codex:** two MEDIUMs deferred to `deferrals.md` (fence-aware section extraction; re-capturing the SHA on each round). Both fail safe or visibly.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
