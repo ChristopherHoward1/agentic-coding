@@ -2589,7 +2589,9 @@ registry_release_flow() {
   printf "Reviewed-SHA: different\n" >>"$S/work/demo/pr.md"
   registry_run state demo | grep -qx 'next_action: /4-release' || return 1
   sed -i.bak '$d' "$S/work/demo/pr.md"
-  git -C "$WT" push -q "$REG/origin.git" HEAD:main
+  git clone -q "$REG/origin.git" "$REG/other"
+  git -C "$REG/other" fetch -q "$WT" HEAD
+  git -C "$REG/other" push -q origin "$sha":main
   registry_run state demo | grep -qx 'next_action: merge the PR (work/demo/pr.md)' || return 1
   git -C "$REG/repo" fetch -q origin
   registry_run state demo | grep -qx 'stage: done' || return 1
