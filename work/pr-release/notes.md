@@ -25,3 +25,13 @@ The tests also check that refusals leave `pr.md` absent or preserve its existing
 `harness gate` passes, including 306 script tests. The reviewer mutation pins remain unverified; the plan assigns those checks to the reviewer.
 
 Gate PASS (306 / 6); demo 0. ARCHI healed on the branch (test-suite description) before review.
+
+## Followup 2 (review round 1: inert bash 3.2 assertions, /4-release exit-code order, LOWs)
+
+Updated the registry release tests so assertions fail reliably on Bash 3.2, including checks that the Goal text appears under `## Why` and that the worktree HEAD stays unchanged. Updated the release instructions to stop immediately on a non-zero exit, corrected the registry success report, and indented the Loop merge guidance.
+
+For the requested mutation check, I temporarily removed the post-gate checks and confirmed that both `gate-commit` and `gate-untracked` failed. I restored the checks afterward.
+
+`harness gate` passed: 306 script tests and 6 publish tests. No acceptance criteria remain partially met, and no additional issues were identified outside the plan’s scope.
+
+Gate PASS (306 / 6); demo 0; ARCHI healed on the branch before round 2.
