@@ -2559,7 +2559,7 @@ registry_flow() {
 }
 # shellcheck disable=SC2317,SC2329,SC2016 # Exported case runs in a child bash.
 registry_release_flow() {
-  local S WT sha before repo_head
+  local S WT sha before repo_head wt_head
   registry_fixture release-flow
   S=$(registry_run register --subdir app)
   mkdir -p "$S/work/demo"
@@ -2573,29 +2573,31 @@ registry_release_flow() {
   touch "$S/ARCHI.md" "$S/work/demo/handoff.md"
   before=$(git -C "$REG/origin.git" for-each-ref)
   repo_head=$(git -C "$REG/repo" rev-parse HEAD)
-  registry_run state demo | grep -qx 'next_action: /4-release'
+  wt_head=$(git -C "$WT" rev-parse HEAD)
+  registry_run state demo | grep -qx 'next_action: /4-release' || return 1
   registry_run release demo
-  [[ $(tail -n 1 "$S/work/demo/pr.md") == "Reviewed-SHA: $sha" ]]
-  [[ $(grep -c "^Reviewed-SHA:" "$S/work/demo/pr.md") == 1 ]]
-  grep -A1 "^## What$" "$S/work/demo/pr.md" | grep -qx "demo."
-  grep -q "Goal text." "$S/work/demo/pr.md"
-  grep -q "harness gate: PASS at $sha" "$S/work/demo/pr.md"
-  [[ $(git -C "$REG/repo" rev-parse HEAD) == "$repo_head" && -z $(git -C "$REG/repo" status --porcelain) ]]
-  [[ ! -e "$REG/repo/VERSION" && ! -e "$REG/repo/CHANGELOG.md" && ! -e "$REG/repo/work/.last-released" ]]
-  [[ "$before" == "$(git -C "$REG/origin.git" for-each-ref)" ]]
-  registry_run state demo | grep -qx 'next_action: merge the PR (work/demo/pr.md)'
+  [[ $(tail -n 1 "$S/work/demo/pr.md") == "Reviewed-SHA: $sha" ]] || return 1
+  [[ $(grep -c "^Reviewed-SHA:" "$S/work/demo/pr.md") == 1 ]] || return 1
+  grep -A1 "^## What$" "$S/work/demo/pr.md" | grep -qx "demo." || return 1
+  awk '/^## Why$/ {on=1; next} /^## / && on {exit} on {print}' "$S/work/demo/pr.md" | grep -Fxq "Goal text." || return 1
+  grep -q "harness gate: PASS at $sha" "$S/work/demo/pr.md" || return 1
+  [[ $(git -C "$REG/repo" rev-parse HEAD) == "$repo_head" && -z $(git -C "$REG/repo" status --porcelain) ]] || return 1
+  [[ $(git -C "$WT" rev-parse HEAD) == "$wt_head" ]] || return 1
+  [[ ! -e "$REG/repo/VERSION" && ! -e "$REG/repo/CHANGELOG.md" && ! -e "$REG/repo/work/.last-released" ]] || return 1
+  [[ "$before" == "$(git -C "$REG/origin.git" for-each-ref)" ]] || return 1
+  registry_run state demo | grep -qx 'next_action: merge the PR (work/demo/pr.md)' || return 1
   printf "Reviewed-SHA: different\n" >>"$S/work/demo/pr.md"
-  registry_run state demo | grep -qx 'next_action: /4-release'
+  registry_run state demo | grep -qx 'next_action: /4-release' || return 1
   sed -i.bak '$d' "$S/work/demo/pr.md"
   git -C "$WT" push -q "$REG/origin.git" HEAD:main
-  registry_run state demo | grep -qx 'next_action: merge the PR (work/demo/pr.md)'
+  registry_run state demo | grep -qx 'next_action: merge the PR (work/demo/pr.md)' || return 1
   git -C "$REG/repo" fetch -q origin
-  registry_run state demo | grep -qx 'stage: done'
-  registry_run state demo | grep -qx 'next_action: none'
+  registry_run state demo | grep -qx 'stage: done' || return 1
+  registry_run state demo | grep -qx 'next_action: none' || return 1
   echo more >>"$WT/app/change"
   git -C "$WT" -c user.name=t -c user.email=t@t commit -qam more
   if registry_run release demo 2>"$REG/error"; then return 1; fi
-  grep -q 'moved after review' "$REG/error"
+  grep -q 'moved after review' "$REG/error" || return 1
 }
 # shellcheck disable=SC2317,SC2329,SC2016 # These helpers run in child shells.
 registry_release_case() {
@@ -2652,17 +2654,18 @@ Stacked on: parent
   esac
   if [[ $scenario == dev-pass ]]; then
     registry_run release demo >"$REG/out" 2>&1
-    grep -F 'release: nothing pushed' "$REG/out" | grep -Fq 'PR to dev'
+    grep -F 'release: nothing pushed' "$REG/out" | grep -Fq 'PR to dev' || return 1
     return
   fi
   # Exercise preservation of an existing PR as well as the absent-file case.
   if [[ $scenario == gate-fail ]]; then printf 'existing PR\n' >"$S/work/demo/pr.md"; cp "$S/work/demo/pr.md" "$REG/pr-before"; fi
   if [[ $scenario == confirm ]]; then registry_run release demo --confirm-delta reason >"$REG/out" 2>&1 || status=$?
   else registry_run release demo >"$REG/out" 2>&1 || status=$?; fi
-  [[ $status -ne 0 ]] && grep -Fq -- "$expected" "$REG/out"
-  if [[ $scenario == stacked ]]; then grep -Fq 'land parent, rebase onto origin/main, delete the Stacked on: line, then re-run /3-review' "$REG/out"; fi
-  if [[ $scenario == gate-fail ]]; then cmp -s "$REG/pr-before" "$S/work/demo/pr.md"; else [[ ! -e "$S/work/demo/pr.md" ]]; fi
-  case "$scenario" in gate-fail|stale-archi|missing-archi|gate-commit|gate-untracked) [[ -e "$REG/marker" ]] ;; *) [[ ! -e "$REG/marker" ]] ;; esac
+  [[ $status -ne 0 ]] || return 1
+  grep -Fq -- "$expected" "$REG/out" || return 1
+  if [[ $scenario == stacked ]]; then grep -Fq 'land parent, rebase onto origin/main, delete the Stacked on: line, then re-run /3-review' "$REG/out" || return 1; fi
+  if [[ $scenario == gate-fail ]]; then cmp -s "$REG/pr-before" "$S/work/demo/pr.md" || return 1; else [[ ! -e "$S/work/demo/pr.md" ]] || return 1; fi
+  case "$scenario" in gate-fail|stale-archi|missing-archi|gate-commit|gate-untracked) [[ -e "$REG/marker" ]] || return 1 ;; *) [[ ! -e "$REG/marker" ]] || return 1 ;; esac
 }
 export -f registry_release_case registry_fixture registry_run
 export ROOT TMP
@@ -2683,7 +2686,7 @@ for spec in \
   check "registry release ${spec%%|*}" bash -e -c 'registry_release_case "$@"' _ "${spec%%|*}" "${spec#*|}"
 done
 # shellcheck disable=SC2016 # Child shell expands the fixture variables.
-check 'registry tag after merge refuses' bash -e -c 'registry_fixture no-tags; S=$(registry_run register --subdir app); status=0; registry_run release tag-after-merge demo >"$REG/out" 2>&1 || status=$?; [[ $status == 1 ]]; grep -Fq "the merged PR is the record" "$REG/out"'
+check 'registry tag after merge refuses' bash -e -c 'registry_fixture no-tags; S=$(registry_run register --subdir app); status=0; registry_run release tag-after-merge demo >"$REG/out" 2>&1 || status=$?; [[ $status == 1 ]] || exit 1; grep -Fq "the merged PR is the record" "$REG/out" || exit 1'
 export -f registry_release_flow registry_subdir registry_fixture registry_run registry_lookup registry_register registry_literal registry_flow
 export ROOT TMP
 check "registry release and state flow" bash -e -c registry_release_flow
