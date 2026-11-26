@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 # Smoke tests for the deterministic layer. Run from repo root: bash harness/tests/test-scripts.sh
+# TEST_FILTER=<ERE> runs only the cases whose description matches (for mutation
+# runs). The gate always runs the whole suite: its hook clears TEST_FILTER.
 set -uo pipefail
 
-pass=0; fail=0
+pass=0; fail=0; skipped=0
+filtered_out() {
+  [[ -n "${TEST_FILTER:-}" && ! "$1" =~ $TEST_FILTER ]] || return 1
+  skipped=$((skipped+1))
+}
 check() {
   local desc="$1"; shift
+  filtered_out "$desc" && return 0
   if "$@" >/dev/null 2>&1; then
     echo "ok: $desc"; pass=$((pass+1))
   else
@@ -13,6 +20,7 @@ check() {
 }
 check_fails() {
   local desc="$1"; shift
+  filtered_out "$desc" && return 0
   if "$@" >/dev/null 2>&1; then
     echo "FAIL: $desc (expected non-zero exit)"; fail=$((fail+1))
   else
@@ -24,6 +32,7 @@ check_exit() {
   local expected="$2"
   local stderr_substring="$3"
   shift 3
+  filtered_out "$desc" && return 0
   local err
   local status
 
@@ -3100,4 +3109,5 @@ check "gate.sh runs on this repo" bash "$ROOT/harness/bin/harness" gate
 
 echo
 echo "passed: $pass, failed: $fail"
+if [[ "$skipped" -gt 0 ]]; then echo "skipped: $skipped (TEST_FILTER=$TEST_FILTER)"; fi
 exit "$((fail > 0 ? 1 : 0))"

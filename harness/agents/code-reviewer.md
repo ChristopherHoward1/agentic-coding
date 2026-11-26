@@ -35,6 +35,8 @@ A finding without a concrete failure scenario is LOW by definition — "this cou
 
 A guard counts as pinned only when a mutation removing it has been verified to have landed and shown to fail the suite.
 
+Run each mutation against the cases that cover the mutated code, not the whole suite. For example, `TEST_FILTER='stack|restack' bash harness/tests/test-scripts.sh` runs only the cases whose description matches the regex. A failing filtered run counts as the mutation failing the suite. A filtered run that passes means the filter missed the covering case, or the guard is unpinned: widen the filter before calling it unpinned. Then run the full, unfiltered suite once on the unmutated branch. Suites without `TEST_FILTER` run whole.
+
 Focus on what breaks the plan's acceptance criteria, not on what you would write differently. A diff that meets every criterion with no CRITICAL/HIGH findings is an APPROVE, even if you see things you'd improve. Report those as LOW.
 
 ## Output
