@@ -4,6 +4,9 @@ set -uo pipefail
 : "${NB_EXEC_NOTEBOOKS=}" "${NB_EXEC_CELL_TIMEOUT=600}" "${NB_EXEC_KERNEL=}"
 [[ -n "$NB_EXEC_NOTEBOOKS" ]] || { echo 'nb-exec: no notebooks listed; skipping'; exit 0; }
 command -v papermill >/dev/null 2>&1 || { echo 'nb-exec: papermill not found' >&2; exit 1; }
+if [[ -f "$(dirname "$0")/data-contract.sh" ]] && ! bash "$(dirname "$0")/data-contract.sh"; then
+  echo 'nb-exec: skipped; data contracts failed' >&2; exit 1
+fi
 primary=$(git worktree list --porcelain | awk 'NR == 1 {sub(/^worktree /, ""); print; exit}')
 prefix=$(git rev-parse --show-prefix) || exit 1
 root=${NB_DATA_ROOT:-$primary/$prefix}
@@ -27,7 +30,8 @@ PY
   then
     echo "nb-exec: $nb has no parameters-tagged cell" >&2; failed=1; continue
   fi
-  tmp=$(mktemp -d "${TMPDIR:-/tmp}/nb-exec.XXXXXX") || exit 1
+  : "${TMPDIR:=/tmp}"
+  tmp=$(mktemp -d "${TMPDIR%/}/nb-exec.XXXXXX") || exit 1
   mkdir -p "$tmp/out"
   args=("$nb" "$tmp/${nb##*/}" --cwd "$(dirname "$nb")" -p data_dir "$root" -p out_dir "$tmp/out" -p smoke 1 --execution-timeout "$NB_EXEC_CELL_TIMEOUT")
   [[ -z "$NB_EXEC_KERNEL" ]] || args+=(-k "$NB_EXEC_KERNEL")
