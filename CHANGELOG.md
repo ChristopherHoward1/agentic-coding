@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.11.4] - 2026-11-25
+
+- in registry mode, `harness state` takes the code-reviewer's verdict as the whole review, as Decision 2026-10-18 intended. An approved registry unit now reaches `stage: release` instead of sitting in `review`, and a review in progress points at `/3-review`. The `reviewer-set` placeholder is gone from `codex-review`, `/3-review` and `ARCHI.md`.
+- Confirm-delta: none
+
 ## [2026.11.3] - 2026-11-25
 
 - `harness register --subdir` treats `[`, `*`, `?` and `\` in the subdir literally: the exclude line is escaped and the tracked check uses a literal pathspec (closes the `harness-registry` deferral). The codex reviewer now runs at `model_reasoning_effort=high`, in this repo's config and the skeleton.
