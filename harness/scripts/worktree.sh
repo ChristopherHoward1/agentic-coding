@@ -2,6 +2,7 @@
 # Manage isolated implementation worktrees.
 # Usage:
 #   harness worktree add <slug>      # create worktree + branch wt/<slug>, print its path
+#   harness worktree restack <slug>  # rebase a stacked worktree onto its current target
 #   harness worktree base <slug>     # print the exact review base
 #   harness worktree remove <slug>   # remove worktree, keep the branch
 #   harness worktree sync-artifacts <slug>  # copy primary work artifacts into worktree + commit
@@ -35,10 +36,10 @@ worktree_for_branch() {
 cmd=${1:-}
 slug=${2:-}
 case "$cmd" in
-  add|base|remove|sync-artifacts)
+  add|base|restack|remove|sync-artifacts)
     [[ -n "$slug" ]] || { echo "usage: harness worktree $cmd <slug>" >&2; exit 1; } ;;
   list) ;;
-  *) echo 'usage: harness worktree {add|base|remove|sync-artifacts|list} [slug]' >&2; exit 1 ;;
+  *) echo 'usage: harness worktree {add|base|restack|remove|sync-artifacts|list} [slug]' >&2; exit 1 ;;
 esac
 # shellcheck source=/dev/null
 source "$HERE/lib/project.sh"
@@ -91,6 +92,9 @@ case "$cmd" in
     # stdout carries only the path, so callers can capture it
     cd "$path" && pwd -P
     ;;
+  restack)
+    restack "$slug"
+    ;;
   base)
     review_base "$slug"
     ;;
@@ -125,7 +129,7 @@ case "$cmd" in
     git worktree list
     ;;
   *)
-    echo "usage: harness worktree {add|base|remove|sync-artifacts|list} [slug]" >&2
+    echo "usage: harness worktree {add|base|restack|remove|sync-artifacts|list} [slug]" >&2
     exit 1
     ;;
 esac
