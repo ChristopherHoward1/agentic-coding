@@ -39,7 +39,7 @@ Pick the lightest lane that fits. When unsure, say which lane and why in one lin
    4. Re-run `harness gate` on the final head after review fixes and record its SHA. Open the PR against the integration branch; after the reviewer approves, add `Reviewed-SHA: <gated sha>` to the PR description. Check immediately before merging that the gated SHA starts with the PR's `source.commit.hash`. The PR is the record: no VERSION, CHANGELOG, tag or retro.
 3. **Loop** — `/1-plan` → `/2-implement` → `/3-review`, only when a wrong approach would cost days: a new pipeline, a schema or data-contract change, a refactor across modules. `/4-release` runs `harness release` to gate the reviewed SHA and write `work/<slug>/pr.md`. Open the PR against the integration branch with `pr.md` as its description. Before merging, check that `Reviewed-SHA` starts with the PR’s `source.commit.hash`. Ship step 4’s manual gate and SHA steps do not apply. Skip `/5-retro`.
 
-Merge Loop PRs by merge commit or fast-forward only; squash and rebase merges rewrite the SHA, so `harness state` cannot report done.
+   Merge Loop PRs by merge commit or fast-forward only; squash and rebase merges rewrite the SHA, so `harness state` cannot report done.
 
 4. **Promote** — only when the Owner asks.
    1. Run `git fetch origin`, then pin the integration tip with `sha=$(git rev-parse origin/<integration>)`.

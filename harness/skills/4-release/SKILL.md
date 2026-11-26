@@ -9,9 +9,9 @@ Input: a work unit slug.
 
 ## Steps
 
-1. In registry mode, run `harness release <slug>`. Fill in Out of scope and any profile-required `EVAL_METRIC` for model or data changes in `pr.md`; a re-run overwrites it. The Owner or profile pushes and opens the PR. Before merging, check that `Reviewed-SHA` starts with the PR source commit hash. On a base refusal, rebase and re-run `/3-review`; never re-stamp. Step 2 applies to both modes; steps 3–6 are repo-only. In repo mode, **run the release script:** from the repo root, run `harness worktree sync-artifacts <slug>`, then `harness release <slug> --confirm-delta "none"` (full TRIP: no in-session confirmation; `Confirm-delta` is logged as `none`).
+1. In registry mode, run `harness release <slug>`. If it exits non-zero, report the output and stop before touching `pr.md`, pushing, or opening a PR. Fill in Out of scope and any profile-required `EVAL_METRIC` for model or data changes in `pr.md`; a re-run overwrites it. The Owner or profile pushes and opens the PR. Before merging, check that `Reviewed-SHA` starts with the PR source commit hash. On a base refusal, rebase and re-run `/3-review`; never re-stamp. Step 2 applies to both modes; steps 3–6 are repo-only. In repo mode, **run the release script:** from the repo root, run `harness worktree sync-artifacts <slug>`, then `harness release <slug> --confirm-delta "none"` (full TRIP: no in-session confirmation; `Confirm-delta` is logged as `none`).
 2. **React to the exit code:**
-   - Exit 0 → report the bump commit on the release branch, that no tag exists yet, and that `main` was untouched.
+   - Exit 0 → in registry mode, report the `pr.md` path. In repo mode, report the bump commit on the release branch, that no tag exists yet, and that `main` was untouched.
    - Non-zero → report the script output and stop.
 3. **Check README drift:** confirm README's loop, skills and Layout sections still match the shipped skills and scripts; fix drift via the small-fix path, never mentioning dogfood-only scripts (README is published).
 4. **Push the release branch and open the PR** against `main` autonomously; never push `main` directly. `main` stays protected, so a PR + merge is still required. After the PR merges, run `harness release tag-after-merge <slug>`. If it exits non-zero, report the output and stop. If it succeeds, run `git push origin v<version>`.
