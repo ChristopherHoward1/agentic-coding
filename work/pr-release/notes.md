@@ -35,3 +35,7 @@ For the requested mutation check, I temporarily removed the post-gate checks and
 `harness gate` passed: 306 script tests and 6 publish tests. No acceptance criteria remain partially met, and no additional issues were identified outside the plan’s scope.
 
 Gate PASS (306 / 6); demo 0; ARCHI healed on the branch before round 2.
+
+## Followup 3 (release PR CI failure: git 2.56 updates the tracking ref on a URL push)
+
+Diagnosed with a throwaway draft PR (#90, closed, branch deleted) tracing registry_release_flow on Ubuntu. The Release v2026.11.5 commit was dropped from the branch per Decision 2026-10-09. The test now advances origin from a separate clone. Gate PASS; ARCHI healed.
