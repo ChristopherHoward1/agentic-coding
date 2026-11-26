@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.11.7] - 2026-11-26
+
+- Two opt-in example gate hooks for data-science repos. `nb-exec.sh` runs listed notebooks through papermill in smoke mode (`-p data_dir <primary checkout> -p smoke 1`) with outputs kept out of the repo. `data-contract.sh` checks committed JSON contracts (columns, dtypes, row range) against the real CSV or Parquet data in the primary checkout. The `machine-learning`, `work-slim` and `work` profiles gain `NOTEBOOK_EXEC` and `DATA_CONTRACTS` declarations. This release also carries two small fixes from `main`: `TEST_FILTER=<ERE>` lets the code-reviewer run each mutation against matching cases (the gate always runs the whole suite), and the registry `/3-review` diff gets a `':/'` root pathspec.
+- Confirm-delta: none
+
 ## [2026.11.6] - 2026-11-26
 
 - `harness worktree restack <slug>` moves a stacked unit onto its parent in one command, whatever the parent's state: rewritten, grown, or landed by rebase or merge commit. It never leaves a rebase in progress, and the existing printed commands now name it. `harness worktree base` warns when an unmerged parent has no fork point, and a near-miss `Stacked on:` line warns instead of being ignored.
