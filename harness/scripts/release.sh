@@ -314,12 +314,47 @@ fi
 
 # shellcheck source=/dev/null
 source "$HERE/lib/project.sh"
+registry_release() {
+  local slug="$1" plan="$STATE_DIR/work/$1/plan.md" branch="wt/$1"
+  local reviewed parent base status wt note tmp target
+  [[ -f "$plan" ]] || die "missing work unit plan: $plan"
+  grep -qx 'Plan verdict: APPROVE' "$plan" || die "missing Plan verdict: APPROVE"
+  grep -qx 'Code-review verdict: APPROVE' "$plan" || die "missing Code-review verdict: APPROVE"
+  reviewed=$(awk '/^Reviewed-SHA:/ { count++; line=$0; if (prev != "Code-review verdict: APPROVE") bad=1 } { prev=$0 } END { if (count == 1 && !bad && line ~ /^Reviewed-SHA: [0-9a-f]+$/ && length(line) == 54) print substr(line,15) }' "$plan")
+  [[ -n "$reviewed" ]] || die "expected exactly one Reviewed-SHA line after the code-review verdict"
+  if base=$(integration_ref); then :; else status=$?; [[ $status -eq 1 ]] || exit "$status"; base=origin/main; fi
+  parent=$(stack_parent "$slug") || die "cannot read stack parent"
+  [[ -z "$parent" ]] || die "stacked on $parent; land $parent, rebase onto $base, delete the Stacked on: line, then re-run /3-review"
+  wt=$(worktree_for_branch "$branch") || die "$branch must be checked out in a linked worktree"
+  [[ "$wt" != "$PRIMARY_ROOT" ]] || die "$branch must be checked out in a linked worktree"
+  check_clean_worktree "$wt" "$branch"
+  [[ $(git -C "$wt" rev-parse HEAD) == "$reviewed" ]] || die "$branch moved after review; re-run /3-review"
+  note=$(extract_release_note "$plan")
+  git fetch origin "${base#origin/}" || die "cannot fetch $base"
+  git merge-base --is-ancestor "$base" "$branch" || die "$branch is not based on $base; rebase onto $base, then re-run /3-review"
+  (cd "$wt" && bash "$HERE/gate.sh") || die "harness gate failed"
+  check_clean_worktree "$wt" "$branch"
+  [[ $(git -C "$wt" rev-parse HEAD) == "$reviewed" ]] || die "$branch moved after review; re-run /3-review"
+  "$HERE/archi-fresh.sh" "$branch" || die "ARCHI.md is stale"
+  target="$STATE_DIR/work/$slug/pr.md"
+  tmp=$(mktemp "$STATE_DIR/work/$slug/.pr.XXXXXX")
+  {
+    printf '## What\n%s\n\n## Why\n' "$note"
+    awk '/^## Goal[[:space:]]*$/ {on=1; next} /^## / && on {exit} on {print}' "$plan"
+    printf '\n## How verified\n- harness gate: PASS at %s\n- Code review: APPROVE by a fresh code-reviewer at %s\n\nAcceptance criteria the reviewer checked against at %s:\n' "$reviewed" "$reviewed" "$reviewed"
+    awk '/^## Acceptance criteria[[:space:]]*$/ {on=1; next} /^## / && on {exit} on {print}' "$plan"
+    printf '\n## Out of scope\n_Fill in before opening the PR._\n\nReviewed-SHA: %s\n' "$reviewed"
+  } >"$tmp"
+  mv "$tmp" "$target"
+  printf '%s\nrelease: nothing pushed; push %s and open a PR to %s with this description\n' "$target" "$branch" "${base#origin/}"
+}
+
 registry_release_guard() {
   resolve_project
   # shellcheck source=/dev/null
   source "$HERE/lib/stack.sh"
   if [[ "$PROJECT_MODE" == registry ]]; then
-    die "registry mode has no release script yet (pr-release); open the PR by hand"
+    die "registry mode has no tags; the merged PR is the record"
   fi
 }
 case "$1" in
@@ -343,11 +378,13 @@ case "$1" in
   *)
     slug="$1"
     confirm_delta="none"
+    confirm_supplied=false
     shift
     while [[ $# -gt 0 ]]; do
       case "$1" in
         --confirm-delta)
           [[ $# -ge 2 ]] || die "--confirm-delta requires a value"
+          confirm_supplied=true
           confirm_delta="$2"
           shift 2
           ;;
@@ -357,7 +394,14 @@ case "$1" in
           ;;
       esac
     done
-    registry_release_guard
-    release "$slug" "$confirm_delta"
+    resolve_project
+    # shellcheck source=/dev/null
+    source "$HERE/lib/stack.sh"
+    if [[ "$PROJECT_MODE" == registry ]]; then
+      [[ "$confirm_supplied" == false ]] || die "--confirm-delta is repo-mode only"
+      registry_release "$slug"
+    else
+      release "$slug" "$confirm_delta"
+    fi
     ;;
 esac

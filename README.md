@@ -40,7 +40,7 @@ flowchart TD
     classDef human fill:#e8f0ff,stroke:#3a6ea5,stroke-width:2px,color:#000;
 ```
 
-The five **`/slash`-command stages** are the loop. `{{Hexagons}}` are the **adversarial checkpoints** — an agent whose only job is to try to break the previous agent's work. Blue nodes mark the Owner and the completed release. Everything else is the Orchestrator driving the loop. In repo mode both reviewers must approve; in registry mode review uses only the code-reviewer, and the loop stops after review for the Owner or the profile’s lanes to take the PR from there. A plan can declare `Stacked on: <parent>` to build on an unmerged unit.
+The five **`/slash`-command stages** are the loop. `{{Hexagons}}` are the **adversarial checkpoints** — an agent whose only job is to try to break the previous agent's work. Blue nodes mark the Owner and the completed release. Everything else is the Orchestrator driving the loop. In repo mode both reviewers must approve; in registry mode review uses only the code-reviewer, and release writes `pr.md` and stops before the Owner or the profile opens the PR. A plan can declare `Stacked on: <parent>` to build on an unmerged unit.
 
 Trivial fixes (typos, one-liners, config tweaks) skip the loop — you just do them on a branch. The loop is for work with enough surface area to get wrong.
 

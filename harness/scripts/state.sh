@@ -54,7 +54,7 @@ else
 fi
 
 unit_dir="$STATE_DIR/work/$slug"
-# ponytail: registry stops at release even after a hand-merged PR; pr-release will define done.
+
 last_released=
 if [[ "$PROJECT_MODE" == repo && -f work/.last-released ]]; then
   last_released=$(
@@ -80,6 +80,23 @@ elif [[ "$review" != approve ]]; then
     next_action='/3-review'
   else
     next_action='run harness gate'
+  fi
+elif [[ "$PROJECT_MODE" == registry ]]; then
+  # shellcheck source=/dev/null
+  source "$HERE/lib/stack.sh"
+  reviewed=$(grep '^Reviewed-SHA:' <<<"$plan" | tail -n 1)
+  pr_reviewed=$(grep '^Reviewed-SHA:' "$unit_dir/pr.md" 2>/dev/null | tail -n 1)
+  base=$(integration_branch)
+  base=${base:-main}
+  if [[ -z "$reviewed" || "$reviewed" != "$pr_reviewed" ]]; then
+    stage=release
+    next_action='/4-release'
+  elif ! git merge-base --is-ancestor "${reviewed#Reviewed-SHA: }" "refs/remotes/origin/$base" 2>/dev/null; then
+    stage=release
+    next_action="merge the PR (work/$slug/pr.md)"
+  else
+    stage='done'
+    next_action=none
   fi
 elif [[ "$last_released" != "$slug" ]]; then
   stage=release

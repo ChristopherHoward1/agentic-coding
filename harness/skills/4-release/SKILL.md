@@ -9,7 +9,7 @@ Input: a work unit slug.
 
 ## Steps
 
-1. In registry mode, stop here: `pr-release` owns release; hand the Owner the branch to PR by hand. In repo mode, **run the release script:** from the repo root, run `harness worktree sync-artifacts <slug>`, then `harness release <slug> --confirm-delta "none"` (full TRIP: no in-session confirmation; `Confirm-delta` is logged as `none`).
+1. In registry mode, run `harness release <slug>`. Fill in Out of scope and any profile-required `EVAL_METRIC` for model or data changes in `pr.md`; a re-run overwrites it. The Owner or profile pushes and opens the PR. Before merging, check that `Reviewed-SHA` starts with the PR source commit hash. On a base refusal, rebase and re-run `/3-review`; never re-stamp. Step 2 applies to both modes; steps 3–6 are repo-only. In repo mode, **run the release script:** from the repo root, run `harness worktree sync-artifacts <slug>`, then `harness release <slug> --confirm-delta "none"` (full TRIP: no in-session confirmation; `Confirm-delta` is logged as `none`).
 2. **React to the exit code:**
    - Exit 0 → report the bump commit on the release branch, that no tag exists yet, and that `main` was untouched.
    - Non-zero → report the script output and stop.
