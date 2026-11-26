@@ -272,3 +272,20 @@ Plan review round 3: APPROVE, with ten LOWs. Applied:
 - unmapped Arrow types need `any`.
 
 Plan verdict: APPROVE
+
+Code review round 1:
+- **Codex: REQUEST CHANGES**, one HIGH and one MEDIUM.
+  - **HIGH:** the gate keeps running hooks after a failure, so `nb-exec` ran notebooks after a contract had failed.
+  - **MEDIUM:** the contract format was undocumented for users.
+- **Code-reviewer: APPROVE**, after the 14 mutation pins plus extras each failed the filtered suite. Three MEDIUMs:
+  - the `data-contract` override case was vacuous;
+  - `out_dir` was unpinned;
+  - the pyarrow ran/skipped note was invisible.
+- **Followup 1 fixed all of these, plus five LOWs:**
+  - `nb-exec` runs a sibling `data-contract.sh` first and skips the notebooks when it fails;
+  - the contract format is documented in the hook header and in `DATA_CONTRACTS`;
+  - blank CSV lines are skipped;
+  - `halffloat` maps to `float`;
+  - no double slash in the temp path;
+  - idle-skip cases run from a subfolder missing in the primary checkout;
+  - the dead test line is removed.
