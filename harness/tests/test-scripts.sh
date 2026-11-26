@@ -3104,6 +3104,92 @@ for scenario in dev dev-base quoted unset main no-config registry registry-base 
   check "integration branch $scenario" bash -e -c 'integration_case "$1"' _ "$scenario"
 done
 
+# Linked-worktree fixtures keep real data only in the primary checkout.
+# shellcheck disable=SC2317,SC2329
+notebook_fixture() {
+  local t
+  t=$(mktemp -d "$TMP/notebook.XXXXXX") || return 1
+  t=$(cd -P "$t" && pwd) || return 1
+  export NBT="$t" TMPDIR="$TMP/nbtmp"
+  mkdir -p "$TMPDIR" || return 1
+  TMPDIR=$(cd -P "$TMPDIR" && pwd) || return 1
+  export TMPDIR
+  mkdir -p "$TMPDIR" "$t/repo/sub/contracts" "$t/repo/sub/nb" "$t/bin" || return 1
+  git init -q "$t/repo" || return 1
+  printf 'data/\n' >"$t/repo/.gitignore"
+  printf '{"cells":[{"metadata":{"tags":["parameters"]}}]}\n' >"$t/repo/sub/nb/a.ipynb"
+  cp "$t/repo/sub/nb/a.ipynb" "$t/repo/sub/nb/b.ipynb" || return 1
+  printf '{"path":"data/a.csv","columns":{"id":"int","value":"float","flag":"bool","date":"any"},"rows":[2,2]}\n' >"$t/repo/sub/contracts/a.json"
+  git -C "$t/repo" add . || return 1
+  git -C "$t/repo" -c user.name=T -c user.email=t@t commit -qm init || return 1
+  git -C "$t/repo" worktree add -qb fixture "$t/wt" || return 1
+  mkdir -p "$t/repo/sub/data" || return 1
+  printf '\357\273\277id,value,flag,date\n1,2.5,true,anything\n2,3.0,0,other\n' >"$t/repo/sub/data/a.csv"
+  cat >"$t/bin/papermill" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$@" >>"$NBT/argv"
+printf 'output\n' >"$2"
+if grep -q RAISE "$1"; then echo boom >&2; exit 1; fi
+STUB
+  chmod +x "$t/bin/papermill" || return 1
+  export PATH="$t/bin:$PATH"
+  cd "$t/wt/sub" || return 1
+}
+# shellcheck disable=SC2317,SC2329
+nb_case() (
+  local scenario="$1" out rc=0 kept
+  notebook_fixture || return 1
+  case "$scenario" in
+    idle) out=$(bash "$ROOT/harness/examples/gate.d/nb-exec.sh") || return 1; [[ "$out" == *'no notebooks listed'* ]] || return 1 ;;
+    missing) NB_EXEC_NOTEBOOKS=absent bash "$ROOT/harness/examples/gate.d/nb-exec.sh" ;;
+    no-parameters) printf '{"cells":[],"metadata":{"papermill":{"parameters":{}}}}' >nb/a.ipynb; NB_EXEC_NOTEBOOKS=nb/a.ipynb bash "$ROOT/harness/examples/gate.d/nb-exec.sh"; rc=$?; [[ ! -s "$NBT/argv" ]] || return 2; return "$rc" ;;
+    no-papermill) mkdir "$NBT/restricted"; for x in bash git mktemp tail dirname; do ln -s "$(command -v "$x")" "$NBT/restricted/$x" || return 1; done; PATH="$NBT/restricted" NB_EXEC_NOTEBOOKS=nb/a.ipynb /bin/bash "$ROOT/harness/examples/gate.d/nb-exec.sh" ;;
+    success|override) export NB_EXEC_NOTEBOOKS=nb/a.ipynb NB_EXEC_KERNEL=testkernel; [[ "$scenario" != override ]] || export NB_DATA_ROOT="$NBT/repo"; out=$(bash "$ROOT/harness/examples/gate.d/nb-exec.sh") || return 1; [[ "$out" == *'nb-exec: ok nb/a.ipynb'* ]] || return 1; grep -Fx -- '--cwd' "$NBT/argv" || return 1; grep -Fx 'nb' "$NBT/argv" || return 1; grep -Fx 'smoke' "$NBT/argv" || return 1; grep -Fx '1' "$NBT/argv" || return 1; grep -Fx '600' "$NBT/argv" || return 1; grep -Fx 'testkernel' "$NBT/argv" || return 1; if [[ "$scenario" == override ]]; then grep -Fx "$NBT/repo" "$NBT/argv" || return 1; else grep -Fx "$NBT/repo/sub" "$NBT/argv" || return 1; fi; grep -F "$TMPDIR/nb-exec." "$NBT/argv" || return 1; [[ -z "$(git status --porcelain)" ]] || return 1 ;;
+    failure) printf 'RAISE\n' >>nb/a.ipynb; # Keep valid JSON and mark the source.
+      printf '{"cells":[{"metadata":{"tags":["parameters"]},"source":"RAISE"}]}' >nb/a.ipynb
+      NB_EXEC_NOTEBOOKS=nb/a.ipynb:nb/b.ipynb bash "$ROOT/harness/examples/gate.d/nb-exec.sh" >"$NBT/out" 2>"$NBT/err" || rc=$?
+      [[ $rc -eq 1 ]] || return 1; grep -F 'FAILED nb/a.ipynb' "$NBT/err" || return 1; grep -F 'nb/b.ipynb' "$NBT/argv" || return 1; kept=$(sed -n 's/^nb-exec: kept output //p' "$NBT/err"); [[ "$kept" == "$TMPDIR"/* && -f "$kept/a.ipynb" && -d "$kept/out" ]] || return 1; git checkout -- nb/a.ipynb || return 1; [[ -z "$(git status --porcelain)" ]] || return 1 ;;
+    missing-subdir) mkdir -p "$NBT/wt/new"; cd "$NBT/wt/new" || return 1; NB_EXEC_NOTEBOOKS=x bash "$ROOT/harness/examples/gate.d/nb-exec.sh" ;;
+  esac
+)
+# shellcheck disable=SC2317,SC2329
+contract_case() (
+  local scenario="$1"
+  notebook_fixture || return 1
+  case "$scenario" in
+    idle) rm -rf contracts; bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    override) mkdir -p "$NBT/override/data"; cp "$NBT/repo/sub/data/a.csv" "$NBT/override/data/a.csv"; NB_DATA_ROOT="$NBT/override" bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    pass) bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    cap) printf '3,abc,true,x\n' >>"$NBT/repo/sub/data/a.csv"; sed 's/\[2,2\]/[3,3]/' contracts/a.json >contracts/b.json; rm contracts/a.json; DATA_CONTRACT_SCAN_ROWS=2 bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    missing-column) sed 's/"date":"any"/"absent":"any"/' contracts/a.json >contracts/b.json; rm contracts/a.json; bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    extra) sed 's/,"date":"any"//' contracts/a.json >contracts/b.json; rm contracts/a.json; bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    allow) sed 's/,"date":"any"//; s/"rows"/"extra_columns":"allow","rows"/' contracts/a.json >contracts/b.json; rm contracts/a.json; bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    int|float|bool) case "$scenario" in int) sed 's/^1,2.5/x,2.5/' "$NBT/repo/sub/data/a.csv" >"$NBT/file" ;; float) sed 's/2.5/abc/' "$NBT/repo/sub/data/a.csv" >"$NBT/file" ;; bool) sed 's/true/maybe/' "$NBT/repo/sub/data/a.csv" >"$NBT/file" ;; esac; cp "$NBT/file" "$NBT/repo/sub/data/a.csv"; bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    under|over) if [[ "$scenario" == under ]]; then printf '3,3'; else printf '0,1'; fi >"$NBT/range"; sed "s/2,2/$(cat "$NBT/range")/" contracts/a.json >contracts/b.json; rm contracts/a.json; bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    missing) rm "$NBT/repo/sub/data/a.csv"; bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    malformed) echo '{' >contracts/a.json; bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    unsupported) mv "$NBT/repo/sub/data/a.csv" "$NBT/repo/sub/data/a.txt"; sed 's/a.csv/a.txt/' contracts/a.json >contracts/b.json; rm contracts/a.json; bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    both) cp contracts/a.json contracts/b.json; rm "$NBT/repo/sub/data/a.csv"; bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    no-arrow) python3 -m venv --without-pip "$NBT/nopa" || return 1; touch "$NBT/repo/sub/data/a.parquet"; sed 's/a.csv/a.parquet/' contracts/a.json >contracts/b.json; rm contracts/a.json; PATH="$NBT/nopa/bin:$PATH" bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    arrow) python3 -I -c 'import pyarrow' 2>/dev/null || { echo 'pyarrow unavailable; parquet case skipped'; return 0; }; python3 -c 'import pyarrow as p, pyarrow.parquet as q, sys; q.write_table(p.table({"id":[1,2]}),sys.argv[1])' "$NBT/repo/sub/data/a.parquet" || return 1; printf '{"path":"data/a.parquet","columns":{"id":"int"},"rows":[2,2]}' >contracts/a.json; bash "$ROOT/harness/examples/gate.d/data-contract.sh" || return 1; sed 's/"int"/"str"/' contracts/a.json >contracts/b.json; rm contracts/a.json; bash "$ROOT/harness/examples/gate.d/data-contract.sh" >/dev/null 2>"$NBT/err" && return 1; grep -q 'expected str' "$NBT/err" || return 1; echo 'pyarrow parquet case ran' ;;
+  esac
+)
+export ROOT TMP
+export -f notebook_fixture nb_case contract_case
+for scenario in idle success override failure; do check "nb-exec $scenario" nb_case "$scenario"; done
+check_exit 'nb-exec missing notebook' 1 'missing notebook' nb_case missing
+check_exit 'nb-exec no parameters' 1 'has no parameters-tagged cell' nb_case no-parameters
+check_exit 'nb-exec missing papermill' 1 'papermill not found' nb_case no-papermill
+check_exit 'nb-exec missing primary subfolder' 1 'in the primary checkout' nb_case missing-subdir
+for scenario in pass override cap allow arrow; do check "data-contract $scenario" contract_case "$scenario"; done
+# shellcheck disable=SC2016
+check 'data-contract idle' bash -c 'out=$(contract_case idle) || exit 1; grep -q "no contracts" <<<"$out"'
+for pair in 'missing-column:missing column' 'extra:extra column' 'int:expected int' 'float:expected float' 'bool:expected bool' 'under:row count' 'over:row count' 'missing:primary checkout' 'malformed:bad contract' 'unsupported:unsupported format' 'no-arrow:parquet needs pyarrow'; do
+  check_exit "data-contract ${pair%%:*}" 1 "${pair#*:}" contract_case "${pair%%:*}"
+done
+# shellcheck disable=SC2016
+check 'data-contract reports both contracts' bash -c 'err=$(contract_case both 2>&1 >/dev/null); s=$?; [[ $s -eq 1 ]] || exit 1; grep -q a.json <<<"$err" || exit 1; grep -q b.json <<<"$err"'
+
 # --- gate.sh runs and exits cleanly on this repo
 check "gate.sh runs on this repo" bash "$ROOT/harness/bin/harness" gate
 

@@ -7,7 +7,7 @@ The `work` profile's **S3 write discipline**, **Snowflake** and **Gate** section
 ## Declarations required at /init (recorded in ARCHI.md → Verification)
 
 - **Implementer runtime** — `implementer.runtime: claude` with `command: 'claude -p --dangerously-skip-permissions'`, as in `work`, for the rare change that runs `/2-implement`.
-- **EVAL_METRIC**, **NOTEBOOK_STRATEGY** and **REPO_HYGIENE** — as defined in `$(harness root)/profiles/machine-learning.md`. Copy `nb-clean.sh` and `ds-hygiene.sh` from `$(harness root)/examples/gate.d/` into the state dir's `scripts/gate.d/`.
+- **EVAL_METRIC**, **NOTEBOOK_STRATEGY**, **REPO_HYGIENE**, **NOTEBOOK_EXEC** and **DATA_CONTRACTS** — as defined in `$(harness root)/profiles/machine-learning.md`. Copy `nb-clean.sh`, `ds-hygiene.sh`, `nb-exec.sh` and `data-contract.sh` from `$(harness root)/examples/gate.d/` into the state dir's `scripts/gate.d/`. Add `papermill` to `gate.required_tools` when enabling notebook execution.
 - **integration_branch** — check `origin/dev` and `origin/develop`; for a candidate run `git merge-base --is-ancestor origin/main origin/<candidate>` and show the Owner the result before confirmation. If it fails, recommend creating `dev` from `origin/main`, or a new branch such as `integration` if the candidate is `dev`, only with the Owner's yes; if neither exists, offer to create `dev` from `origin/main` only with the Owner's yes. Record the answer in `$(harness project)/config.yaml`. Ask a registered project missing the key before its first Explore, Ship or Promote.
 - **Gate tools** — the repo's linter and test runner (for example `gate.required_tools: ruff:pytest`).
 
