@@ -2925,6 +2925,108 @@ stack_edge_case() {
       [[ "$(bash scripts/worktree.sh base c)" == origin/main ]] || return 1 ;;
   esac
 }
+# shellcheck disable=SC2317,SC2329
+stack_followup_case() {
+  local scenario="$1" status=0 before target=wt/p out base
+  case "$scenario" in registry-*) stack_fixture registry ;; *) stack_fixture ;; esac
+  case "$scenario" in
+    gained) echo more >"$p/more"; git -C "$p" add more; git -C "$p" commit -qm more ;;
+    amended|registry-amended|hint) stack_rewrite amend ;;
+    landed|second|release-hint) stack_land rebase; target=origin/main ;;
+    rewritten-landed) stack_rewrite amend; stack_land rebase; target=origin/main ;;
+    merge|registry-merge) stack_land merge; target=origin/main ;;
+    missing) git worktree remove --force "$p"; git branch -D wt/p ;;
+    no-worktree) git worktree remove "$c" ;;
+    dirty) echo dirty >"$c/dirty" ;;
+    no-fork|warning|warning-merged) stack_rewrite amend; if [[ "$scenario" == warning-merged ]]; then stack_land merge; fi; git reflog expire --expire=now --expire-unreachable=now refs/heads/wt/p ;;
+    conflict) echo child >"$c/parent.txt"; git -C "$c" commit -qam conflict; stack_rewrite amend ;;
+    unstacked) mkdir -p work/u; echo '# U' >work/u/plan.md ;;
+  esac
+  before=$(git rev-parse wt/c) || return 1
+  case "$scenario" in
+    warning|warning-merged)
+      status=0; git merge-base --fork-point wt/p wt/c >/dev/null || status=$?
+      [[ "$status" == 1 ]] || return 1
+      status=0; bash scripts/worktree.sh base c >"$t/out" 2>"$t/err" || status=$?
+      [[ "$status" == 0 && "$(cat "$t/out")" == origin/main ]] || return 1
+      grep -q 'warning: no fork point' "$t/err" || return 1; return 0 ;;
+    release-hint)
+      status=0; bash scripts/release.sh c >"$t/out" 2>"$t/err" || status=$?
+      [[ "$status" != 0 ]] || return 1
+      grep -q 'run: harness worktree restack c, or restack first:' "$t/err" || return 1 ;;
+    registry-release)
+      printf '# Child\nStacked on: p\nPlan verdict: APPROVE\nCode-review verdict: APPROVE\nReviewed-SHA: %s\n' "$(git rev-parse wt/c)" >"$HARNESS_HOME/projects/x/work/c/plan.md"
+      status=0; bash scripts/release.sh c >"$t/out" 2>"$t/err" || status=$?
+      [[ "$status" != 0 ]] || return 1
+      grep -q 'stacked on p.*harness worktree restack c does the rebase)' "$t/err" || return 1
+      return 0 ;;
+    hint)
+      bash scripts/worktree.sh base c >"$t/out" 2>"$t/err" || return 1
+      grep -q 'run: harness worktree restack c, or to pick it up:' "$t/err" || return 1 ;;
+  esac
+  if [[ "$scenario" == unstacked ]]; then slug=u; else slug=c; fi
+  status=0; bash scripts/worktree.sh restack "$slug" >"$t/out" 2>"$t/err" || status=$?
+  case "$scenario" in
+    missing|no-worktree|dirty|no-fork|conflict|unstacked)
+      [[ "$status" == 1 && "$(git rev-parse wt/c)" == "$before" ]] || return 1
+      case "$scenario" in missing) out='wt/p is gone'; grep -q 'rebase -i' "$t/err" || return 1 ;; no-worktree) out='no worktree for' ;; dirty) out='has uncommitted changes' ;; no-fork) out='no fork point' ;; conflict) out='restack conflicted; aborted'; [[ ! -d "$(git -C "$c" rev-parse --git-path rebase-merge)" ]] || return 1 ;; unstacked) out='not stacked' ;; esac
+      grep -q "$out" "$t/err" || return 1
+      if [[ "$scenario" == missing ]]; then status=0; bash scripts/worktree.sh base c >"$t/out" 2>"$t/err" || status=$?; [[ "$status" == 2 ]] || return 1; grep -q 'delete the Stacked on: line' "$t/err" || return 1; grep -q 'rebase -i' "$t/err" || return 1; fi
+      return 0 ;;
+    untouched|registry-untouched)
+      [[ "$status" == 0 && "$(git rev-parse wt/c)" == "$before" ]] || return 1
+      grep -q 'already on wt/p' "$t/out" || return 1
+      if [[ "$scenario" == registry-untouched ]]; then grep -q 'rebase -i' "$t/err" || return 1; fi
+      return 0 ;;
+  esac
+  [[ "$status" == 0 ]] || return 1
+  grep -q "restacked wt/c onto $target" "$t/out" || return 1
+  git merge-base --is-ancestor "$target" wt/c || return 1
+  [[ "$(git log --format=%s "$target..wt/c" | sort)" == "$(printf 'Record plan for c\nchild\n' | sort)" || "$scenario" == registry-* && "$(git log --format=%s "$target..wt/c")" == child ]] || return 1
+  base=$(bash scripts/worktree.sh base c) || return 1
+  stack_diff "$base" || return 1
+  [[ "$(git log --format=%s "$base...wt/c" | sort)" == "$(git log --format=%s "$target..wt/c" | sort)" ]] || return 1
+  if [[ "$scenario" == second ]]; then
+    echo changed >"$t/land/parent.txt"; git -C "$t/land" commit -qam later; git -C "$t/land" push -q origin main
+    bash scripts/worktree.sh restack c >"$t/out" 2>"$t/err" || return 1
+    [[ "$(git log --format=%s origin/main..wt/c | sort)" == "$(printf 'Record plan for c\nchild\n' | sort)" ]] || return 1
+    base=$(bash scripts/worktree.sh base c) || return 1; stack_diff "$base" || return 1
+    [[ "$(git log --format=%s "$base...wt/c" | sort)" == "$(printf 'Record plan for c\nchild\n' | sort)" ]] || return 1
+  fi
+  if [[ "$target" == origin/main && "$scenario" != registry-* ]]; then
+    status=0; bash scripts/release.sh c >"$t/out" 2>"$t/err" || status=$?
+    [[ "$status" != 0 ]] || return 1
+    ! grep -q 'stacked on\|is stale' "$t/err" || return 1
+  fi
+}
+# shellcheck disable=SC2317,SC2329
+stack_near_case() {
+  local line="$1" expected="$2" status=0
+  stack_fixture
+  mkdir -p work/n
+  printf '# N\n%b\n' "$line" >work/n/plan.md
+  bash scripts/worktree.sh add n >"$t/out" 2>"$t/err" || return 1
+  if [[ "$expected" == warn ]]; then
+    grep -q 'warning: ignoring near-miss stack line' "$t/err" || return 1
+    git merge-base --is-ancestor wt/p wt/n && return 1
+  else
+    ! grep -q 'warning: ignoring near-miss stack line' "$t/err" || return 1
+  fi
+  return "$status"
+}
+export -f stack_fixture stack_diff stack_land stack_rewrite stack_followup_case stack_near_case
+for scenario in untouched gained amended landed rewritten-landed merge second missing no-worktree dirty no-fork conflict unstacked warning warning-merged hint release-hint registry-release registry-untouched registry-amended registry-merge; do
+  # shellcheck disable=SC2016
+  check "stack followup $scenario" bash -e -c 'stack_followup_case "$1"' _ "$scenario"
+done
+for line in 'stacked on: p' 'Stacked on p' '**Stacked on:** p' 'Stacked on: P'; do
+  # shellcheck disable=SC2016
+  check "stack near miss $line" bash -e -c 'stack_near_case "$1" warn' _ "$line"
+done
+for line in 'Stacked on: p' 'ordinary' '## Approach\nStacked on: p' '## Approach\nstacked on: p' 'Stacked onboarding flow' 'prefix stacked on: p'; do
+  # shellcheck disable=SC2016
+  check "stack silent $line" bash -e -c 'stack_near_case "$1" silent' _ "$line"
+done
 export -f stack_fixture stack_diff stack_land stack_base_case stack_rewrite stack_rewrite_case stack_release_case stack_edge_case
 for scenario in unmerged merge rebase; do
   # shellcheck disable=SC2016

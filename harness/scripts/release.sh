@@ -170,7 +170,7 @@ check_stack_landed() {
   [[ "$base" != origin/main ]] || return 0
   fork=$(stack_fork "$slug" "$parent") || die "cannot find stack fork"
   wt=$(worktree_for_branch "wt/$slug") || die "missing wt/$slug worktree"
-  die "stacked on $parent, which has landed; restack first: git -C $(printf '%q' "$wt") rebase --onto origin/main $fork"
+  die "stacked on $parent, which has landed; run: harness worktree restack $slug, or restack first: git -C $(printf '%q' "$wt") rebase --onto origin/main $fork"
 }
 
 check_origin_main_ancestor() {
@@ -324,7 +324,7 @@ registry_release() {
   [[ -n "$reviewed" ]] || die "expected exactly one Reviewed-SHA line after the code-review verdict"
   if base=$(integration_ref); then :; else status=$?; [[ $status -eq 1 ]] || exit "$status"; base=origin/main; fi
   parent=$(stack_parent "$slug") || die "cannot read stack parent"
-  [[ -z "$parent" ]] || die "stacked on $parent; land $parent, rebase onto $base, delete the Stacked on: line, then re-run /3-review"
+  [[ -z "$parent" ]] || die "stacked on $parent; land $parent, rebase onto $base, delete the Stacked on: line, then re-run /3-review (harness worktree restack $slug does the rebase)"
   wt=$(worktree_for_branch "$branch") || die "$branch must be checked out in a linked worktree"
   [[ "$wt" != "$PRIMARY_ROOT" ]] || die "$branch must be checked out in a linked worktree"
   check_clean_worktree "$wt" "$branch"
