@@ -53,6 +53,7 @@ An end-to-end agentic development framework for a solo developer: skills-driven 
 - 2026-11-23 — A release-only unit for merged small fixes gives the code-reviewer the released range (`git diff v<last>..origin/main`) as well as the unit diff, because small fixes ship unreviewed. In `template-catchup` that caught `/docs` opening its PR to `main` from a `dev`-based branch, bypassing Promote — `work/template-catchup/retro.md`
 - 2026-11-25 — The codex reviewer runs at `model_reasoning_effort=high` (`config.yaml` `reviewer.command`, skeleton too): a no-reasoning reviewer produced a shallow false-positive HIGH in `review-diff-base-origin-main` — small fix `codex-reviewer-reasoning-effort`
 - 2026-11-25 — After any followup dispatch that touches `archi.sources` paths, run `harness archi-fresh wt/<slug>` and heal `ARCHI.md` on the branch before the next review round. In `reviewer-set`, a stale ARCHI after the followup cost a full code-review round that `/3-review` step 7 would have healed for free — `work/reviewer-set/retro.md`
+- 2026-11-26 — A handoff whose footprint includes `harness/tests/test-scripts.sh` cites `knowledge/test-helper-contract.md`. Uncited, the doc doesn't exist for a cold implementer: in `pr-release` the bash 3.2 inert-`[[ ]]` trap it documents recurred and cost a review round — `work/pr-release/retro.md`
 
 ## Risks
 

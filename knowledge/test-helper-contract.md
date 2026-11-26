@@ -122,3 +122,13 @@ Give every non-final test command an explicit exit: `[[ ... ]] || return 1` insi
 `|| exit 1` at the top level of the body. `stacked-units` (v2026.10.9) sent nine such
 checks to review. The implementer's five mutations each still failed a case, so the evidence
 looked complete; the reviewer's mutations of mid-body checks passed. Mutate a mid-body check too.
+
+## Advance a fixture's origin from a separate clone
+
+To make origin move while the work repo's `refs/remotes/origin/<b>` stays stale (a "pushed but not fetched" case), push from a **separate clone** of the bare origin. Do not push from the work repo or one of its worktrees, even by URL. Git 2.56, on CI's Ubuntu, updates the local tracking ref on a push to a URL that matches a configured remote's URL; local git 2.47 doesn't. So the case passes locally and fails only on CI:
+
+    git clone -q "$REG/origin.git" "$REG/other"
+    git -C "$REG/other" fetch -q "$WT" HEAD
+    git -C "$REG/other" push -q origin "$sha":main
+
+`pr-release` (v2026.11.5) lost a release-PR CI run, a traced debug PR and a dropped release commit to this.
