@@ -1,6 +1,6 @@
 # Stacked units follow-ups
 
-**Slug:** stacked-units-followups · **Date:** 2026-11-26 · **Status:** approved
+**Slug:** stacked-units-followups · **Date:** 2026-11-26 · **Status:** implemented
 
 ## Goal
 
@@ -239,3 +239,14 @@ Code review round 1: both reviewers APPROVE.
   - Restack accepted `wt/<slug>` checked out in the primary checkout (codex MEDIUM; code-reviewer LOW).
 - **Also in followup 1:** the ARCHI line-24 LOW.
 - **LOWs left as they are:** the fork-point refusal ordering after reflog expiry, and the indirect `base is wt/p` check.
+
+Code review round 2: both reviewers APPROVE.
+- **Code-reviewer:** both new guards are pinned by mutation, and the full suite plus 23 stack cases pass under bash 3.2.
+- **Codex:** no findings.
+- **LOWs left as they are:**
+  - the with-worktree warning's `rebase -i` text isn't asserted;
+  - the no-worktree remedy takes two steps;
+  - `no worktree for` is imprecise for a primary checkout.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
