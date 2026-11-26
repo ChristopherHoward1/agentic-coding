@@ -59,3 +59,13 @@ data-contract: contracts/sales.json: column amount expected int, got '2.5'
 drift exit=1
 
 ```
+
+## Followup 1 (round-1: contract-before-notebook coordination, contract docs, three vacuous tests, LOWs)
+
+Implemented the review fixes. `nb-exec` now runs a sibling data-contract hook before executing notebooks and stops if validation fails. The contract format is documented in the hook and machine-learning profile.
+
+The tests now cover contract ordering, the data-root override, temporary `out_dir` writes, and idle hooks in missing primary subfolders. Blank CSV lines are skipped, Parquet `halffloat` maps to `float`, and the pyarrow skip is visible in gate output.
+
+`harness gate` passed: 370 script checks and 6 publish checks. The pyarrow-dependent case was skipped because pyarrow is unavailable in this environment.
+
+Orchestrator run: GATE PASS (370 / 6), "data-contract: pyarrow parquet case ran"; demo 0; ARCHI healed on the branch.
