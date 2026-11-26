@@ -32,3 +32,15 @@ c1
 Record plan for c
 
 ```
+
+## Followup 1 (round-1 MEDIUMs: git -C '' warning, primary-checkout restack, ARCHI line 24)
+
+Implemented the review fixes:
+
+- The no-fork-point warning now tells users to recreate the worktree when none exists, without printing a `git -C` command.
+- `restack` refuses when the child branch is checked out in the primary checkout.
+- Added regression tests for both cases and updated the release entry in [ARCHI.md](/Users/cboyfly/Documents/repos/agentic-coding-worktrees/stacked-units-followups/ARCHI.md).
+
+**Verification:** `harness gate` passed. No requested criteria remain partial; no out-of-scope changes were made.
+
+Gate PASS; demo 0; archi-fresh 0.
