@@ -231,3 +231,11 @@ Plan review round 3: APPROVE, with five LOWs:
 - **Applied:** the second-restack fixture edits a file added after the fork point; `stack_fork` exit >1 returns 2; output streams are named; `mainref` is resolved before the preconditions.
 - **Skipped:** the optional near-miss addition to the demo. The criteria cover it.
 Plan verdict: APPROVE
+
+Code review round 1: both reviewers APPROVE.
+- **Code-reviewer:** all 16 criteria met. Each of the 10 required mutation pins failed the suite, under bash 3.2 as well.
+- **Two MEDIUMs, sent back as followup 1:**
+  - The no-fork-point warning printed `git -C ''` when the child had no worktree. Both reviewers raised it.
+  - Restack accepted `wt/<slug>` checked out in the primary checkout (codex MEDIUM; code-reviewer LOW).
+- **Also in followup 1:** the ARCHI line-24 LOW.
+- **LOWs left as they are:** the fork-point refusal ordering after reflog expiry, and the indirect `base is wt/p` check.
