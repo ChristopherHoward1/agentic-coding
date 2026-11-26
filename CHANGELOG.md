@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.11.5] - 2026-11-26
+
+- In registry mode `harness release <slug>` now prepares the PR instead of refusing. It checks the verdicts and the `Reviewed-SHA:` that `/3-review` now records, and refuses if `wt/<slug>` moved after review or isn't based on the integration branch. It then gates that SHA and writes `work/<slug>/pr.md`. Nothing is pushed and no forge is called. `harness state` reports a registry unit done once its reviewed SHA is in the integration branch.
+- Confirm-delta: none
+
 ## [2026.11.4] - 2026-11-25
 
 - in registry mode, `harness state` takes the code-reviewer's verdict as the whole review, as Decision 2026-10-18 intended. An approved registry unit now reaches `stage: release` instead of sitting in `review`, and a review in progress points at `/3-review`. The `reviewer-set` placeholder is gone from `codex-review`, `/3-review` and `ARCHI.md`.
