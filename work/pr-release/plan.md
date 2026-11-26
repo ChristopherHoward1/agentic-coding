@@ -203,7 +203,9 @@ bash "$H" release demo
 cat "$S/work/demo/pr.md"
 [ "$before" = "$(git -C "$d/origin.git" for-each-ref)" ] && echo "origin unchanged"
 bash "$H" state demo | grep -E '^(stage|next_action):'
-git -C "$WT" push -q "$d/origin.git" HEAD:main
+git clone -q "$d/origin.git" "$d/other"
+git -C "$d/other" fetch -q "$WT" HEAD
+git -C "$d/other" push -q origin FETCH_HEAD:main
 bash "$H" state demo | grep -E '^next_action:'
 git fetch -q origin
 bash "$H" state demo | grep -E '^(stage|next_action):'
@@ -270,5 +272,13 @@ Code review round 2: both reviewers APPROVE.
 - **Code-reviewer:** all seven required mutation pins, plus five extra mutations, fail the suite. LOWs left as they are: `pr.md` mode 0600, the migration message for older registry plans without `Reviewed-SHA`, no temp-file cleanup trap, the primary-checkout path comparison, and the dense step-1 paragraph.
 - **Codex:** two MEDIUMs deferred to `deferrals.md` (fence-aware section extraction; re-capturing the SHA on each round). Both fail safe or visibly.
 
+Release PR CI failure (PR #89): Ubuntu's git 2.56 also updates the local tracking ref on a push by URL that matches `origin`, so the no-fetch state step saw `done`. A throwaway draft PR (#90, closed, branch deleted) traced it. Per Decision 2026-10-09 the `Release v2026.11.5` commit was dropped. Followup 3 then moved the test's push to a separate clone, and ARCHI was edited on the branch. The demo was moved to a separate clone too (code-reviewer round-3 LOW).
+
+Code review round 3:
+- **Code-reviewer: APPROVE.** Seven mutation pins plus three extras fail the suite under bash 3.2. Two LOWs: the demo's URL push (fixed above), and CI has not yet run on this head (the release precondition).
+- **Codex: REQUEST CHANGES**, one HIGH: the registry `/3-review` diff `git diff "$base...$reviewed"` has no `':/'` pathspec, so run from a project subfolder it "limits the diff to that subfolder".
+- **Orchestrator analysis:** the claim is false under git's defaults. Tested: from a subfolder, `git diff main...wt/x` with no pathspec listed both `app/a` and the root-level `b`. It narrows only when the user has set `diff.relative=true`. The Claude reviewer raised nothing on this behavior. The cap of 3 rounds was reached, so the disputed HIGH went to the Owner.
+
+Owner approval (2026-11-26): override codex's round-3 HIGH on the analysis above. Record the `':/'` hardening as a deferral and land it right after release as a one-line small fix on main.
 Code-review verdict: APPROVE
 Codex-review verdict: APPROVE
