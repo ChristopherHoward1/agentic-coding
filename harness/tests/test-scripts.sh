@@ -2362,6 +2362,9 @@ registry_fixture() {
   printf '#!/usr/bin/env bash\necho $UNQUOTED\n' >"$REG/repo/bad.sh"
   git -C "$REG/repo" add -A
   git -C "$REG/repo" -c user.name=t -c user.email=t@t commit -qm init
+  git init -q --bare "$REG/origin.git"
+  git -C "$REG/repo" remote add origin "$REG/origin.git"
+  git -C "$REG/repo" push -q origin main
   export HARNESS_HOME="$REG/hh"
   H="$ROOT/harness/bin/harness"
 }
@@ -2542,7 +2545,7 @@ registry_flow() {
   grep -q "registry mode has no codex reviewer; /3-review uses the code-reviewer only" "$REG/error"
   registry_run release demo 2>"$REG/error" && exit 1
   [[ $? == 1 ]] || return 1
-  grep -q pr-release "$REG/error"
+  grep -q "Code-review verdict: APPROVE" "$REG/error"
   registry_run fan-exec dispatch demo "$REG/handoff" 1 2>"$REG/error" && exit 1
   [[ $? == 1 ]] || return 1
   grep -q 'repo-mode only' "$REG/error"
@@ -2554,8 +2557,39 @@ registry_flow() {
   touch "$S/ARCHI.md"
   registry_run archi-fresh
 }
-export -f registry_subdir registry_fixture registry_run registry_lookup registry_register registry_literal registry_flow
+# shellcheck disable=SC2317,SC2329,SC2016 # Exported case runs in a child bash.
+registry_release_flow() {
+  local S WT sha before
+  registry_fixture release-flow
+  S=$(registry_run register --subdir app)
+  mkdir -p "$S/work/demo"
+  printf 'worktrees:\n  dir: %s/wts\n' "$REG" >"$S/config.yaml"
+  WT=$(registry_run worktree add demo)
+  echo change >"$WT/app/change"
+  git -C "$WT" add app/change
+  git -C "$WT" -c user.name=t -c user.email=t@t commit -qm change
+  sha=$(git -C "$WT" rev-parse HEAD)
+  printf '## Goal\n\nGoal text.\n\n## Acceptance criteria\n\n- works\n\n## Release\n\nRelease note: demo.\n\nPlan verdict: APPROVE\nCode-review verdict: APPROVE\nReviewed-SHA: %s\n' "$sha" >"$S/work/demo/plan.md"
+  touch "$S/ARCHI.md" "$S/work/demo/handoff.md"
+  before=$(git -C "$REG/origin.git" for-each-ref)
+  registry_run state demo | grep -qx 'next_action: /4-release'
+  registry_run release demo
+  [[ $(tail -n 1 "$S/work/demo/pr.md") == "Reviewed-SHA: $sha" ]]
+  grep -q "harness gate: PASS at $sha" "$S/work/demo/pr.md"
+  [[ "$before" == "$(git -C "$REG/origin.git" for-each-ref)" ]]
+  registry_run state demo | grep -qx 'next_action: merge the PR (work/demo/pr.md)'
+  git -C "$WT" push -q "$REG/origin.git" HEAD:main
+  registry_run state demo | grep -qx 'next_action: merge the PR (work/demo/pr.md)'
+  git -C "$REG/repo" fetch -q origin
+  registry_run state demo | grep -qx 'stage: done'
+  echo more >>"$WT/app/change"
+  git -C "$WT" -c user.name=t -c user.email=t@t commit -qam more
+  if registry_run release demo 2>"$REG/error"; then return 1; fi
+  grep -q 'moved after review' "$REG/error"
+}
+export -f registry_release_flow registry_subdir registry_fixture registry_run registry_lookup registry_register registry_literal registry_flow
 export ROOT TMP
+check "registry release and state flow" bash -e -c registry_release_flow
 check "registry subdir normalization and validation" bash -e -c registry_subdir
 check 'registry lookup skips unrelated stale and malformed entries under set -e' bash -e -c registry_lookup
 check 'registry register preflight and idempotent excluded imports' bash -e -c registry_register
