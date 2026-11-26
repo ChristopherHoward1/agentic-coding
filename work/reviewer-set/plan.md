@@ -1,6 +1,6 @@
 # Reviewer set by mode
 
-**Slug:** reviewer-set · **Date:** 2026-11-25 · **Status:** approved
+**Slug:** reviewer-set · **Date:** 2026-11-25 · **Status:** implemented
 
 ## Goal
 
@@ -93,7 +93,7 @@ bash "$H" codex-review demo || echo "codex-review exit=$?"
 Expected, in order:
 1. `stage: review`, then `next_action: run harness gate`.
 2. `next_action: /3-review`.
-3. `review: approve`, `stage: release`, `next_action: /4-release`.
+3. `stage: release`, `review: approve`, `next_action: /4-release` (in `state.sh`'s print order).
 4. The `registry mode has no codex reviewer` message on stderr, then `codex-review exit=2`.
 
 ## Review
@@ -107,3 +107,20 @@ Plan review round 2: APPROVE, with three LOWs:
 2. The `ponytail` comment must say registry units stay at `release` even after a hand-merged PR: applied.
 3. The ARCHI dual-vendor line is already scoped by "Repo mode retains…": no change.
 Plan verdict: APPROVE
+
+Code review round 1:
+- **Codex: REQUEST CHANGES**, one HIGH. Registry `state.sh` still read the repo-side `work/.last-released` and `retro.md`, so a repo that had once used repo mode could jump a registry unit to `/5-retro` or `done`. That path only became reachable with this unit. It was sent back as followup 1: the marker is now read in repo mode only, with a regression case.
+- **Code-reviewer: APPROVE**, with two LOWs:
+  1. `review-round` persists through followups.
+  2. No canned-reviewer marker in the registry codex-review test.
+
+Code review round 2:
+- **Codex: APPROVE.**
+- **Code-reviewer: REQUEST CHANGES**, one HIGH. The followup touched `harness/` after the last ARCHI edit, so `archi-fresh` failed. The orchestrator made a targeted ARCHI edit on the branch: registry state ignores the repo-side marker. Its four mutations, including one for the followup's guard, all failed the suite.
+
+Code review round 3: both APPROVE.
+- **Codex MEDIUM:** the `PLAN.md` roadmap and Now line. This is orchestrator work, done on the branch at release.
+- **Code-reviewer LOWs:** the same `PLAN.md` note, `review-round` precision, and the ARCHI test-summary breadth. Left as is.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
