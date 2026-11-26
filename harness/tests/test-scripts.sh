@@ -2936,20 +2936,26 @@ stack_followup_case() {
     rewritten-landed) stack_rewrite amend; stack_land rebase; target=origin/main ;;
     merge|registry-merge) stack_land merge; target=origin/main ;;
     missing) git worktree remove --force "$p"; git branch -D wt/p ;;
-    no-worktree) git worktree remove "$c" ;;
+    no-worktree|primary) git worktree remove "$c"; if [[ "$scenario" == primary ]]; then rm -rf work/p work/c; git checkout -q wt/c || return 1; fi ;;
     dirty) echo dirty >"$c/dirty" ;;
-    no-fork|warning|warning-merged) stack_rewrite amend; if [[ "$scenario" == warning-merged ]]; then stack_land merge; fi; git reflog expire --expire=now --expire-unreachable=now refs/heads/wt/p ;;
+    no-fork|warning|warning-merged|warning-no-worktree) stack_rewrite amend; if [[ "$scenario" == warning-merged ]]; then stack_land merge; fi; git reflog expire --expire=now --expire-unreachable=now refs/heads/wt/p; if [[ "$scenario" == warning-no-worktree ]]; then git worktree remove "$c"; fi ;;
     conflict) echo child >"$c/parent.txt"; git -C "$c" commit -qam conflict; stack_rewrite amend ;;
     unstacked) mkdir -p work/u; echo '# U' >work/u/plan.md ;;
   esac
   before=$(git rev-parse wt/c) || return 1
   case "$scenario" in
-    warning|warning-merged)
+    warning|warning-merged|warning-no-worktree)
       status=0; git merge-base --fork-point wt/p wt/c >/dev/null || status=$?
       [[ "$status" == 1 ]] || return 1
       status=0; bash scripts/worktree.sh base c >"$t/out" 2>"$t/err" || status=$?
       [[ "$status" == 0 && "$(cat "$t/out")" == origin/main ]] || return 1
-      grep -q 'warning: no fork point' "$t/err" || return 1; return 0 ;;
+      grep -q 'warning: no fork point' "$t/err" || return 1
+      if [[ "$scenario" == warning-no-worktree ]]; then
+        ! grep -q 'git -C' "$t/err" || return 1
+        grep -q 'harness worktree add c' "$t/err" || return 1
+        grep -q 'harness worktree base c' "$t/err" || return 1
+      fi
+      return 0 ;;
     release-hint)
       status=0; bash scripts/release.sh c >"$t/out" 2>"$t/err" || status=$?
       [[ "$status" != 0 ]] || return 1
@@ -2967,9 +2973,9 @@ stack_followup_case() {
   if [[ "$scenario" == unstacked ]]; then slug=u; else slug=c; fi
   status=0; bash scripts/worktree.sh restack "$slug" >"$t/out" 2>"$t/err" || status=$?
   case "$scenario" in
-    missing|no-worktree|dirty|no-fork|conflict|unstacked)
+    missing|no-worktree|primary|dirty|no-fork|conflict|unstacked)
       [[ "$status" == 1 && "$(git rev-parse wt/c)" == "$before" ]] || return 1
-      case "$scenario" in missing) out='wt/p is gone'; grep -q 'rebase -i' "$t/err" || return 1 ;; no-worktree) out='no worktree for' ;; dirty) out='has uncommitted changes' ;; no-fork) out='no fork point' ;; conflict) out='restack conflicted; aborted'; [[ ! -d "$(git -C "$c" rev-parse --git-path rebase-merge)" ]] || return 1 ;; unstacked) out='not stacked' ;; esac
+      case "$scenario" in missing) out='wt/p is gone'; grep -q 'rebase -i' "$t/err" || return 1 ;; no-worktree|primary) out='no worktree for' ;; dirty) out='has uncommitted changes' ;; no-fork) out='no fork point' ;; conflict) out='restack conflicted; aborted'; [[ ! -d "$(git -C "$c" rev-parse --git-path rebase-merge)" ]] || return 1 ;; unstacked) out='not stacked' ;; esac
       grep -q "$out" "$t/err" || return 1
       if [[ "$scenario" == missing ]]; then status=0; bash scripts/worktree.sh base c >"$t/out" 2>"$t/err" || status=$?; [[ "$status" == 2 ]] || return 1; grep -q 'delete the Stacked on: line' "$t/err" || return 1; grep -q 'rebase -i' "$t/err" || return 1; fi
       return 0 ;;
@@ -3015,7 +3021,7 @@ stack_near_case() {
   return "$status"
 }
 export -f stack_fixture stack_diff stack_land stack_rewrite stack_followup_case stack_near_case
-for scenario in untouched gained amended landed rewritten-landed merge second missing no-worktree dirty no-fork conflict unstacked warning warning-merged hint release-hint registry-release registry-untouched registry-amended registry-merge; do
+for scenario in untouched gained amended landed rewritten-landed merge second missing no-worktree primary dirty no-fork conflict unstacked warning warning-merged warning-no-worktree hint release-hint registry-release registry-untouched registry-amended registry-merge; do
   # shellcheck disable=SC2016
   check "stack followup $scenario" bash -e -c 'stack_followup_case "$1"' _ "$scenario"
 done
