@@ -2559,7 +2559,7 @@ registry_flow() {
 }
 # shellcheck disable=SC2317,SC2329,SC2016 # Exported case runs in a child bash.
 registry_release_flow() {
-  local S WT sha before
+  local S WT sha before repo_head
   registry_fixture release-flow
   S=$(registry_run register --subdir app)
   mkdir -p "$S/work/demo"
@@ -2572,21 +2572,118 @@ registry_release_flow() {
   printf '## Goal\n\nGoal text.\n\n## Acceptance criteria\n\n- works\n\n## Release\n\nRelease note: demo.\n\nPlan verdict: APPROVE\nCode-review verdict: APPROVE\nReviewed-SHA: %s\n' "$sha" >"$S/work/demo/plan.md"
   touch "$S/ARCHI.md" "$S/work/demo/handoff.md"
   before=$(git -C "$REG/origin.git" for-each-ref)
+  repo_head=$(git -C "$REG/repo" rev-parse HEAD)
   registry_run state demo | grep -qx 'next_action: /4-release'
   registry_run release demo
   [[ $(tail -n 1 "$S/work/demo/pr.md") == "Reviewed-SHA: $sha" ]]
+  [[ $(grep -c "^Reviewed-SHA:" "$S/work/demo/pr.md") == 1 ]]
+  grep -A1 "^## What$" "$S/work/demo/pr.md" | grep -qx "demo."
+  grep -q "Goal text." "$S/work/demo/pr.md"
   grep -q "harness gate: PASS at $sha" "$S/work/demo/pr.md"
+  [[ $(git -C "$REG/repo" rev-parse HEAD) == "$repo_head" && -z $(git -C "$REG/repo" status --porcelain) ]]
+  [[ ! -e "$REG/repo/VERSION" && ! -e "$REG/repo/CHANGELOG.md" && ! -e "$REG/repo/work/.last-released" ]]
   [[ "$before" == "$(git -C "$REG/origin.git" for-each-ref)" ]]
   registry_run state demo | grep -qx 'next_action: merge the PR (work/demo/pr.md)'
+  printf "Reviewed-SHA: different\n" >>"$S/work/demo/pr.md"
+  registry_run state demo | grep -qx 'next_action: /4-release'
+  sed -i.bak '$d' "$S/work/demo/pr.md"
   git -C "$WT" push -q "$REG/origin.git" HEAD:main
   registry_run state demo | grep -qx 'next_action: merge the PR (work/demo/pr.md)'
   git -C "$REG/repo" fetch -q origin
   registry_run state demo | grep -qx 'stage: done'
+  registry_run state demo | grep -qx 'next_action: none'
   echo more >>"$WT/app/change"
   git -C "$WT" -c user.name=t -c user.email=t@t commit -qam more
   if registry_run release demo 2>"$REG/error"; then return 1; fi
   grep -q 'moved after review' "$REG/error"
 }
+# shellcheck disable=SC2317,SC2329,SC2016 # These helpers run in child shells.
+registry_release_case() {
+  set -e
+  local scenario=$1 expected=$2 S WT sha status=0
+  registry_fixture "release-$scenario"
+  S=$(registry_run register --subdir app)
+  mkdir -p "$S/work/demo" "$S/scripts/gate.d"
+  printf 'worktrees:\n  dir: %s/wts\n' "$REG" >"$S/config.yaml"
+  WT=$(registry_run worktree add demo)
+  echo change >"$WT/app/change"
+  git -C "$WT" add app/change
+  git -C "$WT" -c user.name=t -c user.email=t@t commit -qm change
+  sha=$(git -C "$WT" rev-parse HEAD)
+  printf '## Goal\n\nGoal text.\n\n## Acceptance criteria\n\n- works\n\n## Release\n\nRelease note: demo.\n\nPlan verdict: APPROVE\nCode-review verdict: APPROVE\nReviewed-SHA: %s\n' "$sha" >"$S/work/demo/plan.md"
+  touch "$S/ARCHI.md" "$S/work/demo/handoff.md"
+  printf 'touch "%s/marker"\n' "$REG" >"$S/scripts/gate.d/marker.sh"
+  case "$scenario" in
+    no-plan) rm "$S/work/demo/plan.md" ;;
+    no-worktree) git -C "$REG/repo" worktree remove "$WT" ;;
+    no-plan-verdict) sed -i.bak '/^Plan verdict:/d' "$S/work/demo/plan.md" ;;
+    no-review-verdict) sed -i.bak '/^Code-review verdict:/d' "$S/work/demo/plan.md" ;;
+    no-sha) sed -i.bak '/^Reviewed-SHA:/d' "$S/work/demo/plan.md" ;;
+    malformed-sha) sed -i.bak 's/^Reviewed-SHA:.*/Reviewed-SHA: <sha>/' "$S/work/demo/plan.md" ;;
+    duplicate-sha) printf 'Reviewed-SHA: %s\n' "$sha" >>"$S/work/demo/plan.md" ;;
+    goal-sha) sed -i.bak "s/^Goal text./Reviewed-SHA: $sha/" "$S/work/demo/plan.md" ;;
+    misplaced-sha) sed -i.bak '/^Code-review verdict:/a\
+intervening text
+' "$S/work/demo/plan.md" ;;
+    moved) git -C "$WT" -c user.name=t -c user.email=t@t commit --allow-empty -qm moved ;;
+    dirty) echo dirty >>"$WT/app/change" ;;
+    base|dev-pass)
+      git -C "$REG/repo" checkout -qb dev
+      git -C "$REG/repo" -c user.name=t -c user.email=t@t commit --allow-empty -qm dev
+      git -C "$REG/repo" push -q origin dev
+      printf 'integration_branch: dev\n' >>"$S/config.yaml"
+      if [[ $scenario == dev-pass ]]; then
+        git -C "$WT" rebase -q origin/dev
+        sha=$(git -C "$WT" rev-parse HEAD)
+        sed -i.bak "s/^Reviewed-SHA:.*/Reviewed-SHA: $sha/" "$S/work/demo/plan.md"
+        touch "$S/ARCHI.md"
+      fi ;;
+    stacked) sed -i.bak '1i\
+Stacked on: parent
+' "$S/work/demo/plan.md" ;;
+    no-note) sed -i.bak '/^Release note:/d' "$S/work/demo/plan.md" ;;
+    missing-dev) printf 'integration_branch: dev\n' >>"$S/config.yaml" ;;
+    confirm) : ;;
+    gate-fail) echo 'exit 1' >>"$S/scripts/gate.d/marker.sh" ;;
+    stale-archi) touch -t 200001010000 "$S/ARCHI.md" ;;
+    missing-archi) rm "$S/ARCHI.md" ;;
+    gate-commit) printf 'git -c user.name=t -c user.email=t@t commit --allow-empty -qm gate\n' >>"$S/scripts/gate.d/marker.sh" ;;
+    gate-untracked) echo 'touch gate-untracked' >>"$S/scripts/gate.d/marker.sh" ;;
+  esac
+  if [[ $scenario == dev-pass ]]; then
+    registry_run release demo >"$REG/out" 2>&1
+    grep -F 'release: nothing pushed' "$REG/out" | grep -Fq 'PR to dev'
+    return
+  fi
+  # Exercise preservation of an existing PR as well as the absent-file case.
+  if [[ $scenario == gate-fail ]]; then printf 'existing PR\n' >"$S/work/demo/pr.md"; cp "$S/work/demo/pr.md" "$REG/pr-before"; fi
+  if [[ $scenario == confirm ]]; then registry_run release demo --confirm-delta reason >"$REG/out" 2>&1 || status=$?
+  else registry_run release demo >"$REG/out" 2>&1 || status=$?; fi
+  [[ $status -ne 0 ]] && grep -Fq -- "$expected" "$REG/out"
+  if [[ $scenario == stacked ]]; then grep -Fq 'land parent, rebase onto origin/main, delete the Stacked on: line, then re-run /3-review' "$REG/out"; fi
+  if [[ $scenario == gate-fail ]]; then cmp -s "$REG/pr-before" "$S/work/demo/pr.md"; else [[ ! -e "$S/work/demo/pr.md" ]]; fi
+  case "$scenario" in gate-fail|stale-archi|missing-archi|gate-commit|gate-untracked) [[ -e "$REG/marker" ]] ;; *) [[ ! -e "$REG/marker" ]] ;; esac
+}
+export -f registry_release_case registry_fixture registry_run
+export ROOT TMP
+for spec in \
+  'no-plan|missing work unit plan' 'no-worktree|must be checked out' \
+  'no-plan-verdict|Plan verdict: APPROVE' 'no-review-verdict|Code-review verdict: APPROVE' \
+  'no-sha|exactly one Reviewed-SHA line after the code-review verdict' \
+  'malformed-sha|exactly one Reviewed-SHA line after the code-review verdict' \
+  'duplicate-sha|exactly one Reviewed-SHA line after the code-review verdict' \
+  'goal-sha|exactly one Reviewed-SHA line after the code-review verdict' \
+  'misplaced-sha|exactly one Reviewed-SHA line after the code-review verdict' \
+  'moved|moved after review; re-run /3-review' 'dirty|has unstaged changes' \
+  'base|is not based on origin/dev' 'stacked|stacked on' \
+  'no-note|missing a Release note: line' 'missing-dev|integration_branch dev has no origin/dev ref' \
+  'confirm|--confirm-delta is repo-mode only' 'gate-fail|harness gate failed' \
+  'stale-archi|ARCHI.md is stale' 'missing-archi|ARCHI.md is stale' \
+  'gate-commit|moved after review' 'gate-untracked|has untracked files' 'dev-pass|unused'; do
+  check "registry release ${spec%%|*}" bash -e -c 'registry_release_case "$@"' _ "${spec%%|*}" "${spec#*|}"
+done
+# shellcheck disable=SC2016 # Child shell expands the fixture variables.
+check 'registry tag after merge refuses' bash -e -c 'registry_fixture no-tags; S=$(registry_run register --subdir app); status=0; registry_run release tag-after-merge demo >"$REG/out" 2>&1 || status=$?; [[ $status == 1 ]]; grep -Fq "the merged PR is the record" "$REG/out"'
 export -f registry_release_flow registry_subdir registry_fixture registry_run registry_lookup registry_register registry_literal registry_flow
 export ROOT TMP
 check "registry release and state flow" bash -e -c registry_release_flow
