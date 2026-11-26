@@ -177,7 +177,7 @@ Fixtures are tiny **untracked** CSVs in the primary checkout, gitignored so that
 
 ## Release
 
-Release note: Two opt-in example gate hooks for data-science repos. `nb-exec.sh` runs listed notebooks through papermill in smoke mode (`-p data_dir <primary checkout> -p smoke 1`) with outputs kept out of the repo. `data-contract.sh` checks committed JSON contracts (columns, dtypes, row range) against the real CSV or Parquet data in the primary checkout. The `machine-learning` and `work-slim` profiles gain `NOTEBOOK_EXEC` and `DATA_CONTRACTS` declarations.
+Release note: Two opt-in example gate hooks for data-science repos. `nb-exec.sh` runs listed notebooks through papermill in smoke mode (`-p data_dir <primary checkout> -p smoke 1`) with outputs kept out of the repo. `data-contract.sh` checks committed JSON contracts (columns, dtypes, row range) against the real CSV or Parquet data in the primary checkout. The `machine-learning`, `work-slim` and `work` profiles gain `NOTEBOOK_EXEC` and `DATA_CONTRACTS` declarations. This release also carries two small fixes from `main`: `TEST_FILTER=<ERE>` lets the code-reviewer run each mutation against matching cases (the gate always runs the whole suite), and the registry `/3-review` diff gets a `':/'` root pathspec.
 
 ## Demonstration
 
