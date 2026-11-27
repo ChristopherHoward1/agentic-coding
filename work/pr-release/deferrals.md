@@ -11,3 +11,4 @@
 - **Code review round 3, codex HIGH, overridden by the Owner: add a `':/'` root pathspec to the registry `/3-review` diff.**
   - **The claim:** under git's defaults, `git diff A...B` from a subfolder already covers the whole tree. Only a user-set `diff.relative=true` narrows it.
   - **Lands in:** a one-line small fix on main straight after v2026.11.5. It changes `git diff "$base...$reviewed"` to `git diff "$base...$reviewed" -- ':/'`, matching the repo-mode line.
+  - **Closed** by small fix #91, shipped in v2026.11.7: `/3-review` step 1 uses `-- ':/'` in registry mode.
