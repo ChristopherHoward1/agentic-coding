@@ -3179,6 +3179,8 @@ contract_case() (
     pass) bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
     cap) printf '3,abc,true,x\n' >>"$NBT/repo/sub/data/a.csv"; sed 's/\[2,2\]/[3,3]/' contracts/a.json >contracts/b.json; rm contracts/a.json; DATA_CONTRACT_SCAN_ROWS=2 bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
     wide) printf '3,4.0,true,x,surplus\n' >>"$NBT/repo/sub/data/a.csv"; sed 's/\[2,2\]/[3,3]/; s/"rows"/"extra_columns":"allow","rows"/' contracts/a.json >contracts/b.json; rm contracts/a.json; bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    wide-after-cap) printf '3,4.0,true,x,surplus\n' >>"$NBT/repo/sub/data/a.csv"; sed 's/\[2,2\]/[3,3]/' contracts/a.json >contracts/b.json; rm contracts/a.json; DATA_CONTRACT_SCAN_ROWS=2 bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
+    wide-twice) printf '3,4.0,true,x,surplus\n4,5.0,true,x,surplus\n' >>"$NBT/repo/sub/data/a.csv"; sed 's/\[2,2\]/[4,4]/' contracts/a.json >contracts/b.json; rm contracts/a.json; bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
     missing-column) sed 's/"date":"any"/"absent":"any"/' contracts/a.json >contracts/b.json; rm contracts/a.json; bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
     extra) sed 's/,"date":"any"//' contracts/a.json >contracts/b.json; rm contracts/a.json; bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
     allow) sed 's/,"date":"any"//; s/"rows"/"extra_columns":"allow","rows"/' contracts/a.json >contracts/b.json; rm contracts/a.json; bash "$ROOT/harness/examples/gate.d/data-contract.sh" ;;
@@ -3203,9 +3205,11 @@ if python3 -I -c 'import pyarrow' 2>/dev/null; then echo 'data-contract: pyarrow
 for scenario in pass override cap allow arrow blank idle-subdir; do check "data-contract $scenario" contract_case "$scenario"; done
 # shellcheck disable=SC2016
 check 'data-contract idle' bash -c 'out=$(contract_case idle) || exit 1; grep -q "no contracts" <<<"$out"'
-for pair in 'missing-column:missing column' 'wide:row 3 has 5 fields, header has 4' 'extra:extra column' 'int:expected int' 'float:expected float' 'bool:expected bool' 'under:row count' 'over:row count' 'missing:primary checkout' 'malformed:bad contract' 'unsupported:unsupported format' 'no-arrow:parquet needs pyarrow'; do
+for pair in 'missing-column:missing column' 'wide:row 3 has 5 fields, header has 4' 'wide-after-cap:row 3 has 5 fields, header has 4' 'extra:extra column' 'int:expected int' 'float:expected float' 'bool:expected bool' 'under:row count' 'over:row count' 'missing:primary checkout' 'malformed:bad contract' 'unsupported:unsupported format' 'no-arrow:parquet needs pyarrow'; do
   check_exit "data-contract ${pair%%:*}" 1 "${pair#*:}" contract_case "${pair%%:*}"
 done
+# shellcheck disable=SC2016
+check 'data-contract wide-twice' bash -c 'err=$(contract_case wide-twice 2>&1 >/dev/null); s=$?; [[ $s -eq 1 ]] || exit 1; [[ $(grep -c "row [0-9]* has [0-9]* fields, header has [0-9]*" <<<"$err") -eq 1 ]] || exit 1; grep -q "row 3 has 5 fields, header has 4" <<<"$err"'
 # shellcheck disable=SC2016
 check 'data-contract reports both contracts' bash -c 'err=$(contract_case both 2>&1 >/dev/null); s=$?; [[ $s -eq 1 ]] || exit 1; grep -q a.json <<<"$err" || exit 1; grep -q b.json <<<"$err"'
 
