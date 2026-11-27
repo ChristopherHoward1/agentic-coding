@@ -3,7 +3,8 @@
 # Example: {"path":"data/sales.csv","columns":{"id":"int","amount":"float"},"rows":[1,null],"extra_columns":"forbid"}
 # path is relative to the data root; columns maps names to int, float, str,
 # bool, or any (presence only). rows is [min, max], with null for no maximum;
-# CSV headers are excluded, and a CSV row wider than its header fails.
+# CSV headers are excluded, and a CSV row wider than its header fails even
+# beyond the DATA_CONTRACT_SCAN_ROWS type-check limit.
 # extra_columns is forbid (default) or allow.
 set -uo pipefail
 : "${DATA_CONTRACT_DIR=contracts}" "${DATA_CONTRACT_SCAN_ROWS=100000}"
@@ -76,11 +77,11 @@ for filename in contracts:
                     if not row:
                         continue
                     count += 1
-                    if count > scan:
-                        continue
                     if len(row) > len(names) and not wide:
                         error(f'{filename}: row {count} has {len(row)} fields, header has {len(names)}')
                         wide = True
+                    if count > scan:
+                        continue
                     for i, name in enumerate(names):
                         dtype = columns.get(name, 'any')
                         value = row[i] if i < len(row) else ''
