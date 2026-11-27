@@ -2578,7 +2578,7 @@ registry_release_flow() {
   git -C "$WT" add app/change
   git -C "$WT" -c user.name=t -c user.email=t@t commit -qm change
   sha=$(git -C "$WT" rev-parse HEAD)
-  printf '## Goal\n\nGoal text.\n\n## Acceptance criteria\n\n- works\n\n## Release\n\nRelease note: demo.\n\nPlan verdict: APPROVE\nCode-review verdict: APPROVE\nReviewed-SHA: %s\n' "$sha" >"$S/work/demo/plan.md"
+  printf '## Goal\n\nGoal text.\n\n```md\n## Fenced goal\n```\n\nGoal tail.\n\n## Acceptance criteria\n\n- works\n\n~~~~\n## Fenced criterion\n~~~\n## Still fenced\n~~~~\n\n- criteria tail\n\n## Release\n\nRelease note: demo.\n\nPlan verdict: APPROVE\nCode-review verdict: APPROVE\nReviewed-SHA: %s\n' "$sha" >"$S/work/demo/plan.md"
   touch "$S/ARCHI.md" "$S/work/demo/handoff.md"
   before=$(git -C "$REG/origin.git" for-each-ref)
   repo_head=$(git -C "$REG/repo" rev-parse HEAD)
@@ -2590,6 +2590,9 @@ registry_release_flow() {
   grep -A1 "^## What$" "$S/work/demo/pr.md" | grep -qx "demo." || return 1
   awk '/^## Why$/ {on=1; next} /^## / && on {exit} on {print}' "$S/work/demo/pr.md" | grep -Fxq "Goal text." || return 1
   grep -q "harness gate: PASS at $sha" "$S/work/demo/pr.md" || return 1
+  awk '/^## How verified$/ {exit} {print}' "$S/work/demo/pr.md" | grep -Fxq "Goal tail." || return 1
+  awk '/^## How verified$/ {on=1} /^## Out of scope$/ {exit} on {print}' "$S/work/demo/pr.md" | grep -Fxq -- "- criteria tail" || return 1
+  ! grep -q '^Plan verdict' "$S/work/demo/pr.md" || return 1
   [[ $(git -C "$REG/repo" rev-parse HEAD) == "$repo_head" && -z $(git -C "$REG/repo" status --porcelain) ]] || return 1
   [[ $(git -C "$WT" rev-parse HEAD) == "$wt_head" ]] || return 1
   [[ ! -e "$REG/repo/VERSION" && ! -e "$REG/repo/CHANGELOG.md" && ! -e "$REG/repo/work/.last-released" ]] || return 1

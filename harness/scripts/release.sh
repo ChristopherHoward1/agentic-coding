@@ -65,6 +65,22 @@ next_version() {
   fi
 }
 
+# Prints the body of a plan's "## <title>" section. Headings inside ``` or ~~~
+# fences don't count, matching demo.sh's fence rule.
+plan_section() {
+  awk -v title="$1" '
+    fence != "" {
+      if (index($0, fence) == 1 && substr($0, length(fence) + 1) ~ ("^[" substr(fence, 1, 1) "]*[[:space:]]*$")) fence = ""
+      if (on) print
+      next
+    }
+    match($0, /^(```+|~~~+)/) { fence = substr($0, 1, RLENGTH); if (on) print; next }
+    !on && $0 ~ ("^## " title "[[:space:]]*$") { on = 1; next }
+    on && /^## / { exit }
+    on { print }
+  ' "$2"
+}
+
 extract_release_note() {
   local plan_path="$1"
   local note
@@ -340,9 +356,9 @@ registry_release() {
   tmp=$(mktemp "$STATE_DIR/work/$slug/.pr.XXXXXX")
   {
     printf '## What\n%s\n\n## Why\n' "$note"
-    awk '/^## Goal[[:space:]]*$/ {on=1; next} /^## / && on {exit} on {print}' "$plan"
+    plan_section "Goal" "$plan"
     printf '\n## How verified\n- harness gate: PASS at %s\n- Code review: APPROVE by a fresh code-reviewer at %s\n\nAcceptance criteria the reviewer checked against at %s:\n' "$reviewed" "$reviewed" "$reviewed"
-    awk '/^## Acceptance criteria[[:space:]]*$/ {on=1; next} /^## / && on {exit} on {print}' "$plan"
+    plan_section "Acceptance criteria" "$plan"
     printf '\n## Out of scope\n_Fill in before opening the PR._\n\nReviewed-SHA: %s\n' "$reviewed"
   } >"$tmp"
   mv "$tmp" "$target"
