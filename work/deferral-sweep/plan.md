@@ -14,7 +14,7 @@ The Owner asked for this release. Done = a release whose note names all three, f
 
 ## Approach
 
-A release-only unit with no behavior change. The branch carries this plan, the orchestrator's `PLAN.md` Now line and a targeted `ARCHI.md` edit. #100 touched `harness/` after #99's ARCHI edit, so ARCHI is stale at `origin/main`. Following the 2026-11-23 decision, the code-reviewer also reads `git diff v2026.11.7..origin/main`, the range being released, because small fixes ship unreviewed.
+A release-only unit; its only behavior change is the round-1 wide-row fix. The branch carries this plan, the orchestrator's `PLAN.md` Now line and a targeted `ARCHI.md` edit. #100 touched `harness/` after #99's ARCHI edit, so ARCHI is stale at `origin/main`. Following the 2026-11-23 decision, the code-reviewer also reads `git diff v2026.11.7..origin/main`, the range being released, because small fixes ship unreviewed.
 
 ## Footprint
 
