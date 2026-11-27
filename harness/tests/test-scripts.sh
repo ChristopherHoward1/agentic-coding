@@ -3153,6 +3153,7 @@ nb_case() (
     missing) NB_EXEC_NOTEBOOKS=absent bash "$ROOT/harness/examples/gate.d/nb-exec.sh" ;;
     no-parameters) printf '{"cells":[],"metadata":{"papermill":{"parameters":{}}}}' >nb/a.ipynb; NB_EXEC_NOTEBOOKS=nb/a.ipynb bash "$ROOT/harness/examples/gate.d/nb-exec.sh"; rc=$?; [[ ! -s "$NBT/argv" ]] || return 2; return "$rc" ;;
     no-papermill) mkdir "$NBT/restricted"; for x in bash git mktemp tail dirname; do ln -s "$(command -v "$x")" "$NBT/restricted/$x" || return 1; done; PATH="$NBT/restricted" NB_EXEC_NOTEBOOKS=nb/a.ipynb /bin/bash "$ROOT/harness/examples/gate.d/nb-exec.sh" ;;
+    tmpdir-slash) NB_EXEC_NOTEBOOKS=nb/a.ipynb TMPDIR="$TMPDIR/" bash "$ROOT/harness/examples/gate.d/nb-exec.sh" >/dev/null || return 1; grep -F "$TMPDIR/nb-exec." "$NBT/argv" || return 1; ! grep -F '//nb-exec.' "$NBT/argv" || return 1 ;;
     success|override) export NB_EXEC_NOTEBOOKS=nb/a.ipynb NB_EXEC_KERNEL=testkernel; if [[ "$scenario" == override ]]; then mkdir -p "$NBT/override/data" || return 1; cp "$NBT/repo/sub/data/a.csv" "$NBT/override/data/a.csv" || return 1; export NB_DATA_ROOT="$NBT/override"; fi; out=$(bash "$ROOT/harness/examples/gate.d/nb-exec.sh") || return 1; [[ "$out" == *'nb-exec: ok nb/a.ipynb'* ]] || return 1; grep -Fx -- '--cwd' "$NBT/argv" || return 1; grep -Fx 'nb' "$NBT/argv" || return 1; grep -Fx 'smoke' "$NBT/argv" || return 1; grep -Fx '1' "$NBT/argv" || return 1; grep -Fx '600' "$NBT/argv" || return 1; grep -Fx 'testkernel' "$NBT/argv" || return 1; if [[ "$scenario" == override ]]; then grep -Fx "$NBT/override" "$NBT/argv" || return 1; else grep -Fx "$NBT/repo/sub" "$NBT/argv" || return 1; fi; grep -F "$TMPDIR/nb-exec." "$NBT/argv" || return 1; [[ -z "$(git status --porcelain)" ]] || return 1 ;;
     failure)
       printf '{"cells":[{"metadata":{"tags":["parameters"]},"source":"RAISE"}]}' >nb/a.ipynb
@@ -3193,7 +3194,7 @@ contract_case() (
 )
 export ROOT TMP
 export -f notebook_fixture nb_case contract_case
-for scenario in idle idle-subdir success override failure contracts-fail contracts-pass; do check "nb-exec $scenario" nb_case "$scenario"; done
+for scenario in idle idle-subdir success override tmpdir-slash failure contracts-fail contracts-pass; do check "nb-exec $scenario" nb_case "$scenario"; done
 check_exit 'nb-exec missing notebook' 1 'missing notebook' nb_case missing
 check_exit 'nb-exec no parameters' 1 'has no parameters-tagged cell' nb_case no-parameters
 check_exit 'nb-exec missing papermill' 1 'papermill not found' nb_case no-papermill

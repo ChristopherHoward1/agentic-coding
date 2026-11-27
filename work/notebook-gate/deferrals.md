@@ -6,7 +6,7 @@
   - **Closed** 2026-11-27 by small fix `csv-wide-rows`: a wider row fails the contract whatever `extra_columns` says, and only the first such row is reported.
 - **Code review round 2, code-reviewer LOWs:**
   - the `halffloat` mapping is untested (local-only, needs pyarrow);
-  - the `${TMPDIR%/}` trailing-slash fix is untested;
+  - the `${TMPDIR%/}` trailing-slash fix is untested (**closed** 2026-11-27: the `nb-exec tmpdir-slash` test pins it, and fails when the fix is reverted);
   - contracts run twice when both hooks are enabled;
   - nb-exec tests depend on the sibling contract hook.
 
