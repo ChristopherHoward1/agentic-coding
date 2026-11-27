@@ -1,6 +1,6 @@
 # Deferral sweep: release the merged small fixes
 
-**Slug:** deferral-sweep · **Date:** 2026-11-27 · **Status:** approved
+**Slug:** deferral-sweep · **Date:** 2026-11-27 · **Status:** implemented
 
 ## Goal
 
@@ -47,3 +47,11 @@ Owner approval (2026-11-27): release the merged small fixes #98–#100 to the te
 Plan verdict: APPROVE
 
 Code review round 1: both APPROVE. Codex MEDIUM: the wide-row check ran only on the first `DATA_CONTRACT_SCAN_ROWS` rows, so the release note overstated it. Fixed, not qualified, because every row is already parsed for the row count, so the check costs nothing. Code-reviewer LOWs: 1, "first wide row only" was unpinned, so it's fixed together with the MEDIUM; 3, the Goal and criterion 2 overstated the closures, so the wording is fixed; 4, the pr-release `':/'` entry had no Closed line, so one is added. LOW 2 is left as it is: an unclosed fence copies the rest of the plan into `pr.md`, the same as `demo.sh`'s rule, and the real `Reviewed-SHA:` is still written last. The fix changes behavior, so a fresh round 2 follows.
+
+Code review round 2: codex APPROVE, no findings. Code-reviewer APPROVE: the gate passed at `eb87e39`, and three mutations each failed their test (late wide row, `and not wide`, `TMPDIR`). Its three LOWs are left as they are:
+1. The `':/'` closure line says v2026.11.7, but #91 shipped in v2026.11.6. This is fixed in the retro, since it's ledger wording.
+2. Criterion 1 cites only the released range, but the scan-limit clause in the note comes from this branch's own round-1 fix. The note is correct for what ships.
+3. The #98 closure line overstated "whatever `extra_columns` says" until this branch's fix made it true.
+
+Code-review verdict: APPROVE
+Codex-review verdict: APPROVE
