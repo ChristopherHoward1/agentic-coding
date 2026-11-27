@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project are documented in this file.
+## [2026.11.8] - 2026-11-27
+
+- Ships three small fixes that close the open MEDIUM notebook-gate and pr-release deferrals. `data-contract.sh` fails a CSV row with more fields than its header, whatever `extra_columns` says and however far past the `DATA_CONTRACT_SCAN_ROWS` type-check limit it sits; only the first such row is reported. `harness release` builds `pr.md` from the plan's Goal and Acceptance criteria without stopping at a `## ` line inside a fenced block. `/3-review` re-captures the reviewed SHA every round, and a new test pins `nb-exec`'s `TMPDIR` trailing-slash handling.
+- Confirm-delta: none
+
 ## [2026.11.7] - 2026-11-26
 
 - Two opt-in example gate hooks for data-science repos. `nb-exec.sh` runs listed notebooks through papermill in smoke mode (`-p data_dir <primary checkout> -p smoke 1`) with outputs kept out of the repo. `data-contract.sh` checks committed JSON contracts (columns, dtypes, row range) against the real CSV or Parquet data in the primary checkout. The `machine-learning`, `work-slim` and `work` profiles gain `NOTEBOOK_EXEC` and `DATA_CONTRACTS` declarations. This release also carries two small fixes from `main`: `TEST_FILTER=<ERE>` lets the code-reviewer run each mutation against matching cases (the gate always runs the whole suite), and the registry `/3-review` diff gets a `':/'` root pathspec.
